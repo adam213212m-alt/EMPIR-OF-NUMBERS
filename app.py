@@ -5,13 +5,13 @@ import time
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'empire_fireworks_key_2026'
+app.secret_key = 'empire_stable_balance_key_2026'
 
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
 
 def init_db():
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -128,6 +128,7 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
+    # التأكد من عدم إعادة ضبط رصيد الأدمن إن كان موجوداً مسبقاً
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -139,6 +140,7 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
+    # إنشاء الحسابات الـ 100 مرة واحدة فقط دون إعادة كتابتها إن وجدت
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
@@ -153,7 +155,7 @@ def init_db():
 init_db()
 
 def check_auto_draw_board():
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT forced_admin_number FROM game_board_state WHERE id=1")
     f_res = cursor.fetchone()
@@ -190,7 +192,7 @@ def check_auto_draw_board():
     conn.close()
 
 def check_and_auto_draw_game_three():
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT is_full, timer_end, forced_admin_slot FROM game_three_state WHERE id=1")
     state = cursor.fetchone()
@@ -229,7 +231,7 @@ def check_and_auto_draw_game_three():
     conn.close()
 
 def get_or_create_scratch_game(username):
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT hidden_numbers, selected_boxes, game_status, message FROM scratch_games WHERE username=?", (username,))
     row = cursor.fetchone()
@@ -272,7 +274,7 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         
-        conn = sqlite3.connect('empire_ultimate.db')
+        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
         user = cursor.fetchone()
@@ -308,9 +310,10 @@ def dashboard():
             check_auto_draw_board()
 
         username = session['username']
-        conn = sqlite3.connect('empire_ultimate.db')
+        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
         cursor = conn.cursor()
         
+        # جلب الرصيد المحدث مباشرة من قاعدة البيانات لضمان عدم ضياعه
         cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
         res = cursor.fetchone()
         user_balance = res[0] if res else 0
@@ -381,7 +384,7 @@ def admin_panel():
     if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
     
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT username, password, balance, role, created_by FROM users")
     all_users = cursor.fetchall()
@@ -416,7 +419,7 @@ def pick_number(num):
     if 'username' not in session:
         return redirect(url_for('login'))
     username = session['username']
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
@@ -450,7 +453,7 @@ def pick_game_three(slot_id):
     if 'username' not in session:
         return redirect(url_for('login'))
     username = session['username']
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
@@ -491,7 +494,7 @@ def play_scratch(box_index):
     if 'username' not in session:
         return redirect(url_for('login'))
     username = session['username']
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
@@ -567,7 +570,7 @@ def play_scratch(box_index):
 def reset_scratch():
     if 'username' not in session:
         return redirect(url_for('login'))
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
     random.shuffle(nums)
@@ -584,7 +587,7 @@ def admin_set_forced():
     f_num = request.form.get('forced_number', '').strip()
     f_slot = request.form.get('forced_slot', '').strip()
     
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("UPDATE game_board_state SET forced_admin_number=? WHERE id=1", (f_num,))
     cursor.execute("UPDATE game_three_state SET forced_admin_slot=? WHERE id=1", (f_slot,))
@@ -600,7 +603,7 @@ def create_user():
     new_pass = request.form.get('new_pass', '').strip()
     role = request.form.get('account_role', 'class_b')
     
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, ?, ?)",
@@ -617,7 +620,7 @@ def recharge_user():
         return "غير مسموح", 403
     amt = float(request.form['amount'])
     t_user = request.form['target_user']
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET balance = balance - ? WHERE username='admin'", (amt,))
     cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (amt, t_user))
@@ -631,7 +634,7 @@ def withdraw_user():
         return "غير مسموح", 403
     t_user = request.form['target_user']
     amount = float(request.form['amount'])
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT balance FROM users WHERE username=?", (t_user,))
     res = cursor.fetchone()
@@ -648,7 +651,7 @@ def change_password():
         return "غير مسموح", 403
     t_user = request.form['target_user']
     new_pass = request.form['new_password'].strip()
-    conn = sqlite3.connect('empire_ultimate.db')
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET password=? WHERE username=?", (new_pass, t_user))
     conn.commit()
@@ -685,7 +688,6 @@ DASHBOARD_PAGE = """
         .luxury-game-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .luxury-game-section h2 { color: #fbbf24; margin: 0; font-size: 24px; }
         
-        /* العداد والتنازلي ورولات اللعبة الملكية باليمين */
         .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
         .roulette-circle { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle, #fbbf24, #b45309); border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; animation: spinRoulette 1.5s infinite linear; }
         @keyframes spinRoulette { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -795,7 +797,6 @@ DASHBOARD_PAGE = """
                         <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى - جائزة 200$)</h2>
                         <p style="color: #cbd5e1; font-size: 13px; margin: 5px 0 0 0;">قيمة الرقم الواحد: 50$</p>
                     </div>
-                    <!-- الجانب الأيمن: العداد التنازل ورولات الأرقام الخمسة -->
                     <div class="luxury-right-panel">
                         {% if g3_is_full %}
                         <div style="text-align: center;">
@@ -890,7 +891,6 @@ DASHBOARD_PAGE = """
             </div>
         </div>
 
-        <!-- سجل الفائزين -->
         <div class="winners-sidebar">
             <h3>🏆 لوحة شرف الفائزين</h3>
             {% if winners_records %}
