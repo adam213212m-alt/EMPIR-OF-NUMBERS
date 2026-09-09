@@ -289,7 +289,6 @@ def dashboard():
 
         conn.close()
     except Exception as e:
-        # حماية إضافية لتفادي أي خطأ مفاجئ وإعادة توجيه الدخول بلطف
         session.clear()
         return redirect(url_for('login'))
 
@@ -784,7 +783,8 @@ DASHBOARD_PAGE = """
                         {% endfor %}
                     </div>
                     {% if scratch_status == 'finished' %}
-                    <form action="/reset_shutdown" method="POST"> <!-- تم التصحيح إلى reset_scratch -->
+                    <form action="/reset_scratch" method="POST">
+                        <button type="submit" style="width: 100%; padding: 10px; background: #8b5cf6; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">🔄 محاولة جديدة (1$)</button>
                     </form>
                     {% endif %}
                 </div>
@@ -918,7 +918,7 @@ ADMIN_PAGE = """
             </div>
 
             <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
-                <h4 style="color: #fbbf24; margin-top: 0;">💎 اللعبة الملكية (تحديد فائز سري وخاص):</h4>
+                <h4 style="color: #fbbf24; luxury-game-section; color: #fbbf24; margin-top: 0;">💎 اللعبة الملكية (تحديد فائز سري وخاص):</h4>
                 <form action="/draw_game_three" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
                     <select name="forced_slot">
                         <option value="">-- اختياري: حدد الخانة الفائزة سراً --</option>
@@ -943,7 +943,7 @@ ADMIN_PAGE = """
                 <td><b>{{ u[0] }}</b></td>
                 <td><code style="background: #000; padding: 3px 6px; border-radius: 4px; color: #facc15;">{{ u[1] }}</code></td>
                 <td><span style="color: #34d399; font-weight: bold;">${{ u[2] }}</span></td>
-                <td>{{ u[3]‬‬</td>
+                <td>{{ u[3] }}</td>
                 <td>{{ u[4] }}</td>
             </tr>
             {% endfor %}
@@ -963,7 +963,7 @@ LOGIN_PAGE = """
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1e293b; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 320px; text-align: center; border: 1px solid #334155; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin0-top: 10px; font-size: 16px; }
         .error { color: #ef4444; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
@@ -972,7 +972,7 @@ LOGIN_PAGE = """
         <h2 style="color: #fbbf24; margin-top: 0;">👑 امبراطورية الأرقام</h2>
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="POST">
-            <input type="text" name="username" placeholder="اسم المستخدم" requried>
+            <input type="text" name="username" placeholder="اسم المستخدم" required>
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول</button>
         </form>
