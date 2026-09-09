@@ -1,11 +1,11 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session
+from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
 import sqlite3
 import random
 import time
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'empire_stable_balance_key_2026'
+app.secret_key = 'empire_smooth_play_key_2026'
 
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
@@ -128,7 +128,6 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
-    # التأكد من عدم إعادة ضبط رصيد الأدمن إن كان موجوداً مسبقاً
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -140,14 +139,14 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
-    # إنشاء الحسابات الـ 100 مرة واحدة فقط دون إعادة كتابتها إن وجدت
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
-        if not cursor.fetchone():
-            rand_pass = f"emp{random.randint(100000, 999999)}"
+        row = cursor.fetchone()
+        if not row:
+            fixed_rand_pass = f"us11${random.randint(100, 999)}"
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, 'class_b', 'admin')", 
-                           (uname, rand_pass))
+                           (uname, fixed_rand_pass))
 
     conn.commit()
     conn.close()
@@ -176,15 +175,15 @@ def check_auto_draw_board():
             winning_number = random.randint(1, 50)
             
     if winning_number:
-        banner_end_time = time.time() + 20
+        banner_end_time = time.time() + 25
         if winner_owner:
             cursor.execute("UPDATE users SET balance = balance + 80.0 WHERE username=?", (winner_owner,))
-            msg = f"🎉 مبروك للرقم {winning_number} - الفائز {winner_owner} ربح 80$! 🎉"
+            msg = f"🎉 مبروك للرقم الحظ {winning_number} - الفائز {winner_owner} ربح 80$ وتم إرسال المبلغ لحسابك فوراً! 🎆"
             cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                            ("لوحة أرقام الحظ (80$)", f"الرقم {winning_number} - الفائز: {winner_owner} (80$)", time.strftime('%Y-%m-%d %H:%M')))
             cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 80.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
         else:
-            msg = f"🎆 مبروك للرقم {winning_number} (ولم يكن محجوزاً لأحد)."
+            msg = f"🎆 مبروك للرقم الحظ {winning_number} (ولم يكن محجوزاً لأحد)."
             
         cursor.execute("UPDATE game_board SET status='available', owner=NULL")
         cursor.execute("UPDATE game_board_state SET last_winner_msg=?, banner_end_time=?, forced_admin_number='' WHERE id=1", (msg, banner_end_time))
@@ -215,10 +214,10 @@ def check_and_auto_draw_game_three():
                     winning_slot = random.randint(1, 5)
                     
             if winning_slot:
-                banner_end_time = time.time() + 20
+                banner_end_time = time.time() + 25
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
-                    msg = f"🏆 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$! 🏆"
+                    msg = f"🏆 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$ وتم إرسال المبلغ لحسابك فوراً! 🎉"
                     cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                                    ("اللعبة الملكية الفاخرة (200$)", f"الخانة {winning_slot} - الفائز: {winner_owner} (200$)", time.strftime('%Y-%m-%d %H:%M')))
                     cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 200.0 WHERE game_name=?", ("اللعبة الملكية الفاخرة (200$)",))
@@ -267,6 +266,61 @@ def manifest():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
+# نقطة API لتحديث البيانات في الخلفية دون إعادة تحميل الصفحة
+@app.route('/api/sync')
+def api_sync():
+    if 'username' not in session:
+        return jsonify({'error': 'unauthorized'})
+    
+    check_and_auto_draw_game_three()
+    now_beirut = get_beirut_time()
+    if now_beirut.hour == 21 and now_beirut.minute == 0:
+        check_auto_draw_board()
+
+    username = session['username']
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    res = cursor.fetchone()
+    balance = res[0] if res else 0
+
+    cursor.execute("SELECT number, status, owner FROM game_board")
+    board = cursor.fetchall()
+
+    cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
+    user_locked = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_board_state WHERE id=1")
+    board_state = cursor.fetchone()
+    board_msg = board_state[0] if board_state else ""
+
+    cursor.execute("SELECT slot_id, status, owner FROM game_three")
+    g3_slots = cursor.fetchall()
+
+    cursor.execute("SELECT is_full, timer_end, last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
+    g3_state = cursor.fetchone()
+    g3_is_full = g3_state[0]
+    g3_timer_end = g3_state[1]
+    g3_msg = g3_state[2]
+    g3_rem = max(0, int(g3_timer_end - time.time())) if g3_is_full else 0
+
+    cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
+    winners = cursor.fetchall()
+
+    conn.close()
+    return jsonify({
+        'balance': balance,
+        'board': board,
+        'user_locked': user_locked,
+        'board_msg': board_msg,
+        'g3_slots': g3_slots,
+        'g3_is_full': g3_is_full,
+        'g3_rem': g3_rem,
+        'g3_msg': g3_msg,
+        'winners': winners
+    })
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     error = None
@@ -302,77 +356,26 @@ def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    try:
-        check_and_auto_draw_game_three()
-        
-        now_beirut = get_beirut_time()
-        if now_beirut.hour == 21 and now_beirut.minute == 0:
-            check_auto_draw_board()
+    username = session['username']
+    role = session['role']
+    password = session['password'] if role == 'admin' else '******' # إخفاء الباسورد عن غير الأدمن
 
-        username = session['username']
-        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-        cursor = conn.cursor()
-        
-        # جلب الرصيد المحدث مباشرة من قاعدة البيانات لضمان عدم ضياعه
-        cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-        res = cursor.fetchone()
-        user_balance = res[0] if res else 0
-        session['balance'] = user_balance
-        
-        cursor.execute("SELECT number, status, owner FROM game_board")
-        board = cursor.fetchall()
-
-        cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
-        user_locked_numbers = [row[0] for row in cursor.fetchall()]
-        user_total_spent = len(user_locked_numbers) * 2.0
-
-        cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_board_state WHERE id=1")
-        board_state = cursor.fetchone()
-        board_last_winner_msg = board_state[0] if board_state else ""
-        board_banner_end = board_state[1] if board_state else 0
-        show_board_banner = time.time() < board_banner_end
-
-        cursor.execute("SELECT slot_id, status, owner FROM game_three")
-        game_three_slots = cursor.fetchall()
-
-        cursor.execute("SELECT is_full, timer_end, last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
-        g3_state = cursor.fetchone()
-        g3_is_full = g3_state[0]
-        g3_timer_end = g3_state[1]
-        g3_last_winner = g3_state[2]
-        banner_end_time = g3_state[3]
-        
-        show_g3_banner = time.time() < banner_end_time
-        current_time = time.time()
-        g3_remaining_time = max(0, int(g3_timer_end - current_time)) if g3_is_full else 0
-
-        cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
-        winners_records = cursor.fetchall()
-
-        conn.close()
-    except Exception as e:
-        session.clear()
-        return redirect(url_for('login'))
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    res = cursor.fetchone()
+    user_balance = res[0] if res else 0
+    session['balance'] = user_balance
+    conn.close()
 
     hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
     not_enough_msg = request.args.get('not_enough', '')
 
     return render_template_string(DASHBOARD_PAGE, 
                                   username=username,
-                                  password=session.get('password', ''),
-                                  role=session.get('role', 'class_b'), 
+                                  password=password,
+                                  role=role, 
                                   balance=user_balance, 
-                                  board=board,
-                                  user_locked_numbers=user_locked_numbers,
-                                  user_total_spent=user_total_spent,
-                                  board_last_winner_msg=board_last_winner_msg,
-                                  show_board_banner=show_board_banner,
-                                  game_three_slots=game_three_slots,
-                                  g3_is_full=g3_is_full,
-                                  g3_remaining_time=g3_remaining_time,
-                                  g3_last_winner=g3_last_winner,
-                                  show_g3_banner=show_g3_banner,
-                                  winners_records=winners_records,
                                   hidden_nums=hidden_nums,
                                   selected_boxes=selected_boxes,
                                   scratch_status=scratch_status,
@@ -688,9 +691,13 @@ DASHBOARD_PAGE = """
         .luxury-game-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .luxury-game-section h2 { color: #fbbf24; margin: 0; font-size: 24px; }
         
-        .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
-        .roulette-circle { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle, #fbbf24, #b45309); border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; animation: spinRoulette 1.5s infinite linear; }
-        @keyframes spinRoulette { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
+        
+        .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .big-wheel-container { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 8px solid #fbbf24; background: radial-gradient(circle, #31103d, #0f172a); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(251,191,36,0.8); animation: spinWheel 1.5s infinite linear; }
+        .wheel-arrow { position: absolute; top: -15px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 25px solid #22c55e; z-index: 10; filter: drop-shadow(0 0 5px #22c55e); }
+        .wheel-number-slot { position: absolute; font-size: 22px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #fbbf24; }
+        @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 20px; font-weight: bold; font-size: 22px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 0 30px rgba(251,191,36,0.9); text-align: center; animation: pulseBanner 0.8s infinite alternate; border: 2px solid #fff; }
         @keyframes pulseBanner { 0% { transform: scale(1); } 100% { transform: scale(1.02); } }
@@ -713,13 +720,6 @@ DASHBOARD_PAGE = """
         .cell { background: #000; border: 1px solid #ffd700; width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: #fff; border-radius: 6px; cursor: pointer; padding: 0; box-sizing: border-box; }
         .cell.locked { background: #ef4444; border-color: #b91c1c; }
         .owner-tag { font-size: 9px; display: block; color: #fde047; margin-top: 2px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
-        .scratch-section { background: #1e293b; border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; }
-        .scratch-section h2 { color: #a78bfa; margin-top: 0; font-size: 20px; }
-        .scratch-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
-        .scratch-cell { background: linear-gradient(135deg, #4f46e5, #312e81); border: 2px solid #a78bfa; height: 55px; border-radius: 8px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .scratch-cell.revealed { background: linear-gradient(135deg, #059669, #065f46); border-color: #34d399; font-size: 22px; color: #fbbf24; }
-        .scratch-msg-box { background: #0f172a; border: 1px dashed #a78bfa; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; color: #facc15; font-size: 14px; margin-bottom: 10px; }
         
         .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
@@ -747,32 +747,56 @@ DASHBOARD_PAGE = """
             navigator.serviceWorker.register('/sw.js');
         }
 
-        {% if g3_is_full and g3_remaining_time > 0 %}
-        let g3TimeLeft = {{ g3_remaining_time }};
-        const countdownEl = document.getElementById('g3TimerVal');
-        const timerInterval = setInterval(() => {
-            g3TimeLeft--;
-            if(countdownEl) countdownEl.innerText = g3TimeLeft;
-            if(g3TimeLeft <= 0) {
-                clearInterval(timerInterval);
-                location.reload();
-            }
-        }, 1000);
-        {% elif g3_is_full and g3_remaining_time <= 0 %}
-        setTimeout(() => { location.reload(); }, 500);
-        {% endif %}
+        // التحديث الذكي في الخلفية كل 3 ثوانٍ دون إعادة تحميل الصفحة أو تغيير مكان اللاعب
+        setInterval(() => {
+            fetch('/api/sync')
+                .then(response => response.json())
+                .then(data => {
+                    if(data.error) return;
+                    // تحديث الرصيد
+                    const balanceEl = document.getElementById('userBalanceBadge');
+                    if(balanceEl) balanceEl.innerText = '$' + data.balance;
 
-        setTimeout(() => { location.reload(); }, 3000);
+                    // تحديث حالة السحب الملكي والدائرة
+                    const wheelOverlay = document.getElementById('bigWheelOverlay');
+                    if(data.g3_is_full) {
+                        if(wheelOverlay) {
+                            wheelOverlay.style.display = 'flex';
+                            const wTimer = document.getElementById('wheelTimer');
+                            if(wTimer) wTimer.innerText = data.g3_rem;
+                        }
+                    } else {
+                        if(wheelOverlay) wheelOverlay.style.display = 'none';
+                    }
+                }).catch(err => console.log(err));
+        }, 3000);
     </script>
 </head>
 <body>
+    <!-- عجلة الروليت الكبرى الفاخرة أثناء السحب التنازلي -->
+    <div id="bigWheelOverlay" class="big-wheel-overlay" style="display: none;">
+        <div style="color: #fbbf24; font-size: 28px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 15px #fbbf24;">🎡 جاري السحب الملكي الفاخر...</div>
+        <div class="big-wheel-container">
+            <div class="wheel-arrow"></div>
+            <div class="wheel-number-slot" style="top: 15px;">1</div>
+            <div class="wheel-number-slot" style="right: 25px; top: 80px;">2</div>
+            <div class="wheel-number-slot" style="right: 45px; bottom: 35px;">3</div>
+            <div class="wheel-number-slot" style="left: 45px; bottom: 35px;">4</div>
+            <div class="wheel-number-slot" style="left: 25px; top: 80px;">5</div>
+        </div>
+        <div style="color: #38bdf8; font-size: 20px; font-weight: bold; margin-top: 25px;">⏳ متبقي <span id="wheelTimer" style="color: #fbbf24;">0</span> ثانية لإعلان الفائز بالـ 200$!</div>
+    </div>
+
     <div class="header">
         <div class="logo-area">
             <img src="https://img.icons8.com/color/512/crown.png" alt="Logo" class="logo-img">
             <h1>إمبراطورية الأرقام</h1>
             <button id="installAppBtn" class="install-pwa-btn" onclick="installApp()">📲 تثبيت التطبيق</button>
-            <div class="user-creds">👤 <b>{{ username }}</b> | 🔑 <b>{{ password }}</b></div>
-            <div class="balance-badge">رصيدك: ${{ balance }}</div>
+            <div class="user-creds">
+                👤 <b>{{ username }}</b>
+                {% if role == 'admin' %} | 🔑 <b>{{ password }}</b>{% endif %}
+            </div>
+            <div class="balance-badge">رصيدك: <span id="userBalanceBadge">${{ balance }}</span></div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a class="whatsapp-btn" href="https://wa.me/?text=الرجاء%20منكم%20شحن%20رصيد%20حسابي%20بلعبة%20امبراطورية%20الارقام%20باسم%20المستخدم:%20{{ username }}" target="_blank">💬 واتساب</a>
@@ -798,23 +822,13 @@ DASHBOARD_PAGE = """
                         <p style="color: #cbd5e1; font-size: 13px; margin: 5px 0 0 0;">قيمة الرقم الواحد: 50$</p>
                     </div>
                     <div class="luxury-right-panel">
-                        {% if g3_is_full %}
                         <div style="text-align: center;">
-                            <div style="font-size: 22px; font-weight: bold; color: #fbbf24;" id="g3TimerVal">{{ g3_remaining_time }}</div>
+                            <div style="font-size: 22px; font-weight: bold; color: #fbbf24;" id="g3TimerVal">60</div>
                             <div style="font-size: 11px; color: #38bdf8;">السحب بعد انتهاء الدقيقة</div>
                         </div>
                         <div class="roulette-circle">🎰</div>
-                        {% else %}
-                        <div style="font-size: 13px; color: #38bdf8; font-weight: bold;">✨ في انتظار اكتمال الخانات الـ 5</div>
-                        {% endif %}
                     </div>
                 </div>
-
-                {% if show_g3_banner %}
-                <div class="winner-win-banner" style="margin-top: 15px;">
-                    🎉 🎆 🎇 {{ g3_last_winner }} 🎇 🎆 🎉
-                </div>
-                {% endif %}
 
                 <div class="luxury-slots-container">
                     {% for slot_id, status, owner in game_three_slots %}
@@ -836,17 +850,9 @@ DASHBOARD_PAGE = """
                 <!-- لوحة أرقام الحظ -->
                 <div class="board-section">
                     <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
-                    
-                    {% if show_board_banner %}
-                    <div class="winner-win-banner" style="background: linear-gradient(90deg, #059669, #34d399, #059669); color: #fff; margin-bottom: 10px;">
-                        🎉 🎆 🎇 {{ board_last_winner_msg }} 🎇 🎆 🎉
-                    </div>
-                    {% else %}
                     <div style="background: rgba(0,0,0,0.6); border: 1px solid #38bdf8; padding: 10px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
-                        <span style="color: #fbbf24; font-size: 14px; font-weight: bold;">⏰ السحب اليومي التلقائي الساعة 9:00 مساءً (برولات الأرقام الـ 50)</span><br>
-                        <span style="color: #38bdf8; font-size: 12px;">{{ board_last_winner_msg }}</span>
+                        <span style="color: #fbbf24; font-size: 14px; font-weight: bold;">⏰ السحب اليومي التلقائي الساعة 9:00 مساءً</span>
                     </div>
-                    {% endif %}
 
                     <div class="player-summary-box">
                         <div class="summary-item">🎯 أرقامك: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
