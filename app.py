@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template_string, request, redirect, url_for, session
 import sqlite3
 import random
@@ -169,11 +168,6 @@ def dashboard():
     g3_state = cursor.fetchone()
     g3_last_winner = g3_state[0] if g3_state else ""
     
-    all_users = []
-    if session.get('role') == 'admin':
-        cursor.execute("SELECT username, password, balance, role, created_by FROM users")
-        all_users = cursor.fetchall()
-        
     conn.close()
     winning_num = session.get('winning_num', None)
     hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
@@ -189,12 +183,24 @@ def dashboard():
                                   board_last_winner_msg=board_last_winner_msg,
                                   game_three_slots=game_three_slots,
                                   g3_last_winner=g3_last_winner,
-                                  all_users=all_users,
                                   winning_num=winning_num,
                                   hidden_nums=hidden_nums,
                                   selected_boxes=selected_boxes,
                                   scratch_status=scratch_status,
                                   scratch_msg=scratch_msg)
+
+@app.route('/admin_panel')
+def admin_panel():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    
+    conn = sqlite3.connect('empire.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, password, balance, role, created_by FROM users")
+    all_users = cursor.fetchall()
+    conn.close()
+    
+    return render_template_string(ADMIN_PAGE, username=session['username'], all_users=all_users)
 
 @app.route('/pick_number/<int:num>', methods=['POST'])
 def pick_number(num):
@@ -296,7 +302,7 @@ def draw_winner():
         conn.commit()
         
     conn.close()
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin_panel'))
 
 @app.route('/draw_game_three', methods=['POST'])
 def draw_game_three():
@@ -332,7 +338,7 @@ def draw_game_three():
         conn.commit()
         
     conn.close()
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin_panel'))
 
 @app.route('/play_scratch/<int:box_index>', methods=['POST'])
 def play_scratch(box_index):
@@ -416,7 +422,7 @@ def create_user():
     except:
         pass
     conn.close()
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin_panel'))
 
 @app.route('/recharge_user', methods=['POST'])
 def recharge_user():
@@ -427,7 +433,7 @@ def recharge_user():
     cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (float(request.form['amount']), request.form['target_user']))
     conn.commit()
     conn.close()
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin_panel'))
 
 @app.route('/withdraw_user', methods=['POST'])
 def withdraw_user():
@@ -444,7 +450,7 @@ def withdraw_user():
         cursor.execute("UPDATE users SET balance = balance + ? WHERE username='admin'", (amount,))
         conn.commit()
     conn.close()
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin_panel'))
 
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
@@ -462,6 +468,7 @@ DASHBOARD_PAGE = """
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .refresh-btn { background: #3b82f6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+        .admin-link-btn { background: #fbbf24; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .main-container { margin-top: 20px; display: flex; flex-direction: column; gap: 25px; }
         
         .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; }
@@ -500,17 +507,12 @@ DASHBOARD_PAGE = """
         .roulette-wheel.spinning { animation: spinWheel 1.5s cubic-bezier(0.15, 0.85, 0.35, 1) forwards; }
         @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(1440deg); } }
         .ball-inner { font-size: 20px; font-weight: bold; color: #1e293b; background: #ffffff; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fbbf24; }
-        
-        .admin-panel { background: #1e293b; padding: 20px; border-radius: 12px; margin-top: 10px; border: 2px solid #fbbf24; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #475569; padding: 10px; text-align: center; }
-        th { background: #334155; }
     </style>
     <script>
-        // تحديث اللوحة والأرصدة لحظياً للجميع كل 4 ثوانٍ
+        // تحديث صفحة الألعاب تلقائياً كل 3 ثوانٍ لتبقى متزامنة وفورية للجميع
         setTimeout(() => {
             location.reload();
-        }, 4000);
+        }, 3000);
     </script>
 </head>
 <body>
@@ -520,10 +522,13 @@ DASHBOARD_PAGE = """
             <div class="user-creds">👤 مستخدمك: <b>{{ username }}</b> | 🔑 الباسورد: <b>{{ password }}</b></div>
             <div class="balance-badge">رصيدك: ${{ balance }}</div>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a class="whatsapp-btn" href="https://wa.me/?text=الرجاء%20منكم%20شحن%20رصيد%20حسابي%20بلعبة%20امبراطورية%20الارقام%20باسم%20المستخدم:%20{{ username }}" target="_blank">💬 اشحن عبر واتساب</a>
+            {% if role == 'admin' %}
+            <a href="/admin_panel" class="admin-link-btn">👑 لوحة تحكم الأدمن المستقلة</a>
+            {% endif %}
             <button class="refresh-btn" onclick="location.reload();">🔄 تحديث</button>
-            <a href="/logout" class="logout-btn">🚪 تسجيل خروج</a>
+            <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
     </div>
 
@@ -608,67 +613,106 @@ DASHBOARD_PAGE = """
             </div>
         </div>
     </div>
+</body>
+</html>
+"""
 
-    {% if role == 'admin' %}
+ADMIN_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لوحة تحكم الأدمن المستقلة</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; margin: 0; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; border: 2px solid #fbbf24; margin-bottom: 25px; }
+        .admin-panel { background: #1e293b; padding: 25px; border-radius: 12px; border: 2px solid #fbbf24; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        input, select { width: 100%; padding: 10px; border-radius: 6px; background: #1e293b; color: white; border: 1px solid #475569; box-sizing: border-box; }
+        button { padding: 10px 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #475569; padding: 12px; text-align: center; }
+        th { background: #334155; color: #fbbf24; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h2 style="color: #fbbf24; margin: 0;">👑 لوحة تحكم الأدمن (تحديث يدوي نقي)</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="/dashboard" class="back-btn">⬅️ العودة للعبة الرئيسية</a>
+            <a href="/logout" style="background: #ef4444; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold;">🚪 خروج</a>
+        </div>
+    </div>
+
     <div class="admin-panel">
-        <h3>👑 لوحة تحكم المؤسس (محدثة لحظياً لكافة الأرصدة والأسماء)</h3>
         <div style="background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد:</h4>
+            <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد (اسم، كلمة مرور، وتحديد الرتبة):</h4>
             <form action="/create_user" method="POST" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <input type="text" name="new_user" placeholder="اسم المستخدم" required style="padding: 10px; border-radius: 6px; background: #1e293b; color: white; flex: 1; border: 1px solid #475569;">
-                <input type="password" name="new_pass" placeholder="كلمة المرور" required style="padding: 10px; border-radius: 6px; background: #1e293b; color: white; flex: 1; border: 1px solid #475569;">
-                <select name="account_role" style="padding: 10px; border-radius: 6px; background: #1e293b; color: white; border: 1px solid #475569;">
-                    <option value="class_b">فئة B</option>
-                    <option value="class_a">فئة A</option>
-                </select>
-                <button type="submit" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">إنشاء</button>
+                <div style="flex: 1;"><input type="text" name="new_user" placeholder="اسم المستخدم" required></div>
+                <div style="flex: 1;"><input type="password" name="new_pass" placeholder="كلمة المرور" required></div>
+                <div>
+                    <select name="account_role">
+                        <option value="class_b">فئة B</option>
+                        <option value="class_a">فئة A</option>
+                    </select>
+                </div>
+                <div><button type="submit" style="background: #3b82f6; color: white;">إنشاء الحساب</button></div>
             </form>
         </div>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
             <form action="/recharge_user" method="POST" style="background: #334155; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                <h4 style="margin: 0; color: #22c55e;">⚡ شحن رصيد:</h4>
-                <select name="target_user" required style="padding: 10px; background: #1e293b; color: white; border-radius: 6px; border: 1px solid #475569;">
+                <h4 style="margin: 0; color: #22c55e;">⚡ شحن رصيد للمستخدم:</h4>
+                <select name="target_user" required>
                     <option value="">اختر المستخدم</option>
-                    {% for u in all_users %}<option value="{{ u[0] }}">{{ u[0] }} (${{ u[2] }})</option>{% endfor %}
+                    {% for u in all_users %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
                 </select>
-                <input type="number" name="amount" placeholder="المبلغ ($)" required style="padding: 10px; background: #1e293b; color: white; border-radius: 6px; border: 1px solid #475569;">
-                <button type="submit" style="padding: 10px; background: #22c55e; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">شحن</button>
+                <input type="number" name="amount" placeholder="المبلغ ($)" required>
+                <button type="submit" style="background: #22c55e; color: black;">تأكيد الشحن</button>
             </form>
 
             <form action="/withdraw_user" method="POST" style="background: #334155; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                <h4 style="margin: 0; color: #ef4444;">💸 سحب رصيد:</h4>
-                <select name="target_user" required style="padding: 10px; background: #1e293b; color: white; border-radius: 6px; border: 1px solid #475569;">
+                <h4 style="margin: 0; color: #ef4444;">💸 سحب رصيد وتحويله لحسابك:</h4>
+                <select name="target_user" required>
                     <option value="">اختر المستخدم</option>
-                    {% for u in all_users %}{% if u[0] != 'admin' %}<option value="{{ u[0] }}">{{ u[0] }} (${{ u[2] }})</option>{% endif %}{% endfor %}
+                    {% for u in all_users %}{% if u[0] != 'admin' %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endif %}{% endfor %}
                 </select>
-                <input type="number" name="amount" placeholder="المبلغ ($)" required style="padding: 10px; background: #1e293b; color: white; border-radius: 6px; border: 1px solid #475569;">
-                <button type="submit" style="padding: 10px; background: #ef4444; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">سحب</button>
+                <input type="number" name="amount" placeholder="المبلغ المراد سحبه ($)" required>
+                <button type="submit" style="background: #ef4444; color: white;">سحب الرصيد</button>
             </form>
         </div>
 
-        <div style="background: #111827; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fbbf24;">
+        <div style="background: #111827; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #fbbf24;">
             <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب لوحة أرقام الحظ اليومي (الساعة 9 مساءً بيروت):</h4>
             <form action="/draw_winner" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <select name="forced_number" style="padding: 10px; border-radius: 6px; background: #1e293b; color: white; border: 1px solid #475569; flex: 1;">
+                <select name="forced_number" style="flex: 1;">
                     <option value="">-- اختر الرقم الفائز يدوياً (أو عشوائي من المحجوزات) --</option>
-                    {% for i in range(1, 51) %}
-                    <option value="{{ i }}">رقم الفوز: {{ i }}</option>
-                    {% endfor %}
+                    {% for i in range(1, 51) %}<option value="{{ i }}">رقم الفوز: {{ i }}</option>{% endfor %}
                 </select>
-                <button type="submit" style="padding: 12px 25px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">إجراء السحب اليومي لإعادة الأرقام</button>
+                <button type="submit" style="background: #fbbf24; color: black;">إجراء السحب اليومي وتصفير اللوحة</button>
             </form>
         </div>
         
-        <h4>قائمة كافة الحسابات والأسماء والأرصدة المحدثة لحظياً للأدمن:</h4>
+        <h4 style="color: #38bdf8;">📋 جدول كافة الحسابات والأسماء والأرصدة والكلمات السرية المفعلة:</h4>
         <table>
-            <tr><th>المستخدم</th><th>كلمة المرور</th><th>الرصيد المحدث</th><th>الفئة</th></tr>
+            <tr>
+                <th>اسم المستخدم</th>
+                <th>كلمة المرور</th>
+                <th>الرصيد الحالي</th>
+                <th>الفئة / الدور</th>
+                <th>أنشئ بواسطة</th>
+            </tr>
             {% for u in all_users %}
-            <tr><td><b>{{ u[0] }}</b></td><td>{{ u[1] }}</td><td><span style="color: #34d399;">${{ u[2] }}</span></td><td>{{ u[3] }}</td></tr>
+            <tr>
+                <td><b>{{ u[0] }}</b></td>
+                <td><code style="background: #000; padding: 3px 6px; border-radius: 4px; color: #facc15;">{{ u[1] }}</code></td>
+                <td><span style="color: #34d399; font-weight: bold;">${{ u[2] }}</span></td>
+                <td>{{ u[3] }}</td>
+                <td>{{ u[4] }}</td>
+            </tr>
             {% endfor %}
         </table>
     </div>
-    {% endif %}
 </body>
 </html>
 """
