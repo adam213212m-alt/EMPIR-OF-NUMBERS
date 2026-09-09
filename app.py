@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'empire_no_scroll_jump_key_2026'
+app.secret_key = 'empire_safe_accounts_final_2026'
 
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
@@ -128,6 +128,7 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
+    # حساب الأدمن الأساسي (لا يتم مسحه أو تغييره)
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -139,6 +140,7 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
+    # إنشاء الحسابات الـ 100 مرة واحدة فقط نهائياً ولن يتم تغييرها أبداً إلا يدوياً عبر الأدمن
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
@@ -266,7 +268,6 @@ def manifest():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-# نظام مزامنة البيانات السريع والصامت كل ثانيتين في الخلفية
 @app.route('/api/sync')
 def api_sync():
     if 'username' not in session:
@@ -286,7 +287,7 @@ def api_sync():
     balance = res[0] if res else 0
 
     cursor.execute("SELECT number, status, owner FROM game_board")
-    board = data_board = cursor.fetchall()
+    board = cursor.fetchall()
 
     cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
     user_locked = [row[0] for row in cursor.fetchall()]
@@ -701,7 +702,7 @@ DASHBOARD_PAGE = """
         .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 20px; font-weight: bold; font-size: 22px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 0 30px rgba(251,191,36,0.9); text-align: center; border: 2px solid #fff; }
 
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
-        .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; }
+        .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; }
         .luxury-owner { font-size: 11px; color: #fde047; margin-top: 6px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
@@ -716,6 +717,13 @@ DASHBOARD_PAGE = """
         .cell { background: #000; border: 1px solid #ffd700; width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: #fff; border-radius: 6px; cursor: pointer; padding: 0; box-sizing: border-box; }
         .cell.locked { background: #ef4444; border-color: #b91c1c; }
         .owner-tag { font-size: 9px; display: block; color: #fde047; margin-top: 2px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .scratch-section { background: #1e293b; border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; }
+        .scratch-section h2 { color: #a78bfa; margin-top: 0; font-size: 20px; }
+        .scratch-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
+        .scratch-cell { background: linear-gradient(135deg, #4f46e5, #312e81); border: 2px solid #a78bfa; height: 55px; border-radius: 8px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .scratch-cell.revealed { background: linear-gradient(135deg, #059669, #065f46); border-color: #34d399; font-size: 22px; color: #fbbf24; }
+        .scratch-msg-box { background: #0f172a; border: 1px dashed #a78bfa; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; color: #facc15; font-size: 14px; margin-bottom: 10px; }
         
         .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
@@ -743,7 +751,6 @@ DASHBOARD_PAGE = """
             navigator.serviceWorker.register('/sw.js');
         }
 
-        // الحجز الفوري للأرقام دون إعادة تحميل الصفحة أو تحريك الشاشة
         function pickNumber(num) {
             fetch('/pick_number/' + num, { method: 'POST' })
                 .then(res => res.json())
@@ -762,18 +769,16 @@ DASHBOARD_PAGE = """
                 });
         }
 
-        // التحديث الفوري كل ثانيتين في الخلفية بهدوء تام دون أي قفز للأعلى
+        // التحديث التلقائي السريع كل ثانيتين (2000ms) بسلاسة تامة دون تحريك الشاشة
         function syncData() {
             fetch('/api/sync')
                 .then(response => response.json())
                 .then(data => {
                     if(data.error) return;
                     
-                    // تحديث الرصيد
                     const balanceEl = document.getElementById('userBalanceBadge');
                     if(balanceEl) balanceEl.innerText = '$' + data.balance;
 
-                    // تحديث لوحة أرقام الحظ
                     const boardContainer = document.getElementById('boardContainer');
                     if(boardContainer && data.board) {
                         let html = '';
@@ -791,14 +796,12 @@ DASHBOARD_PAGE = """
                         boardContainer.innerHTML = html;
                     }
 
-                    // تحديث ملخص اللاعب
                     const myNumsEl = document.getElementById('myLockedNumbers');
                     if(myNumsEl) myNumsEl.innerText = data.user_locked.length > 0 ? data.user_locked.join(', ') : 'لا توجد';
                     
                     const mySpentEl = document.getElementById('myTotalSpent');
                     if(mySpentEl) mySpentEl.innerText = '$' + data.user_spent;
 
-                    // تحديث اللعبة الملكية
                     const g3Container = document.getElementById('g3SlotsContainer');
                     if(g3Container && data.g3_slots) {
                         let g3Html = '';
@@ -817,7 +820,6 @@ DASHBOARD_PAGE = """
                         g3Container.innerHTML = g3Html;
                     }
 
-                    // تفعيل دوال السحب وعجلة الروليت عند الاكتمال
                     const wheelOverlay = document.getElementById('bigWheelOverlay');
                     if(data.g3_is_full) {
                         if(wheelOverlay) {
@@ -888,7 +890,7 @@ DASHBOARD_PAGE = """
                 </div>
 
                 <div id="g3SlotsContainer" class="luxury-slots-container">
-                    <!-- يتم تحديثها تلقائياً بالخلفية دون حركة -->
+                    <!-- يتم تحديثها تلقائياً بالخلفية -->
                 </div>
             </div>
 
@@ -905,11 +907,11 @@ DASHBOARD_PAGE = """
                         <div class="summary-item">💵 المدفوع: <span id="myTotalSpent" style="color: #ef4444;">$0</span></div>
                     </div>
                     <div id="boardContainer" class="board">
-                        <!-- يتم تحديث الأرقام فورياً دون إعادة تحميل أو قفز للأعلى -->
+                        <!-- يتم تحديث الأرقام فورياً -->
                     </div>
                 </div>
 
-                <!-- لعبة اكشف واربح الفاخرة -->
+                <!-- لعبة اكشف واربح الفاخرة (مستعادة بالكامل) -->
                 <div class="scratch-section">
                     <div>
                         <h2>✨ لعبة اكشف واربح الفاخرة</h2>
