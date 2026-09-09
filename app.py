@@ -227,7 +227,7 @@ def login():
             session['role'] = user[4]
             return redirect(url_for('dashboard'))
         else:
-            error = 'اسم المستخدم أو كلمة المرور غير صحيحة'
+            error = f"خطأ: اسم المستخدم '{username}' أو كلمة المرور غير صحيحة!"
             
     return render_template_string(LOGIN_PAGE, error=error)
 
@@ -611,49 +611,29 @@ DASHBOARD_PAGE = """
         .admin-link-btn { background: #fbbf24; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .main-container { margin-top: 20px; display: grid; grid-template-columns: 3fr 1fr; gap: 20px; }
         @media (max-width: 1100px) { .main-container { grid-template-columns: 1fr; } }
-        
         .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; position: relative; overflow: hidden; }
         .luxury-game-section h2 { color: #fbbf24; margin-top: 0; font-size: 26px; }
-        
-        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 15px; font-weight: bold; font-size: 22px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 0 25px rgba(251,191,36,0.8); animation: pulseBanner 0.8s infinite alternate; border: 2px solid #fff; }
-        @keyframes pulseBanner { 0% { transform: scale(1); } 100% { transform: scale(1.03); } }
-
+        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 15px; font-weight: bold; font-size: 22px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 0 25px rgba(251,191,36,0.8); }
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
         .luxury-slot-form { display: flex; }
         .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; }
         .luxury-owner { font-size: 11px; color: #fde047; margin-top: 6px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
         .timer-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 12px 20px; border-radius: 10px; display: inline-block; font-size: 16px; font-weight: bold; color: #38bdf8; margin-top: 10px; width: 100%; box-sizing: border-box; text-align: center; }
-        
         .games-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; margin-top: 20px; }
         @media (max-width: 1000px) { .games-grid { grid-template-columns: 1fr; } }
-        
         .board-section { background: linear-gradient(135deg, #d4af37, #aa771c); padding: 20px; border-radius: 12px; }
         .board-section h2 { color: #111; margin-top: 0; }
         .player-summary-box { background: #0f172a; border: 2px dashed #111; padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; color: #f8fafc; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; font-size: 14px; font-weight: bold; }
         .summary-item { background: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #475569; }
-        
         .board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-top: 15px; }
         .cell-form { display: flex; }
         .cell { background: #000; border: 1px solid #ffd700; width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: #fff; border-radius: 6px; cursor: pointer; padding: 0; box-sizing: border-box; }
         .cell.locked { background: #ef4444; border-color: #b91c1c; }
         .owner-tag { font-size: 9px; display: block; color: #fde047; margin-top: 2px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
-        .scratch-section { background: #1e293b; border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; }
-        .scratch-section h2 { color: #a78bfa; margin-top: 0; font-size: 20px; }
-        .scratch-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
-        .scratch-cell { background: linear-gradient(135deg, #4f46e5, #312e81); border: 2px solid #a78bfa; height: 55px; border-radius: 8px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .scratch-cell.revealed { background: linear-gradient(135deg, #059669, #065f46); border-color: #34d399; font-size: 22px; color: #fbbf24; }
-        .scratch-msg-box { background: #0f172a; border: 1px dashed #a78bfa; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; color: #facc15; font-size: 14px; margin-bottom: 10px; }
-        
         .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
         .winner-record-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-right: 4px solid #10b981; font-size: 13px; }
-        
-        .roulette-container { background: #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px; }
-        .roulette-wheel { position: relative; width: 130px; height: 130px; margin: 10px auto; border-radius: 50%; background: conic-gradient(#3b82f6 0deg 72deg, #ef4444 72deg 144deg, #22c55e 144deg 216deg, #eab308 216deg 288deg, #a855f7 288deg 360deg); border: 5px solid #fbbf24; display: flex; align-items: center; justify-content: center; }
-        .ball-inner { font-size: 20px; font-weight: bold; color: #1e293b; background: #ffffff; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fbbf24; }
     </style>
     <script>
         {% if g3_is_full and g3_remaining_time > 0 %}
@@ -695,25 +675,9 @@ DASHBOARD_PAGE = """
 
     <div class="main-container">
         <div>
-            <!-- اللعبة الملكية الفاخرة -->
             <div class="luxury-game-section">
                 <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى)</h2>
-                
-                {% if show_g3_banner %}
-                <div class="winner-win-banner">
-                    🏆 {{ g3_last_winner }} 🏆
-                </div>
-                {% else %}
                 <p style="color: #cbd5e1; font-size: 14px;">قيمة الرقم الواحد: 50$ | الجائزة الكبرى: 250$ فورية!</p>
-                <div class="timer-box">
-                    {% if g3_is_full %}
-                        ⏳ اكتملت الخانات الـ 5! تدور رولات السحب خلال <span id="countdownG3" style="color: #fbbf24; font-size: 18px;">{{ g3_remaining_time }}</span> ثانية...
-                    {% else %}
-                        ✨ حجز 5 خانات يبدأ عداد دقيقة السحب برولات الأرقام التفاعلية
-                    {% endif %}
-                </div>
-                {% endif %}
-
                 <div class="luxury-slots-container">
                     {% for slot_id, status, owner in game_three_slots %}
                     <form action="/pick_game_three/{{ slot_id }}" method="POST" class="luxury-slot-form">
@@ -722,7 +686,7 @@ DASHBOARD_PAGE = """
                             <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
                             {% if owner %}
                                 <span class="luxury-owner">{{ owner }}</span>
-                                {% if owner == username %}<span style="font-size: 9px; color: #34d399;">(حجزك - للتراجع)</span>{% endif %}
+                                {% if owner == username %}<span style="font-size: 9px; color: #34d399;">(حجزك)</span>{% endif %}
                             {% endif %}
                         </button>
                     </form>
@@ -731,25 +695,14 @@ DASHBOARD_PAGE = """
             </div>
 
             <div class="games-grid">
-                <!-- لوحة أرقام الحظ -->
                 <div class="board-section">
                     <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
-                    
-                    {% if show_board_banner %}
-                    <div class="winner-win-banner" style="background: linear-gradient(90deg, #059669, #34d399, #059669); color: #fff;">
-                        🎉 {{ board_last_winner_msg }} 🎉
-                    </div>
-                    {% else %}
                     <div class="timer-box" style="margin-bottom: 12px;">
-                        ⏰ السحب اليومي التلقائي: الساعة 9:00 مساءً بتوقيت بيروت<br>
-                        <span style="color: #fbbf24; font-size: 14px; margin-top: 5px; display: block;">✨ {{ board_last_winner_msg }}</span>
+                        <span style="color: #fbbf24; font-size: 14px;">✨ {{ board_last_winner_msg }}</span>
                     </div>
-                    {% endif %}
-
                     <div class="player-summary-box">
-                        <div class="summary-item">🎯 أرقامك المحجوزة: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
+                        <div class="summary-item">🎯 أرقامك: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
                         <div class="summary-item">💵 المدفوع: <span style="color: #ef4444;">${{ user_total_spent }}</span></div>
-                        <div class="summary-item">💰 المتبقي: <span style="color: #34d399;">${{ balance }}</span></div>
                     </div>
                     <div class="board">
                         {% for num, status, owner in board %}
@@ -758,59 +711,26 @@ DASHBOARD_PAGE = """
                                     <span style="font-size: 15px;">{{ num }}</span>
                                     {% if owner %}
                                         <span class="owner-tag">{{ owner }}</span>
-                                        {% if owner == username %}<span style="font-size: 8px; color: #34d399;">إلغاء حجزك</span>{% endif %}
                                     {% endif %}
                                 </button>
                             </form>
                         {% endfor %}
                     </div>
                 </div>
-
-                <!-- لعبة الـ 15 مربعاً الفاخرة -->
-                <div class="scratch-section">
-                    <div>
-                        <h2>✨ لعبة الـ 15 مربعاً الفاخرة</h2>
-                        <p style="color: #94a3b8; font-size: 12px;">اختر 3 مربعات (التكلفة: 1$ | الجائزة: 15$)</p>
-                    </div>
-                    <div class="scratch-msg-box">{{ scratch_msg }}</div>
-                    <div class="scratch-board">
-                        {% for i in range(15) %}
-                            <form action="/play_scratch/{{ i }}" method="POST">
-                                <button type="submit" class="scratch-cell {% if i in selected_boxes or scratch_status == 'finished' %}revealed{% endif %}" {% if scratch_status == 'finished' and i not in selected_boxes %}disabled{% endif %}>
-                                    {% if i in selected_boxes or scratch_status == 'finished' %}{{ hidden_nums[i] }}{% else %}🎁{% endif %}
-                                </button>
-                            </form>
-                        {% endfor %}
-                    </div>
-                    {% if scratch_status == 'finished' %}
-                    <form action="/reset_scratch" method="POST">
-                        <button type="submit" style="width: 100%; padding: 10px; background: #8b5cf6; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">🔄 محاولة جديدة (1$)</button>
-                    </form>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="roulette-container">
-                <h2>🔮 روليت سحب الأرقام التفاعلي (رول بـ 5 خانات للسحب)</h2>
-                <div class="roulette-wheel" id="rouletteWheel">
-                    <div class="ball-inner" id="ballDisplay">🎲</div>
-                </div>
             </div>
         </div>
 
-        <!-- سجل الفائزين آخر 24 ساعة -->
         <div class="winners-sidebar">
-            <h3>🏆 لوحة شرف الفائزين (آخر 24 ساعة)</h3>
+            <h3>🏆 لوحة شرف الفائزين</h3>
             {% if winners_records %}
                 {% for game, info, time_str in winners_records %}
                 <div class="winner-record-item">
                     <div style="color: #fbbf24; font-weight: bold;">{{ game }}</div>
                     <div style="color: #e2e8f0; margin-top: 3px;">{{ info }}</div>
-                    <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">⏱ {{ time_str }}</div>
                 </div>
                 {% endfor %}
             {% else %}
-                <p style="color: #94a3b8; text-align: center; font-size: 13px;">لا توجد سجلات فوز مسجلة حالياً!</p>
+                <p style="color: #94a3b8; text-align: center; font-size: 13px;">لا توجد سجلات فوز!</p>
             {% endif %}
         </div>
     </div>
@@ -835,7 +755,6 @@ ADMIN_PAGE = """
         th { background: #334155; color: #fbbf24; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         .manual-refresh-btn { background: #10b981; color: black; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .finance-card { background: #111827; border: 1px solid #38bdf8; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -847,107 +766,14 @@ ADMIN_PAGE = """
             <a href="/logout" style="background: #ef4444; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold;">🚪 خروج</a>
         </div>
     </div>
-
     <div class="admin-panel">
-        <h3 style="color: #38bdf8; border-bottom: 1px solid #475569; padding-bottom: 8px;">📊 التقارير المالية الشهرية (أرباح وخسائر الألعاب)</h3>
-        
-        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px;">
-            {% for row in financial_report %}
-            <div class="finance-card">
-                <h4 style="margin: 0 0 10px 0; color: #fbbf24;">🎮 {{ row.name }}</h4>
-                <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 14px;">
-                    <div>💵 المبلغ المدفوع من اللاعبين: <b style="color: #34d399;">${{ row.collected }}</b></div>
-                    <div>🎁 المبلغ المدفوع للرابحين: <b style="color: #ef4444;">${{ row.payouts }}</b></div>
-                    <div>📈 صافي الأرباح / الخسائر: <b style="color: {% if row.net >= 0 %}#34d399{% else %}#ef4444{% endif %};">${{ row.net }}</b></div>
-                </div>
-            </div>
-            {% endfor %}
-            
-            <div style="background: linear-gradient(135deg, #065f46, #047857); padding: 15px; border-radius: 8px; border: 2px solid #34d399; text-align: center;">
-                <h3 style="margin: 0; color: #fff;">💎 صافي الربح الشهري الإجمالي لجميع الألعاب: <span style="color: #fbbf24; font-size: 24px;">${{ total_net_profit }}</span></h3>
-            </div>
+        <h3 style="color: #38bdf8;">📊 التقارير المالية الشهرية</h3>
+        {% for row in financial_report %}
+        <div style="background: #111827; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+            <b>{{ row.name }}</b> - المدفوع: ${{ row.collected }} | الجوائز: ${{ row.payouts }} | الصافي: ${{ row.net }}
         </div>
-
-        <div style="background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد (لا يسمح بأسماء متشابهة):</h4>
-            <form action="/create_user" method="POST" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <div style="flex: 1;"><input type="text" name="new_user" placeholder="اسم المستخدم" required></div>
-                <div style="flex: 1;"><input type="password" name="new_pass" placeholder="كلمة المرور" required></div>
-                <div>
-                    <select name="account_role">
-                        <option value="class_b">فئة B</option>
-                        <option value="class_a">فئة A</option>
-                    </select>
-                </div>
-                <div><button type="submit" style="background: #3b82f6; color: white;">إنشاء الحساب</button></div>
-            </form>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-            <form action="/recharge_user" method="POST" style="background: #334155; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                <h4 style="margin: 0; color: #22c55e;">⚡ شحن رصيد للمستخدم:</h4>
-                <select name="target_user" required>
-                    <option value="">اختر المستخدم</option>
-                    {% for u in all_users %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
-                </select>
-                <input type="number" name="amount" placeholder="المبلغ ($)" required>
-                <button type="submit" style="background: #22c55e; color: black;">تأكيد الشحن</button>
-            </form>
-
-            <form action="/withdraw_user" method="POST" style="background: #334155; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                <h4 style="margin: 0; color: #ef4444;">💸 سحب رصيد وتحويله لحسابك:</h4>
-                <select name="target_user" required>
-                    <option value="">اختر المستخدم</option>
-                    {% for u in all_users %}{% if u[0] != 'admin' %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endif %}{% endfor %}
-                </select>
-                <input type="number" name="amount" placeholder="المبلغ المراد سحبه ($)" required>
-                <button type="submit" style="background: #ef4444; color: white;">سحب الرصيد</button>
-            </form>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
-            <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
-                <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب الحظ اليومي (تحديد فائز سري خفية):</h4>
-                <form action="/draw_winner" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
-                    <select name="forced_number">
-                        <option value="">-- اختياري: حدد الرقم الفائز سرياً --</option>
-                        {% for i in range(1, 51) %}<option value="{{ i }}">رقم الفوز: {{ i }}</option>{% endfor %}
-                    </select>
-                    <button type="submit" style="background: #fbbf24; color: black;">تنفيذ سحب الحظ الفوري</button>
-                </form>
-            </div>
-
-            <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
-                <h4 style="color: #fbbf24; luxury-game-section; color: #fbbf24; margin-top: 0;">💎 اللعبة الملكية (تحديد فائز سري وخاص):</h4>
-                <form action="/draw_game_three" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
-                    <select name="forced_slot">
-                        <option value="">-- اختياري: حدد الخانة الفائزة سراً --</option>
-                        {% for i in range(1, 6) %}<option value="{{ i }}">الخانة الفائزة: {{ i }}</option>{% endfor %}
-                    </select>
-                    <button type="submit" style="background: #fbbf24; color: black;">تنفيذ السحب الملكي الفاخر (250$)</button>
-                </form>
-            </div>
-        </div>
-        
-        <h4 style="color: #38bdf8;">📋 جدول كافة الحسابات والأسماء والأرصدة والكلمات السرية المفعلة:</h4>
-        <table>
-            <tr>
-                <th>اسم المستخدم</th>
-                <th>كلمة المرور</th>
-                <th>الرصيد الحالي</th>
-                <th>الفئة / الدور</th>
-                <th>أنشئ بواسطة</th>
-            </tr>
-            {% for u in all_users %}
-            <tr>
-                <td><b>{{ u[0] }}</b></td>
-                <td><code style="background: #000; padding: 3px 6px; border-radius: 4px; color: #facc15;">{{ u[1] }}</code></td>
-                <td><span style="color: #34d399; font-weight: bold;">${{ u[2] }}</span></td>
-                <td>{{ u[3] }}</td>
-                <td>{{ u[4] }}</td>
-            </tr>
-            {% endfor %}
-        </table>
+        {% endfor %}
+        <h3 style="color: #34d399;">💎 صافي الربح الإجمالي: ${{ total_net_profit }}</h3>
     </div>
 </body>
 </html>
@@ -963,8 +789,8 @@ LOGIN_PAGE = """
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1e293b; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 320px; text-align: center; border: 1px solid #334155; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin0-top: 10px; font-size: 16px; }
-        .error { color: #ef4444; margin-bottom: 10px; font-weight: bold; }
+        button { width: 100%; padding: 12px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; background: rgba(239,68,68,0.2); padding: 8px; border-radius: 6px; }
     </style>
 </head>
 <body>
