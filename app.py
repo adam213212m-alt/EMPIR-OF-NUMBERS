@@ -10,6 +10,7 @@ def init_db():
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
     
+    # منع خلق أسماء مستخدمين متشابهة تماماً عبر UNIQUE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,12 +71,22 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_three_state (
             id INTEGER PRIMARY KEY,
-            last_winner_msg TEXT DEFAULT ''
+            last_winner_msg TEXT DEFAULT '',
+            banner_end_time REAL DEFAULT 0
         )
     ''')
     cursor.execute('SELECT COUNT(*) FROM game_three_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO game_three_state (id, last_winner_msg) VALUES (1, "بانتظار اكتمال الأرقام الفاخرة...")')
+        cursor.execute('INSERT INTO game_three_state (id, last_winner_msg, banner_end_time) VALUES (1, "بانتظار اكتمال الأرقام الفاخرة...", 0)')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS winners_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_name TEXT,
+            winner_info TEXT,
+            win_time TEXT
+        )
+    ''')
     
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
@@ -164,10 +175,16 @@ def dashboard():
     cursor.execute("SELECT slot_id, status, owner FROM game_three")
     game_three_slots = cursor.fetchall()
 
-    cursor.execute("SELECT last_winner_msg FROM game_three_state WHERE id=1")
+    cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
     g3_state = cursor.fetchone()
     g3_last_winner = g3_state[0] if g3_state else ""
+    banner_end_time = g3_state[1] if g3_state else 0
     
+    show_g3_banner = time.time() < banner_end_time
+
+    cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
+    winners_records = cursor.fetchall()
+
     conn.close()
     winning_num = session.get('winning_num', None)
     hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
@@ -183,6 +200,8 @@ def dashboard():
                                   board_last_winner_msg=board_last_winner_msg,
                                   game_three_slots=game_three_slots,
                                   g3_last_winner=g3_last_winner,
+                                  show_g3_banner=show_g3_banner,
+                                  winners_records=winners_records,
                                   winning_num=winning_num,
                                   hidden_nums=hidden_nums,
                                   selected_boxes=selected_boxes,
@@ -280,7 +299,7 @@ def draw_winner():
         winning_number = int(forced_number)
         cursor.execute("SELECT owner FROM game_board WHERE number=?", (winning_number,))
         res = cursor.fetchone()
-        winner_owner = res[0] if (res and res[0]) else "بدون مالك"
+        winner_owner = res[0] if (res and res[0]) else None
     else:
         cursor.execute("SELECT number, owner FROM game_board WHERE status='locked'")
         locked = cursor.fetchall()
@@ -288,17 +307,20 @@ def draw_winner():
             winning_number, winner_owner = random.choice(locked)
             
     if winning_number:
-        if winner_owner and winner_owner != "بدون مالك":
+        if winner_owner:
+            # تحويل الجائزة لحساب الفائز الفعلي
             cursor.execute("UPDATE users SET balance = balance + 80.0 WHERE username=?", (winner_owner,))
-            msg = f"🏆 (السحب اليومي 9 مساءً) الكرة الفائزة رقم ({winning_number}) والفائز هو: {winner_owner} بجائزة 80$!"
+            msg = f"🏆 (السحب اليومي) الفائز برقم ({winning_number}) هو: {winner_owner} ($80)!"
+            cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
+                           ("لوحة أرقام الحظ (80$)", f"الرقم {winning_number} - الفائز: {winner_owner}", time.strftime('%Y-%m-%d %H:%M')))
         else:
-            msg = f"🏆 (السحب اليومي 9 مساءً) الكرة الفائزة رقم ({winning_number}) ولم تكن محجوزة لأحد."
+            msg = f"🏆 (السحب اليومي) فاز الرقم ({winning_number}) ولم يكن محجوزاً."
         cursor.execute("UPDATE game_board SET status='available', owner=NULL")
         cursor.execute("UPDATE game_board_state SET last_winner_msg=? WHERE id=1", (msg,))
         conn.commit()
         session['winning_num'] = winning_number
     else:
-        cursor.execute("UPDATE game_board_state SET last_winner_msg=? WHERE id=1", ("⚠️ لا توجد أرقام محجوزة لإجراء السحب اليومي!",))
+        cursor.execute("UPDATE game_board_state SET last_winner_msg=? WHERE id=1", ("⚠️ لا توجد أرقام محجوزة للسحب!",))
         conn.commit()
         
     conn.close()
@@ -317,7 +339,7 @@ def draw_game_three():
         winning_slot = int(forced_slot)
         cursor.execute("SELECT owner FROM game_three WHERE slot_id=?", (winning_slot,))
         res = cursor.fetchone()
-        winner_owner = res[0] if (res and res[0]) else "بدون مالك"
+        winner_owner = res[0] if (res and res[0]) else None
     else:
         cursor.execute("SELECT slot_id, owner FROM game_three WHERE status='locked'")
         locked = cursor.fetchall()
@@ -325,16 +347,21 @@ def draw_game_three():
             winning_slot, winner_owner = random.choice(locked)
             
     if winning_slot:
-        if winner_owner and winner_owner != "بدون مالك":
-            cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
-            msg = f"🏆 الفائز باللعبة الفاخرة هو: {winner_owner} في الرقم ({winning_slot}) بجائزة 200$!"
+        banner_end_time = time.time() + 10  # عرض شريط 250$ win لمدة 10 ثوانٍ بالضبط
+        if winner_owner:
+            # تحويل الجائزة الفورية 250$ لحساب الفائز الحقيقي
+            cursor.execute("UPDATE users SET balance = balance + 250.0 WHERE username=?", (winner_owner,))
+            msg = f"🏆 {winner_owner} - 250$ WIN 🏆"
+            cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
+                           ("اللعبة الملكية الفاخرة", f"الخانة {winning_slot} - الفائز: {winner_owner} (250$)", time.strftime('%Y-%m-%d %H:%M')))
         else:
-            msg = f"🏆 فاز الرقم الفاخر ({winning_slot}) ولكنه لم يكن محجوزاً."
+            msg = f"💎 فاز الرقم الفاخر ({winning_slot}) ولم يكن محجوزاً."
+            
         cursor.execute("UPDATE game_three SET status='available', owner=NULL")
-        cursor.execute("UPDATE game_three_state SET last_winner_msg=? WHERE id=1", (msg,))
+        cursor.execute("UPDATE game_three_state SET last_winner_msg=?, banner_end_time=? WHERE id=1", (msg, banner_end_time))
         conn.commit()
     else:
-        cursor.execute("UPDATE game_three_state SET last_winner_msg=? WHERE id=1", ("⚠️ لا توجد أرقام محجوزة حالياً للسحب!",))
+        cursor.execute("UPDATE game_three_state SET last_winner_msg=? WHERE id=1", ("⚠️ لا توجد أرقام محجوزة بالسحب الملكي!",))
         conn.commit()
         
     conn.close()
@@ -379,6 +406,8 @@ def play_scratch(box_index):
         if v1 == v2 == v3:
             cursor.execute("UPDATE users SET balance = balance + 15 WHERE username=?", (username,))
             scratch_msg = f"🎉 مبروك ربحت 15$! (ثلاثة أرقام {v1})"
+            cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
+                           ("لعبة الـ 15 مربعاً (15$)", f"الفائز: {username}", time.strftime('%Y-%m-%d %H:%M')))
         else:
             scratch_msg = f"❌ حظ أوفر (النتائج: {v1}, {v2}, {v3})"
         scratch_status = 'finished'
@@ -413,13 +442,16 @@ def create_user():
     new_user = request.form.get('new_user', '').strip()
     new_pass = request.form.get('new_pass', '').strip()
     role = request.form.get('account_role', 'class_b')
+    
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
     try:
+        # بفضل خاصية UNIQUE لن يسمح النظام بخلق اسمين متشابهين أبداً
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, ?, ?)",
                        (new_user, new_pass, role, session['username']))
         conn.commit()
-    except:
+    except sqlite3.IntegrityError:
+        # إذا كان الاسم موجوداً مسبقاً يتم تجاهله لتفادي الأخطاء
         pass
     conn.close()
     return redirect(url_for('admin_panel'))
@@ -469,10 +501,16 @@ DASHBOARD_PAGE = """
         .refresh-btn { background: #3b82f6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .admin-link-btn { background: #fbbf24; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        .main-container { margin-top: 20px; display: flex; flex-direction: column; gap: 25px; }
+        .main-container { margin-top: 20px; display: grid; grid-template-columns: 3fr 1fr; gap: 20px; }
+        @media (max-width: 1100px) { .main-container { grid-template-columns: 1fr; } }
         
-        .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; }
+        .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; position: relative; overflow: hidden; }
         .luxury-game-section h2 { color: #fbbf24; margin-top: 0; font-size: 26px; }
+        
+        /* شريط الـ 250$ win لمدة 10 ثوانٍ */
+        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 15px; font-weight: bold; font-size: 22px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 0 25px rgba(251,191,36,0.8); animation: pulseBanner 0.8s infinite alternate; border: 2px solid #fff; }
+        @keyframes pulseBanner { 0% { transform: scale(1); } 100% { transform: scale(1.03); } }
+
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
         .luxury-slot-form { display: flex; }
         .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -481,7 +519,7 @@ DASHBOARD_PAGE = """
         
         .timer-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 12px 20px; border-radius: 10px; display: inline-block; font-size: 16px; font-weight: bold; color: #38bdf8; margin-top: 10px; width: 100%; box-sizing: border-box; text-align: center; }
         
-        .games-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; }
+        .games-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; margin-top: 20px; }
         @media (max-width: 1000px) { .games-grid { grid-template-columns: 1fr; } }
         
         .board-section { background: linear-gradient(135deg, #d4af37, #aa771c); padding: 20px; border-radius: 12px; }
@@ -502,14 +540,15 @@ DASHBOARD_PAGE = """
         .scratch-cell.revealed { background: linear-gradient(135deg, #059669, #065f46); border-color: #34d399; font-size: 22px; color: #fbbf24; }
         .scratch-msg-box { background: #0f172a; border: 1px dashed #a78bfa; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; color: #facc15; font-size: 14px; margin-bottom: 10px; }
         
-        .lottery-section { background: #1e293b; padding: 20px; border-radius: 12px; text-align: center; }
+        .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
+        .winner-record-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-right: 4px solid #10b981; font-size: 13px; }
+        
+        .roulette-container { background: #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px; }
         .roulette-wheel { position: relative; width: 130px; height: 130px; margin: 10px auto; border-radius: 50%; background: conic-gradient(#3b82f6 0deg 36deg, #ef4444 36deg 72deg, #22c55e 72deg 108deg, #eab308 108deg 144deg, #a855f7 144deg 180deg, #ec4899 180deg 216deg, #14b8a6 216deg 252deg, #f97316 252deg 288deg, #6366f1 288deg 324deg, #84cc16 324deg 360deg); border: 5px solid #fbbf24; display: flex; align-items: center; justify-content: center; }
-        .roulette-wheel.spinning { animation: spinWheel 1.5s cubic-bezier(0.15, 0.85, 0.35, 1) forwards; }
-        @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(1440deg); } }
         .ball-inner { font-size: 20px; font-weight: bold; color: #1e293b; background: #ffffff; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fbbf24; }
     </style>
     <script>
-        // تحديث صفحة الألعاب تلقائياً كل 3 ثوانٍ لتبقى متزامنة وفورية للجميع
         setTimeout(() => {
             location.reload();
         }, 3000);
@@ -533,84 +572,110 @@ DASHBOARD_PAGE = """
     </div>
 
     <div class="main-container">
-        <!-- اللعبة الفاخرة -->
-        <div class="luxury-game-section">
-            <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى)</h2>
-            <p style="color: #cbd5e1; font-size: 14px;">قيمة الرقم الواحد: 50$ | الجائزة الكبرى: 200$!</p>
-            <div class="timer-box">✨ {{ g3_last_winner }}</div>
-            <div class="luxury-slots-container">
-                {% for slot_id, status, owner in game_three_slots %}
-                <form action="/pick_game_three/{{ slot_id }}" method="POST" class="luxury-slot-form">
-                    <button type="submit" class="luxury-slot-btn {% if status == 'locked' %}locked{% endif %}">
-                        <span style="font-size: 22px;">رقم {{ slot_id }}</span>
-                        <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
-                        {% if owner %}
-                            <span class="luxury-owner">{{ owner }}</span>
-                            {% if owner == username %}<span style="font-size: 10px; color: #34d399;">(حجزك - للتراجع)</span>{% endif %}
-                        {% endif %}
-                    </button>
-                </form>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="games-grid">
-            <!-- اللعبة الأولى -->
-            <div class="board-section">
-                <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
-                <div class="timer-box" style="margin-bottom: 12px;">
-                    ⏰ موعد السحب اليومي الثابت: الساعة 9:00 مساءً بتوقيت بيروت (سحب يومي واحد فقط)<br>
-                    <span style="color: #fbbf24; font-size: 14px; margin-top: 5px; display: block;">✨ {{ board_last_winner_msg }}</span>
+        <div>
+            <!-- اللعبة الملكية الفاخرة مع شريط الفوز 250$ win لمدة 10 ثوانٍ -->
+            <div class="luxury-game-section">
+                <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى)</h2>
+                
+                {% if show_g3_banner %}
+                <div class="winner-win-banner">
+                    🏆 {{ g3_last_winner }} 🏆
                 </div>
-                <div class="player-summary-box">
-                    <div class="summary-item">🎯 أرقامك المحجوزة: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
-                    <div class="summary-item">💵 إجمالي المدفوع: <span style="color: #ef4444;">${{ user_total_spent }}</span></div>
-                    <div class="summary-item">💰 رصيدك المتبقي: <span style="color: #34d399;">${{ balance }}</span></div>
-                </div>
-                <div class="board">
-                    {% for num, status, owner in board %}
-                        <form action="/pick_number/{{ num }}" method="POST" class="cell-form">
-                            <button type="submit" class="cell {% if status == 'locked' %}locked{% endif %}">
-                                <span style="font-size: 15px;">{{ num }}</span>
-                                {% if owner %}
-                                    <span class="owner-tag">{{ owner }}</span>
-                                    {% if owner == username %}<span style="font-size: 8px; color: #34d399;">إلغاء حجزك</span>{% endif %}
-                                {% endif %}
-                            </button>
-                        </form>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- اللعبة الثانية -->
-            <div class="scratch-section">
-                <div>
-                    <h2>✨ لعبة الـ 15 مربعاً الفاخرة</h2>
-                    <p style="color: #94a3b8; font-size: 12px;">اختر 3 مربعات (التكلفة: 1$ | الجائزة: 15$)</p>
-                </div>
-                <div class="scratch-msg-box">{{ scratch_msg }}</div>
-                <div class="scratch-board">
-                    {% for i in range(15) %}
-                        <form action="/play_scratch/{{ i }}" method="POST">
-                            <button type="submit" class="scratch-cell {% if i in selected_boxes or scratch_status == 'finished' %}revealed{% endif %}" {% if scratch_status == 'finished' and i not in selected_boxes %}disabled{% endif %}>
-                                {% if i in selected_boxes or scratch_status == 'finished' %}{{ hidden_nums[i] }}{% else %}🎁{% endif %}
-                            </button>
-                        </form>
-                    {% endfor %}
-                </div>
-                {% if scratch_status == 'finished' %}
-                <form action="/reset_scratch" method="POST">
-                    <button type="submit" style="width: 100%; padding: 10px; background: #8b5cf6; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">🔄 محاولة جديدة (1$)</button>
-                </form>
+                {% else %}
+                <p style="color: #cbd5e1; font-size: 14px;">قيمة الرقم الواحد: 50$ | الجائزة الكبرى: 250$ فورية!</p>
+                <div class="timer-box">✨ تدار اللعبة لحظياً وتعود للتصفير بعد السحب</div>
                 {% endif %}
+
+                <div class="luxury-slots-container">
+                    {% for slot_id, status, owner in game_three_slots %}
+                    <form action="/pick_game_three/{{ slot_id }}" method="POST" class="luxury-slot-form">
+                        <button type="submit" class="luxury-slot-btn {% if status == 'locked' %}locked{% endif %}">
+                            <span style="font-size: 22px;">رقم {{ slot_id }}</span>
+                            <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
+                            {% if owner %}
+                                <span class="luxury-owner">{{ owner }}</span>
+                                {% if owner == username %}<span style="font-size: 9px; color: #34d399;">(حجزك - للتراجع)</span>{% endif %}
+                            {% endif %}
+                        </button>
+                    </form>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="games-grid">
+                <!-- لوحة أرقام الحظ -->
+                <div class="board-section">
+                    <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
+                    <div class="timer-box" style="margin-bottom: 12px;">
+                        ⏰ موعد السحب اليومي: الساعة 9:00 مساءً بتوقيت بيروت<br>
+                        <span style="color: #fbbf24; font-size: 14px; margin-top: 5px; display: block;">✨ {{ board_last_winner_msg }}</span>
+                    </div>
+                    <div class="player-summary-box">
+                        <div class="summary-item">🎯 أرقامك المحجوزة: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
+                        <div class="summary-item">💵 المدفوع: <span style="color: #ef4444;">${{ user_total_spent }}</span></div>
+                        <div class="summary-item">💰 المتبقي: <span style="color: #34d399;">${{ balance }}</span></div>
+                    </div>
+                    <div class="board">
+                        {% for num, status, owner in board %}
+                            <form action="/pick_number/{{ num }}" method="POST" class="cell-form">
+                                <button type="submit" class="cell {% if status == 'locked' %}locked{% endif %}">
+                                    <span style="font-size: 15px;">{{ num }}</span>
+                                    {% if owner %}
+                                        <span class="owner-tag">{{ owner }}</span>
+                                        {% if owner == username %}<span style="font-size: 8px; color: #34d399;">إلغاء حجزك</span>{% endif %}
+                                    {% endif %}
+                                </button>
+                            </form>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- لعبة الـ 15 مربعاً الفاخرة -->
+                <div class="scratch-section">
+                    <div>
+                        <h2>✨ لعبة الـ 15 مربعاً الفاخرة</h2>
+                        <p style="color: #94a3b8; font-size: 12px;">اختر 3 مربعات (التكلفة: 1$ | الجائزة: 15$)</p>
+                    </div>
+                    <div class="scratch-msg-box">{{ scratch_msg }}</div>
+                    <div class="scratch-board">
+                        {% for i in range(15) %}
+                            <form action="/play_scratch/{{ i }}" method="POST">
+                                <button type="submit" class="scratch-cell {% if i in selected_boxes or scratch_status == 'finished' %}revealed{% endif %}" {% if scratch_status == 'finished' and i not in selected_boxes %}disabled{% endif %}>
+                                    {% if i in selected_boxes or scratch_status == 'finished' %}{{ hidden_nums[i] }}{% else %}🎁{% endif %}
+                                </button>
+                            </form>
+                        {% endfor %}
+                    </div>
+                    {% if scratch_status == 'finished' %}
+                    <form action="/reset_scratch" method="POST">
+                        <button type="submit" style="width: 100%; padding: 10px; background: #8b5cf6; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">🔄 محاولة جديدة (1$)</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="roulette-container">
+                <h2>🔮 روليت سحب الأرقام التفاعلي (رول بـ 5 خانات للسحب)</h2>
+                <div class="roulette-wheel" id="rouletteWheel">
+                    <div class="ball-inner" id="ballDisplay">🎲</div>
+                </div>
             </div>
         </div>
 
-        <div class="lottery-section">
-            <h2>🔮 سحب عجلات الحظ اليومية</h2>
-            <div class="roulette-wheel" id="rouletteWheel">
-                <div class="ball-inner" id="ballDisplay">🎲</div>
-            </div>
+        <!-- سجل الفائزين آخر 24 ساعة (ثابت على زاوية الشاشة) -->
+        <div class="winners-sidebar">
+            <h3>🏆 لوحة شرف الفائزين (آخر 24 ساعة)</h3>
+            {% if winners_records %}
+                {% for game, info, time_str in winners_records %}
+                <div class="winner-record-item">
+                    <div style="color: #fbbf24; font-weight: bold;">{{ game }}</div>
+                    <div style="color: #e2e8f0; margin-top: 3px;">{{ info }}</div>
+                    <div style="color: #94a3b8; font-size: 11px; margin-top: 3px;">⏱ {{ time_str }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #94a3b8; text-align: center; font-size: 13px;">لا توجد سجلات فوز مسجلة حالياً!</p>
+            {% endif %}
         </div>
     </div>
 </body>
@@ -625,7 +690,7 @@ ADMIN_PAGE = """
     <title>لوحة تحكم الأدمن المستقلة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; margin: 0; }
-        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; border: 2px solid #fbbf24; margin-bottom: 25px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; border: 2px solid #fbbf24; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
         .admin-panel { background: #1e293b; padding: 25px; border-radius: 12px; border: 2px solid #fbbf24; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         input, select { width: 100%; padding: 10px; border-radius: 6px; background: #1e293b; color: white; border: 1px solid #475569; box-sizing: border-box; }
         button { padding: 10px 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
@@ -633,12 +698,14 @@ ADMIN_PAGE = """
         th, td { border: 1px solid #475569; padding: 12px; text-align: center; }
         th { background: #334155; color: #fbbf24; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        .manual-refresh-btn { background: #10b981; color: black; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #fbbf24; margin: 0;">👑 لوحة تحكم الأدمن (تحديث يدوي نقي)</h2>
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <h2 style="color: #fbbf24; margin: 0;">👑 لوحة تحكم الأدمن المستقلة</h2>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button class="manual-refresh-btn" onclick="location.reload();">🔄 تحديث البيانات يدويًا</button>
             <a href="/dashboard" class="back-btn">⬅️ العودة للعبة الرئيسية</a>
             <a href="/logout" style="background: #ef4444; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold;">🚪 خروج</a>
         </div>
@@ -646,7 +713,7 @@ ADMIN_PAGE = """
 
     <div class="admin-panel">
         <div style="background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد (اسم، كلمة مرور، وتحديد الرتبة):</h4>
+            <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد (لا يسمح بأسماء متشابهة):</h4>
             <form action="/create_user" method="POST" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <div style="flex: 1;"><input type="text" name="new_user" placeholder="اسم المستخدم" required></div>
                 <div style="flex: 1;"><input type="password" name="new_pass" placeholder="كلمة المرور" required></div>
@@ -682,15 +749,29 @@ ADMIN_PAGE = """
             </form>
         </div>
 
-        <div style="background: #111827; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #fbbf24;">
-            <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب لوحة أرقام الحظ اليومي (الساعة 9 مساءً بيروت):</h4>
-            <form action="/draw_winner" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <select name="forced_number" style="flex: 1;">
-                    <option value="">-- اختر الرقم الفائز يدوياً (أو عشوائي من المحجوزات) --</option>
-                    {% for i in range(1, 51) %}<option value="{{ i }}">رقم الفوز: {{ i }}</option>{% endfor %}
-                </select>
-                <button type="submit" style="background: #fbbf24; color: black;">إجراء السحب اليومي وتصفير اللوحة</button>
-            </form>
+        <!-- زر التحكم السري والموجه للتحدي -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+            <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
+                <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب الحظ اليومي (تحديد فائز سري خفية):</h4>
+                <form action="/draw_winner" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
+                    <select name="forced_number">
+                        <option value="">-- اختياري: حدد الرقم الفائز سرياً --</option>
+                        {% for i in range(1, 51) %}<option value="{{ i }}">رقم الفوز: {{ i }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" style="background: #fbbf24; color: black;">تنفيذ سحب الحظ اليومي</button>
+                </form>
+            </div>
+
+            <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
+                <h4 style="color: #fbbf24; margin-top: 0;">💎 اللعبة الملكية (تحديد فائز سري وخاص):</h4>
+                <form action="/draw_game_three" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
+                    <select name="forced_slot">
+                        <option value="">-- اختياري: حدد الخانة الفائزة سراً --</option>
+                        {% for i in range(1, 6) %}<option value="{{ i }}">الخانة الفائزة: {{ i }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" style="background: #fbbf24; color: black;">تنفيذ السحب الملكي الفاخر (250$)</button>
+                </form>
+            </div>
         </div>
         
         <h4 style="color: #38bdf8;">📋 جدول كافة الحسابات والأسماء والأرصدة والكلمات السرية المفعلة:</h4>
