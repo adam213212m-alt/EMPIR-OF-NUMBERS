@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'empire_ultimate_final_safe_key_2026'
+app.secret_key = 'empire_no_scroll_jump_key_2026'
 
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
@@ -128,7 +128,6 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
-    # التأكد من إنشاء حساب الأدمن وعدم مسحه
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -140,7 +139,6 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
-    # إنشاء حسابات user1 إلى user100 مرة واحدة بثبات كلمات السر us11$ وتجنب أي مسح للبيانات السابقة
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
@@ -180,7 +178,7 @@ def check_auto_draw_board():
         banner_end_time = time.time() + 25
         if winner_owner:
             cursor.execute("UPDATE users SET balance = balance + 80.0 WHERE username=?", (winner_owner,))
-            msg = f"🎉 مبروك للرقم الحظ {winning_number} - الفائز {winner_owner} ربح 80$ وتم إرسال المبلغ لحسابك فوراً! 🎆"
+            msg = f"🎉 مبروك للرقم الحظ {winning_number} - الفائز {winner_owner} ربح 80$!"
             cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                            ("لوحة أرقام الحظ (80$)", f"الرقم {winning_number} - الفائز: {winner_owner} (80$)", time.strftime('%Y-%m-%d %H:%M')))
             cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 80.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
@@ -219,7 +217,7 @@ def check_and_auto_draw_game_three():
                 banner_end_time = time.time() + 25
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
-                    msg = f"🏆 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$ وتم إرسال المبلغ لحسابك فوراً! 🎉"
+                    msg = f"🏆 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$!"
                     cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                                    ("اللعبة الملكية الفاخرة (200$)", f"الخانة {winning_slot} - الفائز: {winner_owner} (200$)", time.strftime('%Y-%m-%d %H:%M')))
                     cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 200.0 WHERE game_name=?", ("اللعبة الملكية الفاخرة (200$)",))
@@ -268,6 +266,7 @@ def manifest():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
+# نظام مزامنة البيانات السريع والصامت كل ثانيتين في الخلفية
 @app.route('/api/sync')
 def api_sync():
     if 'username' not in session:
@@ -286,17 +285,41 @@ def api_sync():
     res = cursor.fetchone()
     balance = res[0] if res else 0
 
-    cursor.execute("SELECT is_full, timer_end FROM game_three_state WHERE id=1")
+    cursor.execute("SELECT number, status, owner FROM game_board")
+    board = data_board = cursor.fetchall()
+
+    cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
+    user_locked = [row[0] for row in cursor.fetchall()]
+    user_spent = len(user_locked) * 2.0
+
+    cursor.execute("SELECT slot_id, status, owner FROM game_three")
+    g3_slots = cursor.fetchall()
+
+    cursor.execute("SELECT is_full, timer_end, last_winner_msg FROM game_three_state WHERE id=1")
     g3_state = cursor.fetchone()
     g3_is_full = g3_state[0]
     g3_timer_end = g3_state[1]
+    g3_msg = g3_state[2]
     g3_rem = max(0, int(g3_timer_end - time.time())) if g3_is_full else 0
+
+    cursor.execute("SELECT last_winner_msg FROM game_board_state WHERE id=1")
+    board_msg = cursor.fetchone()[0]
+
+    cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
+    winners = cursor.fetchall()
 
     conn.close()
     return jsonify({
         'balance': balance,
+        'board': board,
+        'user_locked': user_locked,
+        'user_spent': user_spent,
+        'g3_slots': g3_slots,
         'g3_is_full': g3_is_full,
-        'g3_rem': g3_rem
+        'g3_rem': g3_rem,
+        'g3_msg': g3_msg,
+        'board_msg': board_msg,
+        'winners': winners
     })
 
 @app.route('/', methods=['GET', 'POST'])
@@ -334,84 +357,29 @@ def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    try:
-        check_and_auto_draw_game_three()
-        
-        now_beirut = get_beirut_time()
-        if now_beirut.hour == 21 and now_beirut.minute == 0:
-            check_auto_draw_board()
+    username = session['username']
+    role = session['role']
+    password = session['password'] if role == 'admin' else '******'
 
-        username = session['username']
-        role = session['role']
-        password = session['password'] if role == 'admin' else '******'
-
-        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-        res = cursor.fetchone()
-        user_balance = res[0] if res else 0
-        session['balance'] = user_balance
-        
-        cursor.execute("SELECT number, status, owner FROM game_board")
-        board = cursor.fetchall()
-
-        cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
-        user_locked_numbers = [row[0] for row in cursor.fetchall()]
-        user_total_spent = len(user_locked_numbers) * 2.0
-
-        cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_board_state WHERE id=1")
-        board_state = cursor.fetchone()
-        board_last_winner_msg = board_state[0] if board_state else ""
-        board_banner_end = board_state[1] if board_state else 0
-        show_board_banner = time.time() < board_banner_end
-
-        cursor.execute("SELECT slot_id, status, owner FROM game_three")
-        game_three_slots = cursor.fetchall()
-
-        cursor.execute("SELECT is_full, timer_end, last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
-        g3_state = cursor.fetchone()
-        g3_is_full = g3_state[0]
-        g3_timer_end = g3_state[1]
-        g3_last_winner = g3_state[2]
-        banner_end_time = g3_state[3]
-        
-        show_g3_banner = time.time() < banner_end_time
-        current_time = time.time()
-        g3_remaining_time = max(0, int(g3_timer_end - current_time)) if g3_is_full else 0
-
-        cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
-        winners_records = cursor.fetchall()
-
-        conn.close()
-    except Exception as e:
-        session.clear()
-        return redirect(url_for('login'))
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    res = cursor.fetchone()
+    user_balance = res[0] if res else 0
+    session['balance'] = user_balance
+    conn.close()
 
     hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
-    not_enough_msg = request.args.get('not_enough', '')
 
     return render_template_string(DASHBOARD_PAGE, 
                                   username=username,
                                   password=password,
                                   role=role, 
-                                  balance=user_balance, 
-                                  board=board,
-                                  user_locked_numbers=user_locked_numbers,
-                                  user_total_spent=user_total_spent,
-                                  board_last_winner_msg=board_last_winner_msg,
-                                  show_board_banner=show_board_banner,
-                                  game_three_slots=game_three_slots,
-                                  g3_is_full=g3_is_full,
-                                  g3_remaining_time=g3_remaining_time,
-                                  g3_last_winner=g3_last_winner,
-                                  show_g3_banner=show_g3_banner,
-                                  winners_records=winners_records,
+                                  balance=user_balance,
                                   hidden_nums=hidden_nums,
                                   selected_boxes=selected_boxes,
                                   scratch_status=scratch_status,
-                                  scratch_msg=scratch_msg,
-                                  not_enough_msg=not_enough_msg)
+                                  scratch_msg=scratch_msg)
 
 @app.route('/admin_panel')
 def admin_panel():
@@ -451,7 +419,7 @@ def admin_panel():
 @app.route('/pick_number/<int:num>', methods=['POST'])
 def pick_number(num):
     if 'username' not in session:
-        return redirect(url_for('login'))
+        return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
     username = session['username']
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -473,19 +441,19 @@ def pick_number(num):
                     conn.commit()
                 else:
                     conn.close()
-                    return redirect(url_for('dashboard', not_enough='رصيدك لا يكفي (تكلفة الحجز 2$)، أعد الشحن من الأدمن!'))
+                    return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 2$)!'})
         elif status == 'locked' and owner == username:
             cursor.execute("UPDATE game_board SET status='available', owner=NULL WHERE number=?", (num,))
             cursor.execute("UPDATE users SET balance = balance + 2 WHERE username=?", (username,))
             cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 2.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
             conn.commit()
     conn.close()
-    return redirect(url_for('dashboard'))
+    return jsonify({'success': True})
 
 @app.route('/pick_game_three/<int:slot_id>', methods=['POST'])
 def pick_game_three(slot_id):
     if 'username' not in session:
-        return redirect(url_for('login'))
+        return jsonify({'success': False})
     username = session['username']
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -512,7 +480,7 @@ def pick_game_three(slot_id):
                     conn.commit()
             else:
                 conn.close()
-                return redirect(url_for('dashboard', not_enough='رصيدك لا يكفي (تكلفة الحجز 50$)، أعد الشحن من الأدمن!'))
+                return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 50$)!'})
         elif status == 'locked' and owner == username:
             cursor.execute("UPDATE game_three SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
             cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
@@ -521,7 +489,7 @@ def pick_game_three(slot_id):
                            ("تم إلغاء حجز، في انتظار اكتمال الخانات...",))
             conn.commit()
     conn.close()
-    return redirect(url_for('dashboard'))
+    return jsonify({'success': True})
 
 @app.route('/play_scratch/<int:box_index>', methods=['POST'])
 def play_scratch(box_index):
@@ -539,7 +507,7 @@ def play_scratch(box_index):
     if scratch_status == 'finished':
         if balance < 1.0:
             conn.close()
-            return redirect(url_for('dashboard', not_enough='رصيدك لا يكفي (تكلفة المحاولة 1$)، أعد الشحن من الأدمن!'))
+            return redirect(url_for('dashboard'))
         
         nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
         random.shuffle(nums)
@@ -563,7 +531,7 @@ def play_scratch(box_index):
     if len(selected_boxes) == 0:
         if balance < 1.0:
             conn.close()
-            return redirect(url_for('dashboard', not_enough='رصيدك لا يكفي (تكلفة المحاولة 1$)، أعد الشحن من الأدمن!'))
+            return redirect(url_for('dashboard'))
         cursor.execute("UPDATE users SET balance = balance - 1.0 WHERE username=?", (username,))
         cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 1.0 WHERE game_name=?", ("لعبة اكشف واربح (15$)",))
         cursor.execute("UPDATE scratch_global SET total_global_attempts = total_global_attempts + 1")
@@ -724,19 +692,16 @@ DASHBOARD_PAGE = """
         
         .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
         
-        /* الدائرة الملكية الفاخرة والسهم المقلوب بالأعلى */
         .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         .big-wheel-container { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 8px solid #fbbf24; background: radial-gradient(circle, #31103d, #0f172a); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(251,191,36,0.8); animation: spinWheel 1.5s infinite linear; }
         .wheel-arrow-top { position: absolute; top: -20px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #22c55e; z-index: 10; filter: drop-shadow(0 0 5px #22c55e); }
         .wheel-number-slot { position: absolute; font-size: 22px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #fbbf24; }
         @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 20px; font-weight: bold; font-size: 22px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 0 30px rgba(251,191,36,0.9); text-align: center; animation: pulseBanner 0.8s infinite alternate; border: 2px solid #fff; }
-        @keyframes pulseBanner { 0% { transform: scale(1); } 100% { transform: scale(1.02); } }
+        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 20px; font-weight: bold; font-size: 22px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 0 30px rgba(251,191,36,0.9); text-align: center; border: 2px solid #fff; }
 
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
-        .luxury-slot-form { display: flex; }
-        .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; }
         .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; }
         .luxury-owner { font-size: 11px; color: #fde047; margin-top: 6px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
@@ -748,17 +713,9 @@ DASHBOARD_PAGE = """
         .player-summary-box { background: #0f172a; border: 2px dashed #111; padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; color: #f8fafc; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; font-size: 14px; font-weight: bold; }
         .summary-item { background: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #475569; }
         .board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-top: 15px; }
-        .cell-form { display: flex; }
         .cell { background: #000; border: 1px solid #ffd700; width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: #fff; border-radius: 6px; cursor: pointer; padding: 0; box-sizing: border-box; }
         .cell.locked { background: #ef4444; border-color: #b91c1c; }
         .owner-tag { font-size: 9px; display: block; color: #fde047; margin-top: 2px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
-        .scratch-section { background: #1e293b; border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; }
-        .scratch-section h2 { color: #a78bfa; margin-top: 0; font-size: 20px; }
-        .scratch-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 15px 0; }
-        .scratch-cell { background: linear-gradient(135deg, #4f46e5, #312e81); border: 2px solid #a78bfa; height: 55px; border-radius: 8px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .scratch-cell.revealed { background: linear-gradient(135deg, #059669, #065f46); border-color: #34d399; font-size: 22px; color: #fbbf24; }
-        .scratch-msg-box { background: #0f172a; border: 1px dashed #a78bfa; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; color: #facc15; font-size: 14px; margin-bottom: 10px; }
         
         .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
@@ -786,15 +743,81 @@ DASHBOARD_PAGE = """
             navigator.serviceWorker.register('/sw.js');
         }
 
-        // التحديث السريع في الخلفية كل ثانيتين (2000ms) بصمت تام دون إزعاج أو إعادة توجيه اللاعب لرأس الصفحة
-        setInterval(() => {
+        // الحجز الفوري للأرقام دون إعادة تحميل الصفحة أو تحريك الشاشة
+        function pickNumber(num) {
+            fetch('/pick_number/' + num, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.success && data.msg) alert(data.msg);
+                    syncData();
+                });
+        }
+
+        function pickSlot(slotId) {
+            fetch('/pick_game_three/' + slotId, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.success && data.msg) alert(data.msg);
+                    syncData();
+                });
+        }
+
+        // التحديث الفوري كل ثانيتين في الخلفية بهدوء تام دون أي قفز للأعلى
+        function syncData() {
             fetch('/api/sync')
                 .then(response => response.json())
                 .then(data => {
                     if(data.error) return;
+                    
+                    // تحديث الرصيد
                     const balanceEl = document.getElementById('userBalanceBadge');
                     if(balanceEl) balanceEl.innerText = '$' + data.balance;
 
+                    // تحديث لوحة أرقام الحظ
+                    const boardContainer = document.getElementById('boardContainer');
+                    if(boardContainer && data.board) {
+                        let html = '';
+                        data.board.forEach(cell => {
+                            let num = cell[0];
+                            let status = cell[1];
+                            let owner = cell[2];
+                            let lockedClass = status === 'locked' ? 'locked' : '';
+                            let ownerText = owner ? `<span class="owner-tag">${owner}</span>` : '';
+                            html += `<button type="button" onclick="pickNumber(${num})" class="cell ${lockedClass}">
+                                        <span style="font-size: 15px;">${num}</span>
+                                        ${ownerText}
+                                     </button>`;
+                        });
+                        boardContainer.innerHTML = html;
+                    }
+
+                    // تحديث ملخص اللاعب
+                    const myNumsEl = document.getElementById('myLockedNumbers');
+                    if(myNumsEl) myNumsEl.innerText = data.user_locked.length > 0 ? data.user_locked.join(', ') : 'لا توجد';
+                    
+                    const mySpentEl = document.getElementById('myTotalSpent');
+                    if(mySpentEl) mySpentEl.innerText = '$' + data.user_spent;
+
+                    // تحديث اللعبة الملكية
+                    const g3Container = document.getElementById('g3SlotsContainer');
+                    if(g3Container && data.g3_slots) {
+                        let g3Html = '';
+                        data.g3_slots.forEach(slot => {
+                            let sId = slot[0];
+                            let sStatus = slot[1];
+                            let sOwner = slot[2];
+                            let lockedCls = sStatus === 'locked' ? 'locked' : '';
+                            let ownerTag = sOwner ? `<span class="luxury-owner">${sOwner}</span>` : '';
+                            g3Html += `<button type="button" onclick="pickSlot(${sId})" class="luxury-slot-btn ${lockedCls}">
+                                          <span style="font-size: 22px;">رقم ${sId}</span>
+                                          <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
+                                          ${ownerTag}
+                                       </button>`;
+                        });
+                        g3Container.innerHTML = g3Html;
+                    }
+
+                    // تفعيل دوال السحب وعجلة الروليت عند الاكتمال
                     const wheelOverlay = document.getElementById('bigWheelOverlay');
                     if(data.g3_is_full) {
                         if(wheelOverlay) {
@@ -806,7 +829,9 @@ DASHBOARD_PAGE = """
                         if(wheelOverlay) wheelOverlay.style.display = 'none';
                     }
                 }).catch(err => {});
-        }, 2000);
+        }
+
+        setInterval(syncData, 2000);
     </script>
 </head>
 <body>
@@ -844,10 +869,6 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    {% if not_enough_msg %}
-    <div style="margin-top: 15px;"><div class="alert-box">⚠️ {{ not_enough_msg }}</div></div>
-    {% endif %}
-
     <div class="main-container">
         <div>
             <!-- اللعبة الملكية الفاخرة -->
@@ -866,25 +887,8 @@ DASHBOARD_PAGE = """
                     </div>
                 </div>
 
-                {% if show_g3_banner %}
-                <div class="winner-win-banner" style="margin-top: 15px;">
-                    🎉 🎆 🎇 {{ g3_last_winner }} 🎇 🎆 🎉
-                </div>
-                {% endif %}
-
-                <div class="luxury-slots-container">
-                    {% for slot_id, status, owner in game_three_slots %}
-                    <form action="/pick_game_three/{{ slot_id }}" method="POST" class="luxury-slot-form">
-                        <button type="submit" class="luxury-slot-btn {% if status == 'locked' %}locked{% endif %}">
-                            <span style="font-size: 22px;">رقم {{ slot_id }}</span>
-                            <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
-                            {% if owner %}
-                                <span class="luxury-owner">{{ owner }}</span>
-                                {% if owner == username %}<span style="font-size: 9px; color: #34d399;">(حجزك)</span>{% endif %}
-                            {% endif %}
-                        </button>
-                    </form>
-                    {% endfor %}
+                <div id="g3SlotsContainer" class="luxury-slots-container">
+                    <!-- يتم تحديثها تلقائياً بالخلفية دون حركة -->
                 </div>
             </div>
 
@@ -892,33 +896,16 @@ DASHBOARD_PAGE = """
                 <!-- لوحة أرقام الحظ -->
                 <div class="board-section">
                     <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
-                    
-                    {% if show_board_banner %}
-                    <div class="winner-win-banner" style="background: linear-gradient(90deg, #059669, #34d399, #059669); color: #fff; margin-bottom: 10px;">
-                        🎉 🎆 🎇 {{ board_last_winner_msg }} 🎇 🎆 🎉
-                    </div>
-                    {% else %}
                     <div style="background: rgba(0,0,0,0.6); border: 1px solid #38bdf8; padding: 10px; border-radius: 8px; margin-bottom: 12px; text-align: center;">
-                        <span style="color: #fbbf24; font-size: 14px; font-weight: bold;">⏰ السحب اليومي التلقائي الساعة 9:00 مساءً</span><br>
-                        <span style="color: #38bdf8; font-size: 12px;">{{ board_last_winner_msg }}</span>
+                        <span style="color: #fbbf24; font-size: 14px; font-weight: bold;">⏰ السحب اليومي التلقائي الساعة 9:00 مساءً</span>
                     </div>
-                    {% endif %}
 
                     <div class="player-summary-box">
-                        <div class="summary-item">🎯 أرقامك: <span style="color: #fbbf24;">{% if user_locked_numbers %}{{ user_locked_numbers | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
-                        <div class="summary-item">💵 المدفوع: <span style="color: #ef4444;">${{ user_total_spent }}</span></div>
+                        <div class="summary-item">🎯 أرقامك: <span id="myLockedNumbers" style="color: #fbbf24;">لا توجد</span></div>
+                        <div class="summary-item">💵 المدفوع: <span id="myTotalSpent" style="color: #ef4444;">$0</span></div>
                     </div>
-                    <div class="board">
-                        {% for num, status, owner in board %}
-                            <form action="/pick_number/{{ num }}" method="POST" class="cell-form">
-                                <button type="submit" class="cell {% if status == 'locked' %}locked{% endif %}">
-                                    <span style="font-size: 15px;">{{ num }}</span>
-                                    {% if owner %}
-                                        <span class="owner-tag">{{ owner }}</span>
-                                    {% endif %}
-                                </button>
-                            </form>
-                        {% endfor %}
+                    <div id="boardContainer" class="board">
+                        <!-- يتم تحديث الأرقام فورياً دون إعادة تحميل أو قفز للأعلى -->
                     </div>
                 </div>
 
