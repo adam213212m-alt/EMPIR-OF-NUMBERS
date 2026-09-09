@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'empire_fixed_display_key_2026'
+app.secret_key = 'empire_ultimate_final_safe_key_2026'
 
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
@@ -128,6 +128,7 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
+    # التأكد من إنشاء حساب الأدمن وعدم مسحه
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -139,6 +140,7 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
+    # إنشاء حسابات user1 إلى user100 مرة واحدة بثبات كلمات السر us11$ وتجنب أي مسح للبيانات السابقة
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
@@ -722,9 +724,10 @@ DASHBOARD_PAGE = """
         
         .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
         
+        /* الدائرة الملكية الفاخرة والسهم المقلوب بالأعلى */
         .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         .big-wheel-container { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 8px solid #fbbf24; background: radial-gradient(circle, #31103d, #0f172a); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(251,191,36,0.8); animation: spinWheel 1.5s infinite linear; }
-        .wheel-arrow { position: absolute; top: -15px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 25px solid #22c55e; z-index: 10; filter: drop-shadow(0 0 5px #22c55e); }
+        .wheel-arrow-top { position: absolute; top: -20px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #22c55e; z-index: 10; filter: drop-shadow(0 0 5px #22c55e); }
         .wheel-number-slot { position: absolute; font-size: 22px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #fbbf24; }
         @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -783,7 +786,7 @@ DASHBOARD_PAGE = """
             navigator.serviceWorker.register('/sw.js');
         }
 
-        // التحديث الذكي والصامت في الخلفية كل 3 ثوانٍ دون تحريك اللاعب لأعلى الصفحة أبداً
+        // التحديث السريع في الخلفية كل ثانيتين (2000ms) بصمت تام دون إزعاج أو إعادة توجيه اللاعب لرأس الصفحة
         setInterval(() => {
             fetch('/api/sync')
                 .then(response => response.json())
@@ -803,14 +806,14 @@ DASHBOARD_PAGE = """
                         if(wheelOverlay) wheelOverlay.style.display = 'none';
                     }
                 }).catch(err => {});
-        }, 3000);
+        }, 2000);
     </script>
 </head>
 <body>
     <div id="bigWheelOverlay" class="big-wheel-overlay" style="display: none;">
         <div style="color: #fbbf24; font-size: 28px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 15px #fbbf24;">🎡 جاري السحب الملكي الفاخر...</div>
         <div class="big-wheel-container">
-            <div class="wheel-arrow"></div>
+            <div class="wheel-arrow-top"></div>
             <div class="wheel-number-slot" style="top: 15px;">1</div>
             <div class="wheel-number-slot" style="right: 25px; top: 80px;">2</div>
             <div class="wheel-number-slot" style="right: 45px; bottom: 35px;">3</div>
