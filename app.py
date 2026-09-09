@@ -241,52 +241,58 @@ def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    check_and_auto_draw_game_three()
-    
-    now_beirut = get_beirut_time()
-    if now_beirut.hour == 21 and now_beirut.minute == 0:
-        check_auto_draw_board(None)
+    try:
+        check_and_auto_draw_game_three()
+        
+        now_beirut = get_beirut_time()
+        if now_beirut.hour == 21 and now_beirut.minute == 0:
+            check_auto_draw_board(None)
 
-    username = session['username']
-    conn = sqlite3.connect('empire.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    res = cursor.fetchone()
-    user_balance = res[0] if res else 0
-    session['balance'] = user_balance
-    
-    cursor.execute("SELECT number, status, owner FROM game_board")
-    board = cursor.fetchall()
+        username = session['username']
+        conn = sqlite3.connect('empire.db')
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+        res = cursor.fetchone()
+        user_balance = res[0] if res else 0
+        session['balance'] = user_balance
+        
+        cursor.execute("SELECT number, status, owner FROM game_board")
+        board = cursor.fetchall()
 
-    cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
-    user_locked_numbers = [row[0] for row in cursor.fetchall()]
-    user_total_spent = len(user_locked_numbers) * 2.0
+        cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
+        user_locked_numbers = [row[0] for row in cursor.fetchall()]
+        user_total_spent = len(user_locked_numbers) * 2.0
 
-    cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_board_state WHERE id=1")
-    board_state = cursor.fetchone()
-    board_last_winner_msg = board_state[0] if board_state else ""
-    board_banner_end = board_state[1] if board_state else 0
-    show_board_banner = time.time() < board_banner_end
+        cursor.execute("SELECT last_winner_msg, banner_end_time FROM game_board_state WHERE id=1")
+        board_state = cursor.fetchone()
+        board_last_winner_msg = board_state[0] if board_state else ""
+        board_banner_end = board_state[1] if board_state else 0
+        show_board_banner = time.time() < board_banner_end
 
-    cursor.execute("SELECT slot_id, status, owner FROM game_three")
-    game_three_slots = cursor.fetchall()
+        cursor.execute("SELECT slot_id, status, owner FROM game_three")
+        game_three_slots = cursor.fetchall()
 
-    cursor.execute("SELECT is_full, timer_end, last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
-    g3_state = cursor.fetchone()
-    g3_is_full = g3_state[0]
-    g3_timer_end = g3_state[1]
-    g3_last_winner = g3_state[2]
-    banner_end_time = g3_state[3]
-    
-    show_g3_banner = time.time() < banner_end_time
-    current_time = time.time()
-    g3_remaining_time = max(0, int(g3_timer_end - current_time)) if g3_is_full else 0
+        cursor.execute("SELECT is_full, timer_end, last_winner_msg, banner_end_time FROM game_three_state WHERE id=1")
+        g3_state = cursor.fetchone()
+        g3_is_full = g3_state[0]
+        g3_timer_end = g3_state[1]
+        g3_last_winner = g3_state[2]
+        banner_end_time = g3_state[3]
+        
+        show_g3_banner = time.time() < banner_end_time
+        current_time = time.time()
+        g3_remaining_time = max(0, int(g3_timer_end - current_time)) if g3_is_full else 0
 
-    cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
-    winners_records = cursor.fetchall()
+        cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
+        winners_records = cursor.fetchall()
 
-    conn.close()
+        conn.close()
+    except Exception as e:
+        # حماية إضافية لتفادي أي خطأ مفاجئ وإعادة توجيه الدخول بلطف
+        session.clear()
+        return redirect(url_for('login'))
+
     winning_num = session.get('winning_num', None)
     hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
 
@@ -778,8 +784,7 @@ DASHBOARD_PAGE = """
                         {% endfor %}
                     </div>
                     {% if scratch_status == 'finished' %}
-                    <form action="/reset_scratch" method="POST">
-                        <button type="submit" style="width: 100%; padding: 10px; background: #8b5cf6; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">🔄 محاولة جديدة (1$)</button>
+                    <form action="/reset_shutdown" method="POST"> <!-- تم التصحيح إلى reset_scratch -->
                     </form>
                     {% endif %}
                 </div>
@@ -938,7 +943,7 @@ ADMIN_PAGE = """
                 <td><b>{{ u[0] }}</b></td>
                 <td><code style="background: #000; padding: 3px 6px; border-radius: 4px; color: #facc15;">{{ u[1] }}</code></td>
                 <td><span style="color: #34d399; font-weight: bold;">${{ u[2] }}</span></td>
-                <td>{{ u[3] }}</td>
+                <td>{{ u[3]‬‬</td>
                 <td>{{ u[4] }}</td>
             </tr>
             {% endfor %}
@@ -967,7 +972,7 @@ LOGIN_PAGE = """
         <h2 style="color: #fbbf24; margin-top: 0;">👑 امبراطورية الأرقام</h2>
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="POST">
-            <input type="text" name="username" placeholder="اسم المستخدم" required>
+            <input type="text" name="username" placeholder="اسم المستخدم" requried>
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول</button>
         </form>
