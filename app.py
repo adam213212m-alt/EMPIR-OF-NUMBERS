@@ -10,7 +10,6 @@ def init_db():
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
     
-    # منع خلق أسماء مستخدمين متشابهة تماماً عبر UNIQUE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,6 +67,7 @@ def init_db():
         for i in range(1, 6):
             cursor.execute('INSERT INTO game_three (slot_id, status) VALUES (?, ?)', (i, 'available'))
 
+    # التأكد من إنشاء جدول الحالة للعبة الثالثة مع الأعمدة المطلوبة بأمان
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_three_state (
             id INTEGER PRIMARY KEY,
@@ -75,6 +75,11 @@ def init_db():
             banner_end_time REAL DEFAULT 0
         )
     ''')
+    try:
+        cursor.execute("ALTER TABLE game_three_state ADD COLUMN banner_end_time REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # العمود موجود مسبقاً
+
     cursor.execute('SELECT COUNT(*) FROM game_three_state')
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO game_three_state (id, last_winner_msg, banner_end_time) VALUES (1, "بانتظار اكتمال الأرقام الفاخرة...", 0)')
@@ -308,7 +313,6 @@ def draw_winner():
             
     if winning_number:
         if winner_owner:
-            # تحويل الجائزة لحساب الفائز الفعلي
             cursor.execute("UPDATE users SET balance = balance + 80.0 WHERE username=?", (winner_owner,))
             msg = f"🏆 (السحب اليومي) الفائز برقم ({winning_number}) هو: {winner_owner} ($80)!"
             cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
@@ -347,9 +351,8 @@ def draw_game_three():
             winning_slot, winner_owner = random.choice(locked)
             
     if winning_slot:
-        banner_end_time = time.time() + 10  # عرض شريط 250$ win لمدة 10 ثوانٍ بالضبط
+        banner_end_time = time.time() + 10
         if winner_owner:
-            # تحويل الجائزة الفورية 250$ لحساب الفائز الحقيقي
             cursor.execute("UPDATE users SET balance = balance + 250.0 WHERE username=?", (winner_owner,))
             msg = f"🏆 {winner_owner} - 250$ WIN 🏆"
             cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
@@ -446,12 +449,10 @@ def create_user():
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
     try:
-        # بفضل خاصية UNIQUE لن يسمح النظام بخلق اسمين متشابهين أبداً
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, ?, ?)",
                        (new_user, new_pass, role, session['username']))
         conn.commit()
     except sqlite3.IntegrityError:
-        # إذا كان الاسم موجوداً مسبقاً يتم تجاهله لتفادي الأخطاء
         pass
     conn.close()
     return redirect(url_for('admin_panel'))
@@ -507,7 +508,6 @@ DASHBOARD_PAGE = """
         .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; position: relative; overflow: hidden; }
         .luxury-game-section h2 { color: #fbbf24; margin-top: 0; font-size: 26px; }
         
-        /* شريط الـ 250$ win لمدة 10 ثوانٍ */
         .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 15px; font-weight: bold; font-size: 22px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 0 25px rgba(251,191,36,0.8); animation: pulseBanner 0.8s infinite alternate; border: 2px solid #fff; }
         @keyframes pulseBanner { 0% { transform: scale(1); } 100% { transform: scale(1.03); } }
 
@@ -573,7 +573,7 @@ DASHBOARD_PAGE = """
 
     <div class="main-container">
         <div>
-            <!-- اللعبة الملكية الفاخرة مع شريط الفوز 250$ win لمدة 10 ثوانٍ -->
+            <!-- اللعبة الملكية الفاخرة مع شريط الفائز 250$ win -->
             <div class="luxury-game-section">
                 <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى)</h2>
                 
@@ -662,7 +662,7 @@ DASHBOARD_PAGE = """
             </div>
         </div>
 
-        <!-- سجل الفائزين آخر 24 ساعة (ثابت على زاوية الشاشة) -->
+        <!-- سجل الفائزين آخر 24 ساعة -->
         <div class="winners-sidebar">
             <h3>🏆 لوحة شرف الفائزين (آخر 24 ساعة)</h3>
             {% if winners_records %}
@@ -749,7 +749,6 @@ ADMIN_PAGE = """
             </form>
         </div>
 
-        <!-- زر التحكم السري والموجه للتحدي -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
             <div style="background: #111827; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
                 <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب الحظ اليومي (تحديد فائز سري خفية):</h4>
