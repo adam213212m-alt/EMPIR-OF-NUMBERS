@@ -1,8 +1,8 @@
+
 from flask import Flask, render_template_string, request, redirect, url_for, session
 import sqlite3
 import random
 import time
-from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'empire_of_numbers_secret_key'
@@ -76,7 +76,7 @@ def init_db():
     ''')
     cursor.execute('SELECT COUNT(*) FROM game_three_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO game_three_state (id, last_winner_msg) VALUES (1, "بانتظار اكتمال الأرقام الخمسة...")')
+        cursor.execute('INSERT INTO game_three_state (id, last_winner_msg) VALUES (1, "بانتظار اكتمال الأرقام الفاخرة...")')
     
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
@@ -132,6 +132,11 @@ def login():
             
     return render_template_string(LOGIN_PAGE, error=error)
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/dashboard')
 def dashboard():
     if 'username' not in session:
@@ -141,7 +146,6 @@ def dashboard():
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
     
-    # تحديث رصيد المستخدم الحالي مباشرة من قاعدة البيانات ليراه دائماً محدثاً
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     res = cursor.fetchone()
     user_balance = res[0] if res else 0
@@ -211,7 +215,6 @@ def pick_number(num):
         
     status, owner = row[0], row[1]
     
-    # حجز الرقم فقط إذا كان متاحاً ولم يختاره شخص آخر، ولا يمكن لأحد إلغاء حجز غيره
     if status == 'available':
         cursor.execute("SELECT COUNT(*) FROM game_board WHERE owner=?", (username,))
         user_count = cursor.fetchone()[0]
@@ -219,7 +222,11 @@ def pick_number(num):
             cursor.execute("UPDATE game_board SET status='locked', owner=? WHERE number=?", (username, num))
             cursor.execute("UPDATE users SET balance = balance - 2 WHERE username=?", (username,))
             conn.commit()
-            
+    elif status == 'locked' and owner == username:
+        cursor.execute("UPDATE game_board SET status='available', owner=NULL WHERE number=?", (num,))
+        cursor.execute("UPDATE users SET balance = balance + 2 WHERE username=?", (username,))
+        conn.commit()
+        
     conn.close()
     return redirect(url_for('dashboard'))
 
@@ -242,10 +249,13 @@ def pick_game_three(slot_id):
         
     status, owner = row[0], row[1]
     
-    # حجز الخانة إذا كانت متاحة حصرياً، ولا يمكن لأحد إلغاء حجز غيره
     if status == 'available' and balance >= 50.0:
         cursor.execute("UPDATE game_three SET status='locked', owner=? WHERE slot_id=?", (username, slot_id))
         cursor.execute("UPDATE users SET balance = balance - 50.0 WHERE username=?", (username,))
+        conn.commit()
+    elif status == 'locked' and owner == username:
+        cursor.execute("UPDATE game_three SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
+        cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
         conn.commit()
         
     conn.close()
@@ -451,6 +461,7 @@ DASHBOARD_PAGE = """
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .refresh-btn { background: #3b82f6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+        .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .main-container { margin-top: 20px; display: flex; flex-direction: column; gap: 25px; }
         
         .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; text-align: center; }
@@ -458,7 +469,7 @@ DASHBOARD_PAGE = """
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
         .luxury-slot-form { display: flex; }
         .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; cursor: not-allowed; }
+        .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; }
         .luxury-owner { font-size: 11px; color: #fde047; margin-top: 6px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
         .timer-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 12px 20px; border-radius: 10px; display: inline-block; font-size: 16px; font-weight: bold; color: #38bdf8; margin-top: 10px; width: 100%; box-sizing: border-box; text-align: center; }
@@ -474,7 +485,7 @@ DASHBOARD_PAGE = """
         .board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-top: 15px; }
         .cell-form { display: flex; }
         .cell { background: #000; border: 1px solid #ffd700; width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: bold; color: #fff; border-radius: 6px; cursor: pointer; padding: 0; box-sizing: border-box; }
-        .cell.locked { background: #ef4444; border-color: #b91c1c; cursor: not-allowed; }
+        .cell.locked { background: #ef4444; border-color: #b91c1c; }
         .owner-tag { font-size: 9px; display: block; color: #fde047; margin-top: 2px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
         .scratch-section { background: #1e293b; border: 2px solid #8b5cf6; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -496,10 +507,10 @@ DASHBOARD_PAGE = """
         th { background: #334155; }
     </style>
     <script>
-        // التحديث التلقائي للصفحة كل 5 ثوانٍ ليرى الأدمن وكل المستخدمين الأرصدة والأرقام المحجوزة باللون الأحمر فوراً عند أي تغيير
+        // تحديث اللوحة والأرصدة لحظياً للجميع كل 4 ثوانٍ
         setTimeout(() => {
             location.reload();
-        }, 5000);
+        }, 4000);
     </script>
 </head>
 <body>
@@ -511,7 +522,8 @@ DASHBOARD_PAGE = """
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
             <a class="whatsapp-btn" href="https://wa.me/?text=الرجاء%20منكم%20شحن%20رصيد%20حسابي%20بلعبة%20امبراطورية%20الارقام%20باسم%20المستخدم:%20{{ username }}" target="_blank">💬 اشحن عبر واتساب</a>
-            <button class="refresh-btn" onclick="location.reload();">🔄 تحديث اللوحة</button>
+            <button class="refresh-btn" onclick="location.reload();">🔄 تحديث</button>
+            <a href="/logout" class="logout-btn">🚪 تسجيل خروج</a>
         </div>
     </div>
 
@@ -520,17 +532,17 @@ DASHBOARD_PAGE = """
         <div class="luxury-game-section">
             <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى)</h2>
             <p style="color: #cbd5e1; font-size: 14px;">قيمة الرقم الواحد: 50$ | الجائزة الكبرى: 200$!</p>
-            <div class="timer-box">
-                ✨ {{ g3_last_winner }}
-            </div>
+            <div class="timer-box">✨ {{ g3_last_winner }}</div>
             <div class="luxury-slots-container">
                 {% for slot_id, status, owner in game_three_slots %}
                 <form action="/pick_game_three/{{ slot_id }}" method="POST" class="luxury-slot-form">
-                    <!-- إذا كان الرقم محجوزاً، يتم تعطيل الزر ولا يمكن لأحد إلغاؤه -->
-                    <button type="submit" class="luxury-slot-btn {% if status == 'locked' %}locked{% endif %}" {% if status == 'locked' %}disabled title="هذا الرقم محجوز ولا يمكن إلغاؤه"{% endif %}>
+                    <button type="submit" class="luxury-slot-btn {% if status == 'locked' %}locked{% endif %}">
                         <span style="font-size: 22px;">رقم {{ slot_id }}</span>
                         <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
-                        {% if owner %}<span class="luxury-owner">{{ owner }}</span>{% endif %}
+                        {% if owner %}
+                            <span class="luxury-owner">{{ owner }}</span>
+                            {% if owner == username %}<span style="font-size: 10px; color: #34d399;">(حجزك - للتراجع)</span>{% endif %}
+                        {% endif %}
                     </button>
                 </form>
                 {% endfor %}
@@ -538,7 +550,7 @@ DASHBOARD_PAGE = """
         </div>
 
         <div class="games-grid">
-            <!-- اللعبة الأولى: لوحة أرقام الحظ (سحب يومي الساعة 9 مساءً بتوقيت بيروت) -->
+            <!-- اللعبة الأولى -->
             <div class="board-section">
                 <h2>لوحة أرقام الحظ (تكلفة الرقم: 2$ | الجائزة: 80$)</h2>
                 <div class="timer-box" style="margin-bottom: 12px;">
@@ -553,10 +565,12 @@ DASHBOARD_PAGE = """
                 <div class="board">
                     {% for num, status, owner in board %}
                         <form action="/pick_number/{{ num }}" method="POST" class="cell-form">
-                            <!-- إذا حجز شخص الرقم يصبح أحمر ومغلقاً ولا يمكن لأحد إلغاؤه -->
-                            <button type="submit" class="cell {% if status == 'locked' %}locked{% endif %}" {% if status == 'locked' %}disabled title="هذا الرقم محجوز مسبقاً"{% endif %}>
+                            <button type="submit" class="cell {% if status == 'locked' %}locked{% endif %}">
                                 <span style="font-size: 15px;">{{ num }}</span>
-                                {% if owner %}<span class="owner-tag">{{ owner }}</span>{% endif %}
+                                {% if owner %}
+                                    <span class="owner-tag">{{ owner }}</span>
+                                    {% if owner == username %}<span style="font-size: 8px; color: #34d399;">إلغاء حجزك</span>{% endif %}
+                                {% endif %}
                             </button>
                         </form>
                     {% endfor %}
@@ -597,7 +611,7 @@ DASHBOARD_PAGE = """
 
     {% if role == 'admin' %}
     <div class="admin-panel">
-        <h3>👑 لوحة تحكم المؤسس</h3>
+        <h3>👑 لوحة تحكم المؤسس (محدثة لحظياً لكافة الأرصدة والأسماء)</h3>
         <div style="background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
             <h4 style="margin-top: 0; color: #38bdf8;">👤 إنشاء حساب جديد:</h4>
             <form action="/create_user" method="POST" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -633,7 +647,6 @@ DASHBOARD_PAGE = """
             </form>
         </div>
 
-        <!-- أزرار سحب الأدمن اليدوية المخصصة للمواعيد الثابتة -->
         <div style="background: #111827; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fbbf24;">
             <h4 style="color: #fbbf24; margin-top: 0;">🎯 سحب لوحة أرقام الحظ اليومي (الساعة 9 مساءً بيروت):</h4>
             <form action="/draw_winner" method="POST" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
@@ -643,13 +656,13 @@ DASHBOARD_PAGE = """
                     <option value="{{ i }}">رقم الفوز: {{ i }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" style="padding: 12px 25px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">إجراء سحب الحظ اليومي</button>
+                <button type="submit" style="padding: 12px 25px; background: #fbbf24; color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">إجراء السحب اليومي لإعادة الأرقام</button>
             </form>
         </div>
         
-        <h4>قائمة كافة الحسابات والأسماء والأرصدة المحدثة:</h4>
+        <h4>قائمة كافة الحسابات والأسماء والأرصدة المحدثة لحظياً للأدمن:</h4>
         <table>
-            <tr><th>المستخدم</th><th>كلمة المرور</th><th>الرصيد</th><th>الفئة</th></tr>
+            <tr><th>المستخدم</th><th>كلمة المرور</th><th>الرصيد المحدث</th><th>الفئة</th></tr>
             {% for u in all_users %}
             <tr><td><b>{{ u[0] }}</b></td><td>{{ u[1] }}</td><td><span style="color: #34d399;">${{ u[2] }}</span></td><td>{{ u[3] }}</td></tr>
             {% endfor %}
