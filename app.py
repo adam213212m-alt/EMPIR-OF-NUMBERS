@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template_string, request, redirect, url_for, session
 import sqlite3
 import random
@@ -98,7 +97,6 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO game_three_state (id, is_full, timer_end, last_winner_msg, banner_end_time) VALUES (1, 0, 0, "بانتظار اكتمال الأرقام الفاخرة...", 0)')
 
-    # جدول السجلات المالية وتتبع الأرباح والخسائر لكل لعبة
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS winners_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +114,6 @@ def init_db():
         )
     ''')
     
-    # تهيئة إحصائيات الألعاب المالية إن لم تكن موجودة
     games_list = ["لوحة أرقام الحظ (80$)", "اللعبة الملكية الفاخرة", "لعبة الـ 15 مربعاً (15$)"]
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
@@ -154,7 +151,6 @@ def check_auto_draw_board(forced_number_from_admin=None):
             msg = f"🎉 مبروك {winner_owner} - ربحت 80$ (الرقم {winning_number})! 🎉"
             cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                            ("لوحة أرقام الحظ (80$)", f"الرقم {winning_number} - الفائز: {winner_owner} (80$)", time.strftime('%Y-%m-%d %H:%M')))
-            # تسجيل الجائزة المدفوعة مالياً
             cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 80.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
         else:
             msg = f"🏆 فاز الرقم ({winning_number}) ولم يكن محجوزاً لأحد."
@@ -318,7 +314,7 @@ def dashboard():
 
 @app.route('/admin_panel')
 def admin_panel():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
     
     conn = sqlite3.connect('empire.db')
@@ -326,7 +322,6 @@ def admin_panel():
     cursor.execute("SELECT username, password, balance, role, created_by FROM users")
     all_users = cursor.fetchall()
 
-    # جلب الإحصائيات المالية لكل لعبة وحساب الأرباح والخسائر الصافية
     cursor.execute("SELECT game_name, total_collected, total_payouts FROM financial_stats")
     fin_data = cursor.fetchall()
     
@@ -371,13 +366,11 @@ def pick_number(num):
         if user_count < 36 and balance >= 2:
             cursor.execute("UPDATE game_board SET status='locked', owner=? WHERE number=?", (username, num))
             cursor.execute("UPDATE users SET balance = balance - 2 WHERE username=?", (username,))
-            # تسجيل إيرادات لوحة الحظ (2$)
             cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 2.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
             conn.commit()
     elif status == 'locked' and owner == username:
         cursor.execute("UPDATE game_board SET status='available', owner=NULL WHERE number=?", (num,))
         cursor.execute("UPDATE users SET balance = balance + 2 WHERE username=?", (username,))
-        # خصم المبلغ من الإيرادات عند التراجع
         cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 2.0 WHERE game_name=?", ("لوحة أرقام الحظ (80$)",))
         conn.commit()
         
@@ -406,7 +399,6 @@ def pick_game_three(slot_id):
     if status == 'available' and balance >= 50.0:
         cursor.execute("UPDATE game_three SET status='locked', owner=? WHERE slot_id=?", (username, slot_id))
         cursor.execute("UPDATE users SET balance = balance - 50.0 WHERE username=?", (username,))
-        # تسجيل إيرادات اللعبة الملكية (50$)
         cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 50.0 WHERE game_name=?", ("اللعبة الملكية الفاخرة",))
         conn.commit()
         
@@ -501,7 +493,7 @@ def reset_scratch():
 
 @app.route('/draw_winner', methods=['POST'])
 def draw_winner():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return "غير مسموح", 403
     forced_number = request.form.get('forced_number')
     check_auto_draw_board(forced_number)
@@ -509,7 +501,7 @@ def draw_winner():
 
 @app.route('/draw_game_three', methods=['POST'])
 def draw_game_three():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return "غير مسموح", 403
     forced_slot = request.form.get('forced_slot')
     conn = sqlite3.connect('empire.db')
@@ -550,7 +542,7 @@ def draw_game_three():
 
 @app.route('/create_user', methods=['POST'])
 def create_user():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return "غير مسموح", 403
     new_user = request.form.get('new_user', '').strip()
     new_pass = request.form.get('new_pass', '').strip()
@@ -569,7 +561,7 @@ def create_user():
 
 @app.route('/recharge_user', methods=['POST'])
 def recharge_user():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return "غير مسموح", 403
     conn = sqlite3.connect('empire.db')
     cursor = conn.cursor()
@@ -580,7 +572,7 @@ def recharge_user():
 
 @app.route('/withdraw_user', methods=['POST'])
 def withdraw_user():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return "غير مسموح", 403
     target_user = request.form['target_user']
     amount = float(request.form['amount'])
@@ -852,7 +844,6 @@ ADMIN_PAGE = """
     </div>
 
     <div class="admin-panel">
-        <!-- قسم الحسابات المالية الشهرية لكل لعبة وصافي الأرباح -->
         <h3 style="color: #38bdf8; border-bottom: 1px solid #475569; padding-bottom: 8px;">📊 التقارير المالية الشهرية (أرباح وخسائر الألعاب)</h3>
         
         <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px;">
