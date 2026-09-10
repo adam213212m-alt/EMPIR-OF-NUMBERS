@@ -55,7 +55,7 @@ def init_db():
         )
     ''')
 
-    # جدول حالة سحب الرقم الذهبي (تم إضافة forced_winning_number)
+    # جدول حالة سحب الرقم الذهبي
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_draw_state (
             id INTEGER PRIMARY KEY,
@@ -214,7 +214,6 @@ def game_golden_number():
                 if b_row and (b_row[0] == username or username == 'admin1'):
                     owner = b_row[0]
                     cursor.execute("DELETE FROM golden_number_bookings WHERE number=?", (number,))
-                    # إعادة تكلفة الحجز (2$) لرصيد صاحب الحجز
                     cursor.execute("UPDATE users SET balance = balance + 2.0 WHERE username=?", (owner,))
                     conn.commit()
                     msg = f"تم التراجع عن حجز الرقم {number} وإعادة 2$ لحساب {owner}!"
@@ -223,7 +222,7 @@ def game_golden_number():
             else:
                 msg = "لا يمكن التراجع أثناء عملية السحب!"
 
-        # أمر السحب (بدء القرعة التي تستغرق 10 ثوانٍ)
+        # أمر السحب (ظهور الرقم فوراً وبشكل فوري)
         elif 'admin_execute_draw' in request.form and username == 'admin1':
             cursor.execute("SELECT number FROM golden_number_bookings")
             booked_list = [r[0] for r in cursor.fetchall()]
@@ -243,12 +242,11 @@ def game_golden_number():
                 cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الرقم الذهبي', 'admin1', ?, 75.0, ?)", 
                                (winner_user, time.strftime('%Y-%m-%d %H:%M')))
                 
-                # وقت انتهاء السحب بعد 10 ثوانٍ
-                draw_duration = 10.0
-                end_time = time.time() + draw_duration + 5 # 10 ثواني السحب + 5 ثواني إضاءة النتيجة
-                cursor.execute("UPDATE game_draw_state SET winning_number=?, status='drawing', draw_end_time=? WHERE id=1", (winning_num, end_time))
+                # جعل النتيجة تظهر فوراً وتستمر لمدة 15 ثانية للإضاءة
+                end_time = time.time() + 15.0
+                cursor.execute("UPDATE game_draw_state SET winning_number=?, status='finished', draw_end_time=? WHERE id=1", (winning_num, end_time))
                 conn.commit()
-                msg = f"بدأت قرعة الرقم الذهبي السريعة!"
+                msg = f"تم السحب فوراً! الفائز هو {winner_user} بالرقم {winning_num}"
             else:
                 msg = "لا توجد أرقام محجوزة لإجراء السحب عليها حالياً!"
 
@@ -260,7 +258,6 @@ def game_golden_number():
     draw_row = cursor.fetchone()
     winning_number, draw_status, forced_num = draw_row[0], draw_row[1], draw_row[2]
 
-    # جلب إحصائيات اللاعب الحالية (الأرقام المحجوزة والمبلغ المصروف)
     cursor.execute("SELECT number FROM golden_number_bookings WHERE username=?", (username,))
     my_booked_nums = [r[0] for r in cursor.fetchall()]
     my_total_spent = len(my_booked_nums) * 2.0
@@ -378,7 +375,7 @@ def admin_accounting():
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
 
 
-# قوالب صفحات الـ HTML المحدثة
+# قوالب الـ HTML
 
 LOGIN_PAGE = """
 <!DOCTYPE html>
@@ -550,7 +547,6 @@ GAME_GOLDEN_PAGE = """
 
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
-    <!-- خانة ملخص حساب اللاعب (الأرقام المحجوزة والمبلغ المصروف) -->
     <div class="user-stats-box">
         <div>
             <b style="color: #ffd700;">👤 ملفك الشخصي في اللعبة:</b> <span style="color: #cbd5e1;">{{ username }}</span>
@@ -574,7 +570,6 @@ GAME_GOLDEN_PAGE = """
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
                     {% if bookings[i] == username or username == 'admin1' %}
-                        <!-- يمكنه التراجع لأنه حجزه أو أنه الـ admin1 -->
                         <form method="POST" style="margin: 0;">
                             <input type="hidden" name="number" value="{{ i }}">
                             <button type="submit" name="cancel_number" id="box-{{ i }}" class="number-box {% if bookings[i] == username %}my-booked{% else %}booked{% endif %}" style="width: 100%; height: 60px;" title="اضغط للتراجع واسترداد 2$">
@@ -599,16 +594,13 @@ GAME_GOLDEN_PAGE = """
     </div>
 
     <div class="draw-panel">
-        <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة السحب والقرعة المباشرة</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة السحب والقرعة الفورية</h3>
         <p id="statusText" style="color: #cbd5e1; font-size: 16px;">
-            {% if draw_status == 'finished' %}🎉 تم إعلان الفائز بالرقم الذهبي!
-            {% elif draw_status == 'drawing' %}⚡ القرعة جارية الآن بحماس...!
-            {% else %}في انتظار أمر السحب من المؤسس{% endif %}
+            {% if draw_status == 'finished' %}🎉 تم إعلان الفائز بالرقم الذهبي فوراً!
+            {% else %}في انتظار ضغط زر السحب الفوري من المؤسس{% endif %}
         </p>
         
-        <div class="big-slot-screen" id="slotDisplay">
-            {% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}
-        </div>
+        <div class="big-slot-screen" id="slotDisplay">{% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
 
         <div id="winNotificationContainer">
             {% if draw_status == 'finished' and winning_number %}
@@ -621,33 +613,15 @@ GAME_GOLDEN_PAGE = """
         {% if username == 'admin1' %}
             <form method="POST" style="margin-top: 20px; border-top: 1px dashed #555; padding-top: 15px;">
                 <div style="color: #ffd700; font-size: 14px; margin-bottom: 5px;">
-                    👑 الخانة المسبقة للرقم الفائز: <b>{% if forced_num > 0 %}{{ forced_num }}{% else %}عشوائي (تلقائي){% endif %}</b>
-                    (يمكنك تغييرها من <a href="/admin_games" style="color: #38bdf8;">لوحة الألعاب</a>)
+                    👑 الرقم الفائز المحدد مسبقاً: <b>{% if forced_num > 0 %}{{ forced_num }}{% else %}عشوائي (تلقائي){% endif %}</b>
+                    (يمكنك تعديله من <a href="/admin_games" style="color: #38bdf8;">لوحة الألعاب</a>)
                 </div>
-                <button type="submit" name="admin_execute_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 12px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ اسحب الآن (تشغيل القرعة لمدة 10 ثواني)</button>
+                <button type="submit" name="admin_execute_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 12px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ اسحب الآن (إظهار النتيجة فوراً)</button>
             </form>
         {% endif %}
     </div>
 
     <script>
-        function playHypeMusic() {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                let notes = [261.63, 329.63, 392.00, 523.25, 587.33, 659.25, 783.99, 880.00];
-                let osc = audioCtx.createOscillator();
-                let gainNode = audioCtx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-                osc.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.15);
-            } catch(e) {}
-        }
-
-        let slotInterval = null;
         let lastStatus = "{{ draw_status }}";
         let isRefreshing = false;
 
@@ -658,27 +632,16 @@ GAME_GOLDEN_PAGE = """
                 .then(data => {
                     if (data.status !== lastStatus && !isRefreshing) {
                         isRefreshing = true;
-                        setTimeout(() => { location.reload(); }, 400);
+                        setTimeout(() => { location.reload(); }, 200);
                         return;
                     }
 
                     let slotEl = document.getElementById('slotDisplay');
                     let statusText = document.getElementById('statusText');
 
-                    if (data.status === 'drawing') {
-                        statusText.innerText = "⚡ جاري تدوير الأرقام بسرعة وحماس (تتوقف خلال 10 ثواني)...";
-                        if (!slotInterval) {
-                            slotInterval = setInterval(() => {
-                                slotEl.innerText = Math.floor(Math.random() * 50) + 1;
-                                playHypeMusic();
-                            }, 50); // سرعة فائقة جداً لزيادة الإثارة
-                        }
-                    }
-
                     if (data.status === 'finished') {
-                        if (slotInterval) clearInterval(slotInterval);
                         slotEl.innerText = data.winning_number;
-                        statusText.innerText = "🎉 مبروك للفائز!";
+                        statusText.innerText = "🎉 تم إعلان الفائز فوراً!";
                         let winBox = document.getElementById('box-' + data.winning_number);
                         if (winBox) winBox.className = "number-box winning";
                     }
@@ -819,7 +782,6 @@ ADMIN_GAMES_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
     <div class="games-grid">
-        <!-- 1. الرقم الذهبي مع الخانة المخصصة للرقم المسبق -->
         <div class="game-ctrl-card" style="border: 3px solid #34d399;">
             <div class="game-title">1. الرقم الذهبي 🏆</div>
             <p style="font-size: 12px; color: #cbd5e1;">حدد الرقم الذي سيفوز بالقرعة (اتركه فارغاً لاختيار عشوائي):</p>
