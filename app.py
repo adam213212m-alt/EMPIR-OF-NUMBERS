@@ -68,13 +68,15 @@ def init_db():
         )
     ''')
     
-    # إنشاء الـ 3 حسابات الرئيسية المسؤولة (admin1, admin2, admin3) إن لم تكن موجودة
+    # إنشاء الـ 3 حسابات الرئيسية للمديرين بـ 100 ألف دولار لكل حساب وخصمها من الخزنة
     main_admins = ['admin1', 'admin2', 'admin3']
     for adm in main_admins:
         cursor.execute("SELECT * FROM users WHERE username=?", (adm,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0.0, 'admin', 'system')", 
+        user_exists = cursor.fetchone()
+        if not user_exists:
+            cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 100000.0, 'admin', 'system')", 
                            (adm, 'admin123'))
+            cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - 100000.0 WHERE id=1")
 
     conn.commit()
     conn.close()
@@ -136,7 +138,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# اللعبة الأولى: الرقم الذهبي (صفحة مستقلة بذاتها)
+# اللعبة الأولى: الرقم الذهبي
 @app.route('/game_one_page', methods=['GET', 'POST'])
 def game_one_page():
     if 'username' not in session:
@@ -199,10 +201,14 @@ def game_one_page():
     draw_info = cursor.fetchone()
     winning_number = draw_info[0] if draw_info else None
 
+    user_won = False
+    if winning_number and winning_number in my_bookings:
+        user_won = True
+
     conn.close()
     return render_template_string(GAME_ONE_PAGE, username=username, role=role, balance=balance, 
                                   bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, 
-                                  winning_number=winning_number, msg=msg)
+                                  winning_number=winning_number, user_won=user_won, msg=msg)
 
 @app.route('/game_two_page')
 def game_two_page():
@@ -233,7 +239,7 @@ def admin_panel():
         cursor.execute("SELECT vault_balance FROM system_vault WHERE id=1")
         vault_bal = cursor.fetchone()[0]
 
-        cursor.execute("SELECT balance FROM users WHERE username=?", (target_user,))
+        cursor.execute("SELECT balance, role FROM users WHERE username=?", (target_user,))
         user_row = cursor.fetchone()
 
         if user_row and amount > 0:
@@ -255,7 +261,7 @@ def admin_panel():
     cursor.execute("SELECT vault_balance FROM system_vault WHERE id=1")
     vault_balance = cursor.fetchone()[0]
 
-    cursor.execute("SELECT username, password, balance, created_by FROM users WHERE role != 'admin'")
+    cursor.execute("SELECT username, password, balance, role, created_by FROM users")
     users_list = cursor.fetchall()
 
     cursor.execute("SELECT action_type, admin_name, target_user, amount, log_time FROM financial_logs ORDER BY id DESC LIMIT 15")
@@ -358,9 +364,7 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- شبكة الأيقونات الـ 8 الرئيسية -->
     <div class="icons-grid">
-        <!-- الأيقونة الأولى: لعبة الرقم الذهبي بلولو فاخر واسم واضح -->
         <a href="/game_one_page" class="icon-card">
             <div class="icon-logo">🏆</div>
             <div class="icon-title">الرقم الذهبي</div>
@@ -419,6 +423,10 @@ GAME_ONE_PAGE = """
         .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 20px; border-radius: 12px; margin-top: 25px; text-align: center; }
         .slot-machine { background: #000; border: 3px dashed #ffd700; color: #ffd700; font-size: 45px; font-weight: bold; padding: 15px; width: 220px; margin: 15px auto; border-radius: 10px; letter-spacing: 5px; }
         
+        /* أيقونة الفوز الذهبية الفاخرة المطلوبة */
+        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 22px; border-radius: 16px; margin: 20px auto; width: 85%; max-width: 480px; text-align: center; box-shadow: 0 0 45px rgba(255,215,0,0.8); animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+
         .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
     </style>
@@ -458,19 +466,26 @@ GAME_ONE_PAGE = """
     <!-- لوحة السحب وخانة الأرقام المارة -->
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin: 0;">🎰 شاشة السحب والتدوير التفاعلي</h3>
-        <p style="color: #cbd5e1; font-size: 14px;">تمر الأرقام بسرعة لمدة 15 ثانية لتستقر على الرقم الفائز!</p>
+        <p style="color: #cbd5e1; font-size: 14px;">اضغط على زر السحب لبدء مرور الأرقام السريع لتستقر على الرقم الفائز!</p>
         
-        <div class="slot-machine" id="slotDisplay">?</div>
+        <div class="slot-machine" id="slotDisplay">{% if winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
+
+        {% if user_won %}
+        <div class="win-badge">
+            <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربحت 75$</div>
+            <div style="font-size: 20px; margin-top: 8px; color: #111; font-weight: bold;">الرقم الرابح: {{ winning_number }}</div>
+        </div>
+        {% endif %}
 
         {% if role == 'admin' %}
-            <form method="POST" style="margin-top: 15px;">
+            <form method="POST" style="margin-top: 15px;" onsubmit="triggerSlotAnimation(event)">
                 <label style="color: #ffd700; font-weight: bold;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
                 <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 8px; width: 200px; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; margin-top: 8px;">
                 <button type="submit" name="admin_draw" style="background: #22c55e; color: black; font-weight: bold; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 10px auto;">⚡ بدء السحب الآن</button>
             </form>
         {% endif %}
 
-        {% if winning_number %}
+        {% if winning_number and not role == 'admin' %}
             <div style="font-size: 20px; color: #34d399; font-weight: bold; margin-top: 10px;">🏆 الرقم الفائز في آخر سحب: رقم {{ winning_number }}</div>
         {% endif %}
     </div>
@@ -483,22 +498,20 @@ GAME_ONE_PAGE = """
     </div>
 
     <script>
-        let slotInterval;
-        function startSlotSimulation() {
+        function triggerSlotAnimation(e) {
             let slot = document.getElementById('slotDisplay');
             let counter = 0;
-            slotInterval = setInterval(() => {
+            let slotInterval = setInterval(() => {
                 slot.innerText = Math.floor(Math.random() * 50) + 1;
                 counter++;
-                if(counter > 150) {
+                if(counter > 100) {
                     clearInterval(slotInterval);
                     {% if winning_number %}
                     slot.innerText = "{{ winning_number }}";
                     {% endif %}
                 }
-            }, 100);
+            }, 60);
         }
-        window.onload = startSlotSimulation;
     </script>
 </body>
 </html>
@@ -537,63 +550,61 @@ ADMIN_PAGE = """
     <div class="vault-box">
         <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 رصيد الخزنة المركزية (الشركة)</h3>
         <div style="font-size: 42px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
+        <p style="margin: 0; font-size: 13px; color: #e2e8f0;">تم تخصيص $100,000 لكل مدير (admin1, admin2, admin3) وخصمها تلقائياً من الخزنة المركزية.</p>
     </div>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
         <div class="panel-box">
-            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع رصيد للزبون</h3>
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع رصيد للحساب</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="sell">
-                <label>اختر الزبون:</label>
+                <label>اختر الحساب (مدير أو زبون):</label>
                 <select name="target_user" required>
-                    <option value="">اختر الزبون</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} ({{ u[3] }}) - رصيده: ${{ u[2] }}</option>{% endfor %}
                 </select>
                 <label>المبلغ ($):</label>
                 <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
-                <button type="submit" class="btn-sell">إتمام عملية البيع للزبون</button>
+                <button type="submit" class="btn-sell">إتمام عملية البيع</button>
             </form>
         </div>
 
         <div class="panel-box">
-            <h3 style="color: #ef4444; margin-top: 0;">💸 شراء رصيد من الزبون</h3>
+            <h3 style="color: #ef4444; margin-top: 0;">💸 شراء رصيد وإرجاعه للخزنة</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="buy_back">
-                <label>اختر الزبون:</label>
+                <label>اختر الحساب (مدير أو زبون):</label>
                 <select name="target_user" required>
-                    <option value="">اختر الزبون</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} ({{ u[3] }}) - رصيده: ${{ u[2] }}</option>{% endfor %}
                 </select>
                 <label>المبلغ ($):</label>
                 <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
-                <button type="submit" class="btn-buy">إتمام الشراء وإرجاع الرصيد للخزنة</button>
+                <button type="submit" class="btn-buy">إتمام الشراء للخزنة</button>
             </form>
         </div>
     </div>
 
     <div class="panel-box" style="margin-top: 20px;">
-        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة حسابات الزبائن (مع كلمات المرور والأرصدة)</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة الحسابات (المديرين والزبائن)</h3>
         <table>
-            <tr><th>اسم الزبون</th><th>كلمة المرور (الرمز السري)</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة المدير</th></tr>
-            {% if users_list %}
-                {% for u in users_list %}
-                <tr>
-                    <td><b>{{ u[0] }}</b></td>
-                    <td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
-                    <td style="color: #34d399; font-weight: bold;">${{ u[2] }}</td>
-                    <td>{{ u[3] }}</td>
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr><td colspan="4" style="color: #94a3b8;">لا توجد حسابات زبائن مسجلة حتى الآن!</td></tr>
-            {% endif %}
+            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة</th></tr>
+            {% for u in users_list %}
+            <tr>
+                <td><b>{{ u[0] }}</b></td>
+                <td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
+                <td><span style="padding: 3px 8px; border-radius: 4px; background: {% if u[3] == 'admin' %}#b8860b{% else %}#1f2937{% endif %};">{{ u[3] }}</span></td>
+                <td style="color: #34d399; font-weight: bold;">${{ u[2] }}</td>
+                <td>{{ u[4] }}</td>
+            </tr>
+            {% endfor %}
         </table>
     </div>
 
     <div class="panel-box" style="margin-top: 20px;">
         <h3 style="color: #38bdf8; margin-top: 0;">📋 سجل العمليات المالية الأخيرة</h3>
         <table>
-            <tr><th>نوع العملية</th><th>المدير المسؤول</th><th>الزبون</th><th>المبلغ</th><th>التوقيت</th></tr>
+            <tr><th>نوع العملية</th><th>المدير المسؤول</th><th>الهدف</th><th>المبلغ</th><th>التوقيت</th></tr>
             {% for log in logs %}
             <tr>
                 <td><b>{{ log[0] }}</b></td>
