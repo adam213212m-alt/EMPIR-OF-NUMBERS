@@ -158,7 +158,7 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # فحص تلقائي لانتهاء الـ 30 ثانية
+        # فحص انتهاء الـ 30 ثانية وتحويل الأرباح تلقائياً
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -170,7 +170,7 @@ def api_game_status():
             conn.commit()
             status = 'finished'
 
-            # جدول تصفير اللوحة بعد 15 ثانية من انتهاء السحب
+            # جدول تصفير اللوحة وإعادتها لوضع الخمول بعد 15 ثانية من عرض النتيجة
             def reset_board():
                 time.sleep(15)
                 c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -184,7 +184,6 @@ def api_game_status():
         remaining = int(end_timestamp - current_time) if status == 'drawing' else 0
         if remaining < 0: remaining = 0
 
-    # جلب الحجوزات الحالية لتحديث اللوحة فوراً
     cursor.execute("SELECT number, username FROM golden_number_bookings")
     bookings = {r[0]: r[1] for r in cursor.fetchall()}
 
@@ -242,7 +241,7 @@ def game_one_page():
             cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                            (winning_num, end_timestamp))
             conn.commit()
-            msg = f"تم بدء السحب لجميع اللاعبين (العد التنازلي 30 ثانية)..."
+            msg = f"تم بدء السحب اليدوي لجميع اللاعبين (العد التنازلي 30 ثانية)..."
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -259,14 +258,10 @@ def game_one_page():
     winning_number = draw_info[0] if draw_info else None
     game_status = draw_info[1] if draw_info else 'idle'
 
-    user_won = False
-    if game_status == 'finished' and winning_number and winning_number in my_bookings:
-        user_won = True
-
     conn.close()
     return render_template_string(GAME_ONE_PAGE, username=username, role=role, balance=balance, 
                                   bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, 
-                                  winning_number=winning_number, game_status=game_status, user_won=user_won, msg=msg)
+                                  winning_number=winning_number, game_status=game_status, msg=msg)
 
 @app.route('/game_two_page')
 def game_two_page():
@@ -347,28 +342,6 @@ def create_user_page():
             msg = "خطأ: اسم المستخدم موجود مسبقاً!"
         conn.close()
     return render_template_string(CREATE_USER_PAGE, msg=msg)
-
-# السحب التلقائي اليومي الساعة 9:00 مساءً بتوقيت بيروت (توقيت محلي EEST / UTC+3)
-def daily_auto_draw():
-    while True:
-        now = datetime.now(timezone(timedelta(hours=3))) # توقيت بيروت
-        target_time = now.replace(hour=21, minute=0, second=0, microsecond=0)
-        if now >= target_time:
-            target_time += timedelta(days=1)
-        
-        sleep_seconds = (target_time - now).total_seconds()
-        time.sleep(sleep_seconds)
-        
-        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-        cursor = conn.cursor()
-        winning_num = random.randint(1, 50)
-        end_timestamp = time.time() + 30
-        cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
-                       (winning_num, end_timestamp))
-        conn.commit()
-        conn.close()
-
-threading.Thread(target=daily_auto_draw, daemon=True).start()
 
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
@@ -466,17 +439,18 @@ GAME_ONE_PAGE = """
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 20px; }
         @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
         
-        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
+        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
         .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 35px #ffd700; transform: scale(1.12); font-weight: bold; animation: pulse 0.8s infinite alternate; }
-        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 45px #ffd700; transform: scale(1.15); font-weight: bold; animation: pulse 0.8s infinite alternate; }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.18); } }
         
-        .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 20px; border-radius: 12px; margin-top: 25px; text-align: center; }
-        .slot-machine { background: #000; border: 3px dashed #ffd700; color: #ffd700; font-size: 45px; font-weight: bold; padding: 15px; width: 220px; margin: 15px auto; border-radius: 10px; letter-spacing: 5px; }
+        .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
+        /* شاشة العرض الكبرى البارزة للرقم الرابح */
+        .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 70px; font-weight: bold; padding: 20px; width: 260px; margin: 20px auto; border-radius: 20px; box-shadow: 0 0 40px rgba(255,215,0,0.6); letter-spacing: 6px; text-shadow: 0 0 20px #ffd700; }
         
-        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 22px; border-radius: 16px; margin: 20px auto; width: 85%; max-width: 480px; text-align: center; box-shadow: 0 0 45px rgba(255,215,0,0.8); animation: bounce 1s infinite alternate; }
-        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 4px solid #fff; padding: 25px; border-radius: 20px; margin: 25px auto; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 0 50px rgba(255,215,0,0.9); animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
 
         .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
@@ -496,7 +470,6 @@ GAME_ONE_PAGE = """
     <div class="board-container">
         <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (سعر الحجز: $2 للرقم | الجائزة الكبرى: $75)</h3>
         <div class="board-grid" id="boardGrid">
-            <!-- يتم تعبئة اللوحة وتحديثها ديناميكياً عبر الجافاسكريبت لجميع اللاعبين -->
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
                     <div id="box-{{ i }}" class="number-box booked {% if game_status == 'finished' and winning_number == i %}winning{% endif %}">
@@ -515,33 +488,30 @@ GAME_ONE_PAGE = """
     </div>
 
     <div class="draw-panel">
-        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة السحب والتدوير التفاعلي المشترك</h3>
-        <p id="drawStatusText" style="color: #cbd5e1; font-size: 14px;">
-            {% if game_status == 'drawing' %}⏳ جاري السحب والعد التنازلي الحماسي...{% else %}انتظار بدء السحب (السحب التلقائي الساعة 9:00 مساءً بتوقيت بيروت){% endif %}
+        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
+        <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً عشوائياً...{% else %}انتظار أمر السحب من المدير (السحب اليدوي الحصري){% endif %}
         </p>
         
-        <div class="slot-machine" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
+        <!-- شاشة العرض الكبرى للرقم الرابح -->
+        <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
 
-        <div id="countdownTimer" style="font-size: 24px; color: #ffd700; font-weight: bold; margin: 10px 0;"></div>
+        <div id="countdownTimer" style="font-size: 26px; color: #ffd700; font-weight: bold; margin: 15px 0;"></div>
 
         <div id="winNotificationContainer">
-            {% if user_won %}
+            {% if game_status == 'finished' and winning_number %}
             <div class="win-badge">
-                <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربح الرقم {{ winning_number }} 75$</div>
-                <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
-            </div>
-            {% elif game_status == 'finished' and winning_number %}
-            <div class="win-badge">
-                <div style="font-size: 24px; font-weight: bold; color: #000;">مبروك ربح الرقم {{ winning_number }} 75$</div>
+                <div style="font-size: 32px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك ربح الرقم {{ winning_number }} 75$</div>
+                <div style="font-size: 20px; margin-top: 10px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
             </div>
             {% endif %}
         </div>
 
         {% if role == 'admin' %}
-            <form method="POST" style="margin-top: 15px;">
-                <label style="color: #ffd700; font-weight: bold;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
-                <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 8px; width: 200px; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; margin-top: 8px;">
-                <button type="submit" name="admin_draw" id="drawBtn" style="background: #22c55e; color: black; font-weight: bold; padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 15px auto; font-size: 16px;">⚡ بدء السحب اليدوي للجميع (30 ثانية)</button>
+            <form method="POST" style="margin-top: 20px;">
+                <label style="color: #ffd700; font-weight: bold; font-size: 16px;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
+                <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; margin-top: 10px; text-align: center; font-size: 16px;">
+                <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (30 ثانية)</button>
             </form>
         {% endif %}
     </div>
@@ -552,7 +522,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- نظام التحديث الحي (Real-time Sync) للجميع لحظياً -->
+    <!-- جلب التحديثات الحية وتحديث الشاشة الكبرى واللون الذهبي لجميع اللاعبين -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -562,7 +532,7 @@ GAME_ONE_PAGE = """
                 let gainNode = audioCtx.createGain();
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
                 osc.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
@@ -583,13 +553,12 @@ GAME_ONE_PAGE = """
                     let statusText = document.getElementById('drawStatusText');
                     let winContainer = document.getElementById('winNotificationContainer');
 
-                    // تحديث اللوحة والأرقام المحجوزة فوراً لجميع اللاعبين
+                    // تحديث الحجوزات على اللوحة فوراً لجميع اللاعبين
                     for (let i = 1; i <= 50; i++) {
                         let box = document.getElementById('box-' + i);
                         if (box) {
                             if (data.bookings[i]) {
                                 if (box.tagName === 'BUTTON' || box.tagName === 'FORM') {
-                                    // تحويل زر الحجز إلى مربع محجوز فوراً
                                     let parent = box.closest('form') || box;
                                     parent.outerHTML = `<div id="box-${i}" class="number-box booked">${i}<br><span style="font-size: 10px; color: #f87171;">(${data.bookings[i]})</span></div>`;
                                 }
@@ -598,8 +567,8 @@ GAME_ONE_PAGE = """
                     }
 
                     if (data.status === 'drawing') {
-                        timerEl.innerText = "⏳ متبقي على السحب: " + data.remaining_seconds + " ثانية";
-                        statusText.innerText = "جاري تدوير 50 رقماً عشوائياً بحماس...";
+                        timerEl.innerText = "⏳ العد التنازلي: " + data.remaining_seconds + " ثانية";
+                        statusText.innerText = "جاري تدوير الأرقام الـ 50 عشوائياً...";
                         
                         if (!slotInterval) {
                             slotInterval = setInterval(() => {
@@ -609,25 +578,26 @@ GAME_ONE_PAGE = """
                         }
 
                         if (data.remaining_seconds <= 0 && lastStatus !== 'finished') {
-                            location.reload(); // إعادة تحميل لتثبيت النتيجة وتحديث الأرصدة
+                            location.reload();
                         }
                     } else if (data.status === 'finished') {
                         if (slotInterval) clearInterval(slotInterval);
-                        timerEl.innerText = "🎉 انتهى السحب!";
+                        timerEl.innerText = "🎉 تم السحب بنجاح!";
                         slotEl.innerText = data.winning_number;
-                        statusText.innerText = "تم إعلان الرقم الفائز!";
+                        statusText.innerText = "الرقم الفائز بالقرعة الكبرى:";
 
-                        // تلوين الرقم الفائز باللون الذهبي الفاخر على اللوحة
+                        // إضاءة الرقم الفائز باللون الذهبي الفاخر على اللوحة الأساسية
                         let winBox = document.getElementById('box-' + data.winning_number);
                         if (winBox) {
                             winBox.className = "number-box winning";
                         }
 
+                        // ظهور الإشعار الضخم لجميع اللاعبين
                         if (!winContainer.innerHTML.includes("مبروك ربح")) {
                             winContainer.innerHTML = `
                                 <div class="win-badge">
-                                    <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربح الرقم ${data.winning_number} 75$</div>
-                                    <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
+                                    <div style="font-size: 32px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك ربح الرقم ${data.winning_number} 75$</div>
+                                    <div style="font-size: 20px; margin-top: 10px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
                                 </div>
                             `;
                         }
@@ -639,7 +609,6 @@ GAME_ONE_PAGE = """
                 });
         }
 
-        // تحديث مستمر كل ثانية لضمان رؤية جميع اللاعبين للأحداث في نفس اللحظة
         setInterval(updateGameRealtime, 1000);
     </script>
 </body>
