@@ -22,7 +22,7 @@ def init_db():
         )
     ''')
 
-    # خزنة الشركة الأساسية (مليون دولار لا يسحب منها ولا يبيع إلا admin1)
+    # خزنة الشركة الأساسية
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS system_vault (
             id INTEGER PRIMARY KEY,
@@ -45,7 +45,7 @@ def init_db():
         )
     ''')
 
-    # جدول حجوزات لعبة الرقم الذهبي (الأيقونة الأولى)
+    # جدول حجوزات لعبة الرقم الذهبي
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS golden_number_bookings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,18 +55,19 @@ def init_db():
         )
     ''')
 
-    # جدول حالة سحب الرقم الذهبي
+    # جدول حالة سحب الرقم الذهبي (تم إضافة forced_winning_number)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_draw_state (
             id INTEGER PRIMARY KEY,
             winning_number INTEGER DEFAULT 0,
             status TEXT DEFAULT 'idle',
-            draw_end_time REAL DEFAULT 0
+            draw_end_time REAL DEFAULT 0,
+            forced_winning_number INTEGER DEFAULT 0
         )
     ''')
     cursor.execute('SELECT COUNT(*) FROM game_draw_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO game_draw_state (id, winning_number, status, draw_end_time) VALUES (1, 0, "idle", 0)')
+        cursor.execute('INSERT INTO game_draw_state (id, winning_number, status, draw_end_time, forced_winning_number) VALUES (1, 0, "idle", 0, 0)')
 
     # إنشاء حساب المؤسس الرئيسي admin1 افتراضياً
     cursor.execute("SELECT * FROM users WHERE username='admin1'")
@@ -96,7 +97,6 @@ def manifest():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-# 1. صفحة البداية (تسجيل الدخول مع لوغو فاخر جداً)
 @app.route('/', methods=['GET', 'POST'])
 def login():
     error = None
@@ -123,7 +123,6 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# 2. الصفحة الثانية (لوحة التحكم والشريط العلوي والأيقونات التسع)
 @app.route('/dashboard')
 def dashboard():
     if 'username' not in session:
@@ -138,7 +137,6 @@ def dashboard():
     balance, role = row[0], row[1]
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=role, balance=balance)
 
-# API خاص بالتحقق من حالة السحب للرقم الذهبي لتحديث الشاشة آنياً
 @app.route('/api/golden_status')
 def api_golden_status():
     conn = sqlite3.connect('lira_enterprise.db', check_same_thread=False)
@@ -150,7 +148,6 @@ def api_golden_status():
     if row:
         winning_number, status, end_time = row[0], row[1], row[2]
         if status == 'finished' and current_time >= end_time:
-            # إعادة تصفير اللوحة بعد انتهاء وقت الإضاءة الذهبية
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draw_state SET winning_number=0, status='idle', draw_end_time=0 WHERE id=1")
             conn.commit()
@@ -173,7 +170,6 @@ def api_golden_status():
         "bookings": bookings
     })
 
-# 3. الأيقونة الأولى: الرقم الذهبي (التكلفة 2$)
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session:
@@ -185,13 +181,14 @@ def game_golden_number():
     
     msg = None
     if request.method == 'POST':
+        # حجز رقم
         if 'book_number' in request.form:
             cursor.execute("SELECT status FROM game_draw_state WHERE id=1")
             if cursor.fetchone()[0] == 'idle':
                 number = int(request.form.get('number'))
                 cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
                 bal = cursor.fetchone()[0]
-                cost = 2.0  # تم التعديل إلى 2$
+                cost = 2.0
                 if bal >= cost:
                     cursor.execute("SELECT * FROM golden_number_bookings WHERE number=?", (number,))
                     if not cursor.fetchone():
@@ -207,29 +204,51 @@ def game_golden_number():
             else:
                 msg = "عذراً، جاري السحب حالياً!"
 
-        # أمر السحب الخاص بالمدير (admin1 فقط)
+        # إلغاء حجز رقم (اللاعب نفسه أو admin1)
+        elif 'cancel_number' in request.form:
+            cursor.execute("SELECT status FROM game_draw_state WHERE id=1")
+            if cursor.fetchone()[0] == 'idle':
+                number = int(request.form.get('number'))
+                cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (number,))
+                b_row = cursor.fetchone()
+                if b_row and (b_row[0] == username or username == 'admin1'):
+                    owner = b_row[0]
+                    cursor.execute("DELETE FROM golden_number_bookings WHERE number=?", (number,))
+                    # إعادة تكلفة الحجز (2$) لرصيد صاحب الحجز
+                    cursor.execute("UPDATE users SET balance = balance + 2.0 WHERE username=?", (owner,))
+                    conn.commit()
+                    msg = f"تم التراجع عن حجز الرقم {number} وإعادة 2$ لحساب {owner}!"
+                else:
+                    msg = "لا يمكنك التراجع عن هذا الرقم!"
+            else:
+                msg = "لا يمكن التراجع أثناء عملية السحب!"
+
+        # أمر السحب (بدء القرعة التي تستغرق 10 ثوانٍ)
         elif 'admin_execute_draw' in request.form and username == 'admin1':
             cursor.execute("SELECT number FROM golden_number_bookings")
             booked_list = [r[0] for r in cursor.fetchall()]
             if booked_list:
-                forced_num = request.form.get('forced_number')
-                winning_num = int(forced_num) if forced_num and int(forced_num) in booked_list else random.choice(booked_list)
+                cursor.execute("SELECT forced_winning_number FROM game_draw_state WHERE id=1")
+                forced_num = cursor.fetchone()[0]
+
+                if forced_num and forced_num in booked_list:
+                    winning_num = forced_num
+                else:
+                    winning_num = random.choice(booked_list)
                 
-                # جلب صاحب الرقم الرابح
                 cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_num,))
                 winner_user = cursor.fetchone()[0]
                 
-                # تحويل جائزة 75$ فوراً لحساب الفائز
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_user,))
-                
-                # تسجيل العملية في المحاسبة
                 cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الرقم الذهبي', 'admin1', ?, 75.0, ?)", 
                                (winner_user, time.strftime('%Y-%m-%d %H:%M')))
                 
-                end_time = time.time() + 15 # إضاءة اللوحة لمدة 15 ثانية
-                cursor.execute("UPDATE game_draw_state SET winning_number=?, status='finished', draw_end_time=? WHERE id=1", (winning_num, end_time))
+                # وقت انتهاء السحب بعد 10 ثوانٍ
+                draw_duration = 10.0
+                end_time = time.time() + draw_duration + 5 # 10 ثواني السحب + 5 ثواني إضاءة النتيجة
+                cursor.execute("UPDATE game_draw_state SET winning_number=?, status='drawing', draw_end_time=? WHERE id=1", (winning_num, end_time))
                 conn.commit()
-                msg = f"تم السحب بنجاح! الفائز هو {winner_user} بالرقم {winning_num}"
+                msg = f"بدأت قرعة الرقم الذهبي السريعة!"
             else:
                 msg = "لا توجد أرقام محجوزة لإجراء السحب عليها حالياً!"
 
@@ -237,15 +256,20 @@ def game_golden_number():
     balance = cursor.fetchone()[0]
     cursor.execute("SELECT number, username FROM golden_number_bookings")
     bookings = {r[0]: r[1] for r in cursor.fetchall()}
-    cursor.execute("SELECT winning_number, status FROM game_draw_state WHERE id=1")
+    cursor.execute("SELECT winning_number, status, forced_winning_number FROM game_draw_state WHERE id=1")
     draw_row = cursor.fetchone()
-    winning_number, draw_status = draw_row[0], draw_row[1]
+    winning_number, draw_status, forced_num = draw_row[0], draw_row[1], draw_row[2]
+
+    # جلب إحصائيات اللاعب الحالية (الأرقام المحجوزة والمبلغ المصروف)
+    cursor.execute("SELECT number FROM golden_number_bookings WHERE username=?", (username,))
+    my_booked_nums = [r[0] for r in cursor.fetchall()]
+    my_total_spent = len(my_booked_nums) * 2.0
 
     conn.close()
     return render_template_string(GAME_GOLDEN_PAGE, username=username, role=role, balance=balance, 
-                                  bookings=bookings, winning_number=winning_number, draw_status=draw_status, msg=msg)
+                                  bookings=bookings, winning_number=winning_number, draw_status=draw_status, 
+                                  forced_num=forced_num, my_booked_nums=my_booked_nums, my_total_spent=my_total_spent, msg=msg)
 
-# 4. لوحة تحكم الزبائن والخزنة (حصرياً لـ admin1)
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
     if 'username' not in session or session.get('username') != 'admin1':
@@ -257,8 +281,6 @@ def admin_customers():
 
     if request.method == 'POST':
         action = request.form.get('action')
-        
-        # إنشاء حساب جديد برقم سري
         if action == 'create_user':
             new_u = request.form.get('new_username', '').strip()
             new_p = request.form.get('new_password', '').strip()
@@ -269,7 +291,6 @@ def admin_customers():
             except sqlite3.IntegrityError:
                 msg = "اسم المستخدم موجود مسبقاً!"
 
-        # بيع عملات للحسابات من رصيد الشركة الأساسي (المليون دولار)
         elif action == 'sell_currency':
             target = request.form.get('target_user')
             amount = float(request.form.get('amount', 0))
@@ -285,7 +306,6 @@ def admin_customers():
             else:
                 msg = "رصيد الخزنة غير كافٍ أو المبلغ غير صالح!"
 
-        # شراء العملات من الحسابات وإعادتها لخزينة الشركة
         elif action == 'buy_back_currency':
             target = request.form.get('target_user')
             amount = float(request.form.get('amount', 0))
@@ -309,14 +329,28 @@ def admin_customers():
 
     return render_template_string(ADMIN_CUSTOMERS_PAGE, vault_balance=vault_balance, users_list=users_list, msg=msg)
 
-# 5. لوحة تحكم الألعاب (8 أزرار مرتبطة بالأيقونات)
-@app.route('/admin_games')
+@app.route('/admin_games', methods=['GET', 'POST'])
 def admin_games():
     if 'username' not in session or session.get('username') != 'admin1':
         return redirect(url_for('dashboard'))
-    return render_template_string(ADMIN_GAMES_PAGE)
+    
+    conn = sqlite3.connect('lira_enterprise.db', check_same_thread=False)
+    cursor = conn.cursor()
+    msg = None
 
-# 6. برنامج المحاسبة والشؤون المالية (جامع الأرباح في خانة واحدة)
+    if request.method == 'POST':
+        forced_num = request.form.get('forced_winning_number', '').strip()
+        f_val = int(forced_num) if forced_num.isdigit() else 0
+        cursor.execute("UPDATE game_draw_state SET forced_winning_number=? WHERE id=1", (f_val,))
+        conn.commit()
+        msg = f"تم تحديث الرقم المسبق للسحب إلى: {f_val if f_val > 0 else 'عشوائي'}"
+
+    cursor.execute("SELECT forced_winning_number FROM game_draw_state WHERE id=1")
+    forced_val = cursor.fetchone()[0]
+    conn.close()
+
+    return render_template_string(ADMIN_GAMES_PAGE, forced_val=forced_val, msg=msg)
+
 @app.route('/admin_accounting')
 def admin_accounting():
     if 'username' not in session or session.get('username') != 'admin1':
@@ -330,7 +364,6 @@ def admin_accounting():
     cursor.execute("SELECT action_type, admin_name, target_user, amount, log_time FROM financial_logs ORDER BY id DESC")
     logs = cursor.fetchall()
     
-    # حساب إجمالي الأرباح والواردات والصادرات
     cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='بيع عملات للزبون'")
     sales_res = cursor.fetchone()[0]
     total_sales = sales_res if sales_res else 0.0
@@ -339,13 +372,14 @@ def admin_accounting():
     payout_res = cursor.fetchone()[0]
     total_payouts = payout_res if payout_res else 0.0
 
-    net_profits = total_sales - total_payouts # جمع الأرباح الصافية في خانة واحدة
+    net_profits = total_sales - total_payouts
     conn.close()
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
 
 
-# قوالب صفحات الـ HTML والتصميم الفاخر
+# قوالب صفحات الـ HTML المحدثة
+
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -401,7 +435,6 @@ DASHBOARD_PAGE = """
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
-        /* الأيقونات التسع المربعة الشكل */
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 35px; }
         @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .icons-grid { grid-template-columns: 1fr; } }
@@ -421,7 +454,6 @@ DASHBOARD_PAGE = """
             <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
         </div>
         <div class="nav-buttons">
-            <!-- زر شحن الرصيد التلقائي عبر واتساب لرقم 76030208 -->
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شحن%20رصيد" target="_blank">💬 شحن رصيد (واتساب)</a>
             
             {% if username == 'admin1' %}
@@ -434,7 +466,6 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الأيقونات التسع المربعة الشكل المتاحة للجميع -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card">
             <div class="icon-logo">🏆</div>
@@ -488,18 +519,19 @@ GAME_GOLDEN_PAGE = """
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         
-        /* لوحة الأيقونة الأولى: خلفية فاخرة داكنة، 50 مربع متساوي، لون بني والأرقام نافرة بيضاء */
-        .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 25px; box-shadow: 0 0 35px rgba(184,134,11,0.4); text-align: center; }
+        .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+
+        .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; box-shadow: 0 0 35px rgba(184,134,11,0.4); text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
         @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
         
-        .number-box { background: #3d2314; border: 2px solid #8b5a2b; border-radius: 10px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; text-shadow: 0 2px 4px rgba(0,0,0,0.9); box-shadow: inset 0 2px 5px rgba(255,255,255,0.2), 0 4px 6px rgba(0,0,0,0.5); }
+        .number-box { background: #3d2314; border: 2px solid #8b5a2b; border-radius: 10px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; text-shadow: 0 2px 4px rgba(0,0,0,0.9); box-shadow: inset 0 2px 5px rgba(255,255,255,0.2), 0 4px 6px rgba(0,0,0,0.5); }
         .number-box:hover { background: #5c351e; transform: scale(1.06); }
-        .number-box.booked { background: #7f1d1d !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
+        .number-box.booked { background: #7f1d1d !important; border-color: #ef4444 !important; color: #fca5a5 !important; }
+        .number-box.my-booked { background: #1e3a8a !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
         .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; transform: scale(1.2); box-shadow: 0 0 50px #ffd700; animation: pulse 0.5s infinite alternate; }
         @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.22); } }
 
-        /* مربع السحب الحماسي الفاخر تحت اللعبة مباشرة */
         .draw-panel { background: #18181b; border: 3px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; box-shadow: 0 0 30px rgba(255,215,0,0.2); }
         .big-slot-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 70px; font-weight: bold; padding: 15px; width: 240px; margin: 15px auto; border-radius: 20px; box-shadow: 0 0 30px rgba(255,215,0,0.6); letter-spacing: 5px; }
         
@@ -518,14 +550,42 @@ GAME_GOLDEN_PAGE = """
 
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
+    <!-- خانة ملخص حساب اللاعب (الأرقام المحجوزة والمبلغ المصروف) -->
+    <div class="user-stats-box">
+        <div>
+            <b style="color: #ffd700;">👤 ملفك الشخصي في اللعبة:</b> <span style="color: #cbd5e1;">{{ username }}</span>
+        </div>
+        <div>
+            <b style="color: #38bdf8;">أرقامك المحجوزة:</b> 
+            <span style="color: #fff; font-family: monospace; background: #000; padding: 4px 8px; border-radius: 4px;">
+                {% if my_booked_nums %}{{ my_booked_nums | join(', ') }}{% else %}لا توجد أرقام محجوزة{% endif %}
+            </span>
+        </div>
+        <div>
+            <b style="color: #34d399;">المبلغ المصروف:</b> <span style="color: #34d399; font-weight: bold;">${{ my_total_spent }}</span>
+        </div>
+    </div>
+
     <div class="board-container">
         <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك الحظ (تكلفة الحجز: 2$ | الجائزة الكبرى: 75$)</h3>
+        <p style="font-size: 13px; color: #94a3b8;">ملاحظة: يمكنك الضغط على أي رقم حجزته لتتراجع عنه وتسترد أموالك فوراً!</p>
+        
         <div class="board-grid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
-                    <div id="box-{{ i }}" class="number-box booked {% if draw_status == 'finished' and winning_number == i %}winning{% endif %}">
-                        {{ i }}<br><span style="font-size: 10px; color: #fca5a5;">({{ bookings[i] }})</span>
-                    </div>
+                    {% if bookings[i] == username or username == 'admin1' %}
+                        <!-- يمكنه التراجع لأنه حجزه أو أنه الـ admin1 -->
+                        <form method="POST" style="margin: 0;">
+                            <input type="hidden" name="number" value="{{ i }}">
+                            <button type="submit" name="cancel_number" id="box-{{ i }}" class="number-box {% if bookings[i] == username %}my-booked{% else %}booked{% endif %}" style="width: 100%; height: 60px;" title="اضغط للتراجع واسترداد 2$">
+                                {{ i }}<br><span style="font-size: 9px;">({{ bookings[i] }}) ❌</span>
+                            </button>
+                        </form>
+                    {% else %}
+                        <div id="box-{{ i }}" class="number-box booked">
+                            {{ i }}<br><span style="font-size: 9px; color: #fca5a5;">({{ bookings[i] }})</span>
+                        </div>
+                    {% endif %}
                 {% else %}
                     <form method="POST" style="margin: 0;">
                         <input type="hidden" name="number" value="{{ i }}">
@@ -538,12 +598,17 @@ GAME_GOLDEN_PAGE = """
         </div>
     </div>
 
-    <!-- مربع السحب الحماسي تحت اللعبة مباشرة -->
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة السحب والقرعة المباشرة</h3>
-        <p id="statusText" style="color: #cbd5e1; font-size: 16px;">{% if draw_status == 'finished' %}🎉 تم إعلان الفائز بالرقم الذهبي!{% else %}في انتظار أمر السحب من المؤسس{% endif %}</p>
+        <p id="statusText" style="color: #cbd5e1; font-size: 16px;">
+            {% if draw_status == 'finished' %}🎉 تم إعلان الفائز بالرقم الذهبي!
+            {% elif draw_status == 'drawing' %}⚡ القرعة جارية الآن بحماس...!
+            {% else %}في انتظار أمر السحب من المؤسس{% endif %}
+        </p>
         
-        <div class="big-slot-screen" id="slotDisplay">{% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
+        <div class="big-slot-screen" id="slotDisplay">
+            {% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}
+        </div>
 
         <div id="winNotificationContainer">
             {% if draw_status == 'finished' and winning_number %}
@@ -553,17 +618,17 @@ GAME_GOLDEN_PAGE = """
             {% endif %}
         </div>
 
-        <!-- زر صغير لا يراه إلا الـ admin1 مكتوب عليه قم باختيار الرقم -->
         {% if username == 'admin1' %}
             <form method="POST" style="margin-top: 20px; border-top: 1px dashed #555; padding-top: 15px;">
-                <label style="color: #ffd700; font-weight: bold; display: block; margin-bottom: 8px;">👑 (أداة المؤسس حصراً) قم باختيار الرقم:</label>
-                <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; text-align: center; font-size: 16px;">
-                <button type="submit" name="admin_execute_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 12px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ اسحب الآن (تشغيل الموسيقى والقرعة)</button>
+                <div style="color: #ffd700; font-size: 14px; margin-bottom: 5px;">
+                    👑 الخانة المسبقة للرقم الفائز: <b>{% if forced_num > 0 %}{{ forced_num }}{% else %}عشوائي (تلقائي){% endif %}</b>
+                    (يمكنك تغييرها من <a href="/admin_games" style="color: #38bdf8;">لوحة الألعاب</a>)
+                </div>
+                <button type="submit" name="admin_execute_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 12px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ اسحب الآن (تشغيل القرعة لمدة 10 ثواني)</button>
             </form>
         {% endif %}
     </div>
 
-    <!-- نظام جافاسكريبت للقرعة، الموسيقي الحماسية والتحديث الفوري -->
     <script>
         function playHypeMusic() {
             try {
@@ -600,20 +665,20 @@ GAME_GOLDEN_PAGE = """
                     let slotEl = document.getElementById('slotDisplay');
                     let statusText = document.getElementById('statusText');
 
-                    if (data.status === 'drawing' || data.status === 'finished') {
-                        statusText.innerText = "جاري تدوير الأرقام بحماس وإعلان الفائز...";
-                        if (!slotInterval && data.status !== 'finished') {
+                    if (data.status === 'drawing') {
+                        statusText.innerText = "⚡ جاري تدوير الأرقام بسرعة وحماس (تتوقف خلال 10 ثواني)...";
+                        if (!slotInterval) {
                             slotInterval = setInterval(() => {
                                 slotEl.innerText = Math.floor(Math.random() * 50) + 1;
                                 playHypeMusic();
-                            }, 70);
+                            }, 50); // سرعة فائقة جداً لزيادة الإثارة
                         }
                     }
 
                     if (data.status === 'finished') {
                         if (slotInterval) clearInterval(slotInterval);
                         slotEl.innerText = data.winning_number;
-                        statusText.innerText = "🎉 مبروك 75$ للفائز!";
+                        statusText.innerText = "🎉 مبروك للفائز!";
                         let winBox = document.getElementById('box-' + data.winning_number);
                         if (winBox) winBox.className = "number-box winning";
                     }
@@ -658,14 +723,12 @@ ADMIN_CUSTOMERS_PAGE = """
 
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
-    <!-- خزنة المليون دولار -->
     <div class="vault-box">
         <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (رصيد المليون دولار - حصري لـ admin1)</h3>
         <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
     </div>
 
     <div class="panel-grid">
-        <!-- 1. إنشاء حسابات مع أرقامها السرية -->
         <div class="panel-box">
             <h3 style="color: #3b82f6; margin-top: 0;">👤 خلق حساب جديد</h3>
             <form method="POST">
@@ -678,7 +741,6 @@ ADMIN_CUSTOMERS_PAGE = """
             </form>
         </div>
 
-        <!-- 2. بيع عملات للحسابات من الرصيد الأساسي -->
         <div class="panel-box">
             <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات للزبون</h3>
             <form method="POST">
@@ -694,7 +756,6 @@ ADMIN_CUSTOMERS_PAGE = """
             </form>
         </div>
 
-        <!-- 3. شراء العملات من الحسابات وإعادتها للخزنة -->
         <div class="panel-box">
             <h3 style="color: #ef4444; margin-top: 0;">💸 شراء العملات وإعادتها</h3>
             <form method="POST">
@@ -711,7 +772,6 @@ ADMIN_CUSTOMERS_PAGE = """
         </div>
     </div>
 
-    <!-- جدول كافة الحسابات -->
     <div class="panel-box" style="margin-top: 25px;">
         <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات المسجلة</h3>
         <table>
@@ -746,20 +806,30 @@ ADMIN_GAMES_PAGE = """
         @media(max-width:900px){ .games-grid { grid-template-columns: repeat(2, 1fr); } }
         .game-ctrl-card { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 14px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .game-title { color: #ffd700; font-size: 16px; font-weight: bold; margin-bottom: 15px; }
-        .ctrl-btn { background: #22c55e; color: white; padding: 10px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+        .ctrl-btn { background: #22c55e; color: white; padding: 10px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; text-decoration: none; display: inline-block; box-sizing: border-box; }
+        input[type="number"] { width: 100%; padding: 10px; margin: 10px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; text-align: center; font-size: 16px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم الألعاب (الـ 8 أزرار للتحكم بالسحب وإدارة الأيقونات)</h2>
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم الألعاب (إدارة الأيقونات والنتائج)</h2>
         <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
 
+    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
+
     <div class="games-grid">
-        <div class="game-ctrl-card">
-            <div class="game-title">1. الرقم الذهبي</div>
-            <a href="/game_golden_number" class="ctrl-btn" style="display:block; text-decoration:none; line-height:35px;">إدارة سحب الرقم الذهبي</a>
+        <!-- 1. الرقم الذهبي مع الخانة المخصصة للرقم المسبق -->
+        <div class="game-ctrl-card" style="border: 3px solid #34d399;">
+            <div class="game-title">1. الرقم الذهبي 🏆</div>
+            <p style="font-size: 12px; color: #cbd5e1;">حدد الرقم الذي سيفوز بالقرعة (اتركه فارغاً لاختيار عشوائي):</p>
+            <form method="POST">
+                <input type="number" name="forced_winning_number" value="{% if forced_val > 0 %}{{ forced_val }}{% endif %}" placeholder="رقم من 1 إلى 50" min="1" max="50">
+                <button type="submit" class="ctrl-btn" style="background: #34d399; color: black; margin-top: 5px;">حفظ الرقم الفائز</button>
+            </form>
+            <a href="/game_golden_number" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
         </div>
+
         <div class="game-ctrl-card">
             <div class="game-title">2. روليت الحظ</div>
             <button class="ctrl-btn" onclick="alert('تحكم اللعبة الثانية مفعل')">تحكم السحب</button>
@@ -820,7 +890,6 @@ ADMIN_ACCOUNTING_PAGE = """
         <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
 
-    <!-- الإحصائيات والأرباح مجتمعة في خانة واحدة -->
     <div class="stats-grid">
         <div class="stat-card">
             <div style="color: #94a3b8;">إجمالي الواردات (المبيعات)</div>
