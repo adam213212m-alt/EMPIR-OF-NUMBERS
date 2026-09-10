@@ -11,7 +11,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين
+    # جدول المستخدمين (لن يتم مسح أو تعديل أي حساب موجود مسبقاً بفضل IF NOT EXISTS)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +46,7 @@ def init_db():
         )
     ''')
     
-    # إنشاء الـ 3 حسابات الرئيسية المسؤولة (admin1, admin2, admin3)
+    # إنشاء الـ 3 حسابات الرئيسية المسؤولة (admin1, admin2, admin3) إن لم تكن موجودة
     main_admins = ['admin1', 'admin2', 'admin3']
     for adm in main_admins:
         cursor.execute("SELECT * FROM users WHERE username=?", (adm,))
@@ -136,10 +136,10 @@ def game_two_page():
     conn.close()
     return render_template_string(GAME_TWO_PAGE, username=session['username'], balance=balance)
 
-# لوحة التحكم الحصرية لـ admin1, admin2, admin3 فقط
+# لوحة التحكم الخاصة بـ admin1, admin2, admin3
 @app.route('/admin_panel', methods=['GET', 'POST'])
 def admin_panel():
-    if 'username' not in session or session.get('role') != 'admin':
+    if 'username' not in session or session.get('role'] != 'admin':
         return redirect(url_for('dashboard'))
     
     current_admin = session['username']
@@ -159,14 +159,12 @@ def admin_panel():
 
         if user_row and amount > 0:
             if action == 'sell' and vault_bal >= amount:
-                # البيع للزبون (خصم من خزنة المليون وإضافة لحساب الزبون)
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - ? WHERE id=1", (amount,))
                 cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (amount, target_user))
                 cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('بيع رصيد (من الخزنة)', ?, ?, ?, ?)", 
                                (current_admin, target_user, amount, time.strftime('%Y-%m-%d %H:%M')))
                 conn.commit()
             elif action == 'buy_back' and user_row[0] >= amount:
-                # الشراء من الزبون (خصم من حساب الزبون وإرجاع المبلغ لخزنة المليون)
                 cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (amount, target_user))
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (amount,))
                 cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('شراء رصيد (إلى الخزنة)', ?, ?, ?, ?)", 
@@ -178,8 +176,8 @@ def admin_panel():
     cursor.execute("SELECT vault_balance FROM system_vault WHERE id=1")
     vault_balance = cursor.fetchone()[0]
 
-    # جلب الزبائن فقط (باستثناء حسابات الأدمن الثلاثة)
-    cursor.execute("SELECT username, balance FROM users WHERE role != 'admin'")
+    # جلب قائمة الزبائن وأرصدتهم
+    cursor.execute("SELECT username, balance, created_by FROM users WHERE role != 'admin'")
     users_list = cursor.fetchall()
 
     cursor.execute("SELECT action_type, admin_name, target_user, amount, log_time FROM financial_logs ORDER BY id DESC LIMIT 15")
@@ -202,7 +200,7 @@ def create_user_page():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, 'player', ?)", 
                            (new_user, new_pass, session['username']))
             conn.commit()
-            msg = f"تم إنشاء حساب الزبون '{new_user}' بنجاح!"
+            msg = f"تم إنشاء حساب الزبون '{new_user}' وحفظه في القاعدة بنجاح!"
         except sqlite3.IntegrityError:
             msg = "خطأ: اسم المستخدم موجود مسبقاً!"
         conn.close()
@@ -321,11 +319,11 @@ ADMIN_PAGE = """
         </div>
     </div>
 
-    <!-- خزنة المليون دولار الخاصة بالبرنامج -->
+    <!-- خزنة المليون دولار -->
     <div class="vault-box">
         <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 رصيد الخزنة المركزية (الشركة)</h3>
         <div style="font-size: 42px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
-        <p style="margin: 0; font-size: 13px; color: #e2e8f0;">يتم البيع للزبائن (خصم من الخزنة) والشراء منهم (إضافة للخزنة) حصرياً عبر حسابات (admin1, admin2, admin3).</p>
+        <p style="margin: 0; font-size: 13px; color: #e2e8f0;">يتم البيع للزبائن والشراء منهم حصرياً عبر حسابات (admin1, admin2, admin3).</p>
     </div>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -362,9 +360,28 @@ ADMIN_PAGE = """
         </div>
     </div>
 
+    <!-- جدول إدارة وعرض كافة الحسابات والزبائن المسجلين -->
+    <div class="panel-box" style="margin-top: 20px;">
+        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة حسابات الزبائن المنشأة وأرصدتهم</h3>
+        <table>
+            <tr><th>اسم الزبون</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة المدير</th></tr>
+            {% if users_list %}
+                {% for u in users_list %}
+                <tr>
+                    <td><b>{{ u[0] }}</b></td>
+                    <td style="color: #34d399; font-weight: bold;">${{ u[1] }}</td>
+                    <td>{{ u[2] }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="3" style="color: #94a3b8;">لا توجد حسابات زبائن مسجلة حتى الآن! اضغط على "إنشاء حساب زبون جديد" بالأعلى.</td></tr>
+            {% endif %}
+        </table>
+    </div>
+
     <!-- سجل العمليات المالية للمديرين -->
     <div class="panel-box" style="margin-top: 20px;">
-        <h3 style="color: #38bdf8; margin-top: 0;">📋 سجل العمليات المالية للمديرين (admin1, admin2, admin3)</h3>
+        <h3 style="color: #38bdf8; margin-top: 0;">📋 سجل العمليات المالية الأخيرة</h3>
         <table>
             <tr><th>نوع العملية</th><th>المدير المسؤول</th><th>الزبون</th><th>المبلغ</th><th>التوقيت</th></tr>
             {% for log in logs %}
