@@ -3,7 +3,6 @@ import sqlite3
 import random
 import time
 from datetime import datetime, timezone, timedelta
-import threading
 
 app = Flask(__name__)
 app.secret_key = 'empire_lira_clean_2026'
@@ -137,7 +136,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API يضمن تفريغ الحجوزات وإعادة اللوحة لوضع idle بدقة عند انتهاء الـ 30 ثانية
+# API آمن ومستقر 100% بدون خيوط خلفية متداخلة
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -160,24 +159,14 @@ def api_game_status():
                 winner_name = winner[0]
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
+            # تحديد وقت انتهاء الـ 30 ثانية للإضاءة
             new_lighting_end = current_time + 30
             cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
             end_timestamp = new_lighting_end
 
-            # تصفير اللوحة وإطفاء الأرقام ومسح جميع الحجوزات تلقائياً بعد 30 ثانية
-            def reset_board_after_30s():
-                time.sleep(30)
-                c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-                c_cur = c_conn.cursor()
-                c_cur.execute("DELETE FROM golden_number_bookings")
-                c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
-                c_cur.commit()
-                c_conn.close()
-            threading.Thread(target=reset_board_after_30s, daemon=True).start()
-
-        # 2. انتهاء فترة الإضاءة (30 ثانية) -> تحويلها لـ idle ومسح الحجوزات فوراً
+        # 2. انتهاء فترة الـ 30 ثانية للإضاءة -> تصفير اللوحة تماماً وعودتها لوضع idle
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -247,13 +236,14 @@ def game_one_page():
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
                 
+                # بدء السحب اليدوي بطلب من المدير (15 ثانية)
                 end_timestamp = time.time() + 15
                 cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                                (winning_num, end_timestamp))
                 conn.commit()
-                msg = f"تم بدء السحب الحماسي (15 ثانية)..."
+                msg = f"تم بدء السحب الحماسي (15 ثانية) بواسطة المدير {username}..."
             else:
-                msg = "عذراً، اللوحة ليست في وضع الاستعداد (idle)، يرجى الانتظار لحين انتهاء الجولة الحالية وتفريغ اللوحة."
+                msg = "عذراً، السحب جاري بالفعل أو أن اللوحة في مرحلة الإعلان!"
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -438,4 +428,210 @@ DASHBOARD_PAGE = """
 """
 
 GAME_ONE_PAGE = """
-<!
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لعبة الرقم الذهبي - Lira</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .board-container { background: #120e06; border: 6px solid #b8860b; border-image: linear-gradient(to bottom right, #ffd700, #8b6508) 1; padding: 25px; border-radius: 16px; margin-top: 25px; box-shadow: 0 0 35px rgba(255,215,0,0.2); text-align: center; }
+        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 20px; }
+        @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
+        
+        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
+        .number-box:hover { background: #1a1500; transform: scale(1.05); }
+        .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
+        
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #ffffff !important; box-shadow: 0 0 60px #ffd700; transform: scale(1.18); font-weight: bold; animation: pulse 0.6s infinite alternate; }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.22); } }
+        
+        .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
+        .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 75px; font-weight: bold; padding: 20px; width: 280px; margin: 20px auto; border-radius: 20px; box-shadow: 0 0 45px rgba(255,215,0,0.7); letter-spacing: 6px; text-shadow: 0 0 25px #ffd700; }
+        
+        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 4px solid #fff; padding: 25px; border-radius: 20px; margin: 25px auto; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 0 55px rgba(255,215,0,0.9); animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+
+        .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">👑 لعبة الرقم الذهبي (من 1 إلى 50)</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        </div>
+    </div>
+
+    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
+
+    <div class="board-container">
+        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (سعر الحجز: $2 للرقم | الجائزة الكبرى: $75)</h3>
+        <div class="board-grid" id="boardGrid">
+            {% for i in range(1, 51) %}
+                {% if i in bookings %}
+                    <div id="box-{{ i }}" class="number-box booked {% if game_status == 'finished' and winning_number == i %}winning{% endif %}">
+                        {{ i }}<br><span style="font-size: 10px; color: #f87171;">({{ bookings[i] }})</span>
+                    </div>
+                {% else %}
+                    <form method="POST" style="margin: 0;">
+                        <input type="hidden" name="number" value="{{ i }}">
+                        <button type="submit" name="book_number" id="box-{{ i }}" class="number-box" style="width: 100%; height: 55px;" title="اضغط للحجز بـ $2">
+                            {{ i }}
+                        </button>
+                    </form>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="draw-panel">
+        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
+        <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز!{% else %}مفتوح لحجز المراهنات (في انتظار أمر السحب اليدوي من المدير){% endif %}
+        </p>
+        
+        <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
+
+        <div id="countdownTimer" style="font-size: 26px; color: #ffd700; font-weight: bold; margin: 15px 0;"></div>
+
+        <div id="winNotificationContainer">
+            {% if game_status == 'finished' and winning_number %}
+            <div class="win-badge">
+                <div style="font-size: 28px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك فاز الرقم {{ winning_number }} بمبلغ 75$</div>
+                <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">الرقم مضاء باللون الذهبي لمدة 30 ثانية لجميع اللاعبين!</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if role == 'admin' %}
+            <form method="POST" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
+                <label style="color: #ffd700; font-weight: bold; font-size: 16px;">👑 (لوحة تحكم المدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
+                <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; margin-top: 10px; text-align: center; font-size: 16px;">
+                <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (15 ثانية للجميع)</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="my-stats">
+        <h3 style="color: #38bdf8; margin-top: 0;">👤 ملخص حسابك في اللعبة</h3>
+        <p>الأرقام التي قمت بحجزها: <b style="color: #ffd700;">{% if my_bookings %}{{ my_bookings | join(', ') }}{% else %}لا توجد أرقام محجوزة حتى الآن{% endif %}</b></p>
+        <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
+    </div>
+
+    <script>
+        function playHypeMusicNote() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let notes = [261.63, 329.63, 392.00, 523.25, 587.33, 659.25, 783.99];
+                let osc = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } catch(e) {}
+        }
+
+        let slotInterval = null;
+        let lastStatus = "{{ game_status }}";
+        let isReloading = false;
+
+        function updateGameRealtime() {
+            if (isReloading) return;
+
+            fetch('/api/game_status')
+                .then(res => res.json())
+                .then(data => {
+                    let timerEl = document.getElementById('countdownTimer');
+                    let slotEl = document.getElementById('slotDisplay');
+                    let statusText = document.getElementById('drawStatusText');
+                    let winContainer = document.getElementById('winNotificationContainer');
+
+                    for (let i = 1; i <= 50; i++) {
+                        let box = document.getElementById('box-' + i);
+                        if (box) {
+                            if (data.bookings[i]) {
+                                if (box.tagName === 'BUTTON' || box.tagName === 'FORM') {
+                                    let parent = box.closest('form') || box;
+                                    parent.outerHTML = `<div id="box-${i}" class="number-box booked">${i}<br><span style="font-size: 10px; color: #f87171;">(${data.bookings[i]})</span></div>`;
+                                }
+                            }
+                        }
+                    }
+
+                    if (data.status === 'drawing') {
+                        timerEl.innerText = "⏳ العد التنازلي للتدوير: " + data.remaining_seconds + " ثانية";
+                        statusText.innerText = "جاري تدوير الـ 50 رقماً عشوائياً أمام الجميع...";
+                        
+                        if (!slotInterval) {
+                            slotInterval = setInterval(() => {
+                                slotEl.innerText = Math.floor(Math.random() * 50) + 1;
+                                playHypeMusicNote();
+                            }, 80);
+                        }
+
+                        if (data.remaining_seconds <= 0 && !isReloading) {
+                            isReloading = true;
+                            setTimeout(() => { location.reload(); }, 500);
+                        }
+                    } else if (data.status === 'finished') {
+                        if (slotInterval) clearInterval(slotInterval);
+                        timerEl.innerText = "⏳ اللوحة مضاءة باللون الذهبي (" + data.remaining_seconds + " ثانية متبقية)";
+                        slotEl.innerText = data.winning_number;
+                        statusText.innerText = "الرقم الفائز بالقرعة:";
+
+                        let winBox = document.getElementById('box-' + data.winning_number);
+                        if (winBox) {
+                            winBox.className = "number-box winning";
+                        }
+
+                        if (!winContainer.innerHTML.includes("مبروك فاز الرقم")) {
+                            winContainer.innerHTML = `
+                                <div class="win-badge">
+                                    <div style="font-size: 28px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك فاز الرقم ${data.winning_number} بمبلغ 75$</div>
+                                    <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">الرقم مضاء باللون الذهبي لمدة 30 ثانية لجميع اللاعبين!</div>
+                                </div>
+                            `;
+                        }
+
+                        if (data.remaining_seconds <= 0 && !isReloading) {
+                            isReloading = true;
+                            setTimeout(() => { location.reload(); }, 500);
+                        }
+                    } else {
+                        if (slotInterval) clearInterval(slotInterval);
+                        timerEl.innerText = "";
+                        if (lastStatus === 'finished' && !isReloading) {
+                            isReloading = true;
+                            setTimeout(() => { location.reload(); }, 500);
+                        }
+                    }
+                    lastStatus = data.status;
+                });
+        }
+
+        setInterval(updateGameRealtime, 1000);
+    </script>
+</body>
+</html>
+"""
+
+ADMIN_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لوحة إدارة المديرين والخزنة - Lira</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
+        .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; box-shadow: 0 0 30px rgba(52,211,153,0.3); }
+        .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; margin-bottom: 20px; }
