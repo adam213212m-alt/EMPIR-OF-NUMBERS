@@ -11,7 +11,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين (لن يتم مسح أو تعديل أي حساب موجود مسبقاً بفضل IF NOT EXISTS)
+    # جدول المستخدمين (محفوظ بالكامل ولا يتأثر بالتحديثات)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,10 +136,10 @@ def game_two_page():
     conn.close()
     return render_template_string(GAME_TWO_PAGE, username=session['username'], balance=balance)
 
-# لوحة التحكم الخاصة بـ admin1, admin2, admin3
+# لوحة التحكم الخاصة بـ admin1, admin2, admin3 (تم تصحيح الخطأ البرمجي هنا)
 @app.route('/admin_panel', methods=['GET', 'POST'])
 def admin_panel():
-    if 'username' not in session or session.get('role'] != 'admin':
+    if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
     
     current_admin = session['username']
