@@ -1,6 +1,5 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
 import sqlite3
-import random
 import time
 
 app = Flask(__name__)
@@ -50,21 +49,6 @@ def init_db():
             draw_date TEXT
         )
     ''')
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS game_draws (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            game_name TEXT UNIQUE,
-            winning_number INTEGER,
-            status TEXT,
-            draw_time TEXT,
-            draw_end_timestamp REAL DEFAULT 0
-        )
-    ''')
-    
-    cursor.execute("SELECT COUNT(*) FROM game_draws WHERE game_name='golden_number'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO game_draws (game_name, winning_number, status, draw_end_timestamp) VALUES ('golden_number', 0, 'idle', 0)")
 
     main_admins = ['admin1', 'admin2', 'admin3']
     for adm in main_admins:
@@ -134,54 +118,6 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-@app.route('/api/game_status')
-def api_game_status():
-    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-    cursor = conn.cursor()
-    
-    current_time = time.time()
-    cursor.execute("SELECT winning_number, status, draw_end_timestamp FROM game_draws WHERE game_name='golden_number'")
-    row = cursor.fetchone()
-    
-    if row:
-        winning_number, status, end_timestamp = row[0], row[1], row[2]
-        
-        if status == 'drawing' and current_time >= end_timestamp:
-            cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
-            winner = cursor.fetchone()
-            if winner:
-                winner_name = winner[0]
-                cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
-            
-            new_lighting_end = current_time + 30
-            cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
-            conn.commit()
-            status = 'finished'
-            end_timestamp = new_lighting_end
-
-        elif status == 'finished' and current_time >= end_timestamp:
-            cursor.execute("DELETE FROM golden_number_bookings")
-            cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
-            conn.commit()
-            status = 'idle'
-            end_timestamp = 0
-
-        remaining = int(end_timestamp - current_time) if status in ['drawing', 'finished'] else 0
-        if remaining < 0: remaining = 0
-    else:
-        winning_number, status, remaining = 0, 'idle', 0
-
-    cursor.execute("SELECT number, username FROM golden_number_bookings")
-    bookings = {r[0]: r[1] for r in cursor.fetchall()}
-    conn.close()
-
-    return jsonify({
-        "status": status,
-        "winning_number": winning_number,
-        "remaining_seconds": remaining,
-        "bookings": bookings
-    })
-
 @app.route('/game_one_page', methods=['GET', 'POST'])
 def game_one_page():
     if 'username' not in session:
@@ -194,37 +130,22 @@ def game_one_page():
     msg = None
     if request.method == 'POST':
         if 'book_number' in request.form:
-            cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
-            if cursor.fetchone()[0] == 'idle':
-                number = int(request.form.get('number'))
-                cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-                bal = cursor.fetchone()[0]
-                cost = 2.0
-                if bal >= cost:
-                    cursor.execute("SELECT * FROM golden_number_bookings WHERE number=?", (number,))
-                    if not cursor.fetchone():
-                        cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
-                        cursor.execute("INSERT INTO golden_number_bookings (username, number, draw_date) VALUES (?, ?, ?)", 
-                                       (username, number, time.strftime('%Y-%m-%d')))
-                        conn.commit()
-                        msg = f"تم حجز الرقم {number} بنجاح مقابل ${cost}!"
-                    else:
-                        msg = f"عذراً، الرقم {number} محجوز مسبقاً!"
+            number = int(request.form.get('number'))
+            cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+            bal = cursor.fetchone()[0]
+            cost = 2.0
+            if bal >= cost:
+                cursor.execute("SELECT * FROM golden_number_bookings WHERE number=?", (number,))
+                if not cursor.fetchone():
+                    cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
+                    cursor.execute("INSERT INTO golden_number_bookings (username, number, draw_date) VALUES (?, ?, ?)", 
+                                   (username, number, time.strftime('%Y-%m-%d')))
+                    conn.commit()
+                    msg = f"تم حجز الرقم {number} بنجاح مقابل ${cost}!"
                 else:
-                    msg = "رصيدك غير كافٍ لحجز هذا الرقم!"
+                    msg = f"عذراً، الرقم {number} محجوز مسبقاً!"
             else:
-                msg = "عذراً، جاري السحب حالياً!"
-        
-        elif 'admin_draw' in request.form and role == 'admin':
-            cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
-            if cursor.fetchone()[0] == 'idle':
-                forced_num = request.form.get('forced_number')
-                winning_num = int(forced_num) if forced_num else random.randint(1, 50)
-                end_timestamp = time.time() + 15
-                cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
-                               (winning_num, end_timestamp))
-                conn.commit()
-                msg = f"تم بدء السحب بواسطة المدير {username}..."
+                msg = "رصيدك غير كافٍ لحجز هذا الرقم!"
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -236,14 +157,9 @@ def game_one_page():
     my_bookings = [r[0] for r in cursor.fetchall()]
     my_spent = len(my_bookings) * 2.0
 
-    cursor.execute("SELECT winning_number, status FROM game_draws WHERE game_name='golden_number'")
-    draw_info = cursor.fetchone()
-    winning_number, game_status = (draw_info[0], draw_info[1]) if draw_info else (None, 'idle')
-
     conn.close()
     return render_template_string(GAME_ONE_PAGE, username=username, role=role, balance=balance, 
-                                  bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, 
-                                  winning_number=winning_number, game_status=game_status, msg=msg)
+                                  bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, msg=msg)
 
 @app.route('/game_two_page')
 def game_two_page():
@@ -320,7 +236,7 @@ def create_user_page():
         conn.close()
     return render_template_string(CREATE_USER_PAGE, msg=msg)
 
-# قوالب HTML و CSS منظمة داخل متغيرات
+# قوالب HTML و CSS المعدلة بدون أي أنظمة سحب
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -368,7 +284,7 @@ DASHBOARD_PAGE = """
     <div class="icons-grid">
         <a href="/game_one_page" class="icon-card">
             <div class="icon-logo">🏆</div>
-            <div class="icon-title">الرقم الذهبي</div>
+            <div class="icon-title">لوحة الحجوزات (الرقم الذهبي)</div>
         </a>
         <a href="/game_two_page" class="icon-card">
             <div class="icon-logo">🎰</div>
@@ -385,7 +301,7 @@ GAME_ONE_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>لعبة الرقم الذهبي - Lira</title>
+    <title>لوحة الحجوزات - Lira</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <style>
@@ -397,17 +313,13 @@ GAME_ONE_PAGE = """
         .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
         .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; transform: scale(1.15); animation: pulse 0.6s infinite alternate; }
-        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.2); } }
-        .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
-        .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 65px; font-weight: bold; padding: 15px; width: 220px; margin: 15px auto; border-radius: 20px; }
-        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 20px; border-radius: 15px; margin: 20px auto; width: 90%; max-width: 500px; text-align: center; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لعبة الرقم الذهبي</h2>
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة الحجوزات الرقمية</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <div style="color: #34d399; font-weight: bold;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
@@ -417,87 +329,28 @@ GAME_ONE_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
     <div class="board-container">
-        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (السعر: $2 | الجائزة: $75)</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر وحجز الأرقام (تكلفة الحجز: $2 للرقم)</h3>
         <div class="board-grid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
-                    <div id="box-{{ i }}" class="number-box booked {% if game_status == 'finished' and winning_number == i %}winning{% endif %}">
+                    <div id="box-{{ i }}" class="number-box booked">
                         {{ i }}<br><span style="font-size: 10px; color: #f87171;">({{ bookings[i] }})</span>
                     </div>
                 {% else %}
                     <form method="POST" style="margin: 0;">
                         <input type="hidden" name="number" value="{{ i }}">
-                        <button type="submit" name="book_number" id="box-{{ i }}" class="number-box" style="width: 100%;">{{ i }}</button>
+                        <button type="submit" name="book_number" id="box-{{ i }}" class="number-box" style="width: 100%;" title="اضغط للحجز بـ $2">{{ i }}</button>
                     </form>
                 {% endif %}
             {% endfor %}
         </div>
     </div>
 
-    <div class="draw-panel">
-        <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة العرض والقرعة</h3>
-        <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px;">{% if game_status == 'drawing' %}⏳ جاري السحب...{% elif game_status == 'finished' %}🎉 تم إعلان الفائز!{% else %}في انتظار بدء السحب{% endif %}</p>
-        <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
-        <div id="countdownTimer" style="font-size: 22px; color: #ffd700; font-weight: bold; margin: 10px 0;"></div>
-        <div id="winNotificationContainer">
-            {% if game_status == 'finished' and winning_number %}
-            <div class="win-badge">
-                <div style="font-size: 24px; font-weight: bold; color: #000;">مبروك فاز الرقم {{ winning_number }} بمبلغ 75$</div>
-            </div>
-            {% endif %}
-        </div>
-
-        {% if role == 'admin' %}
-            <form method="POST" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
-                {% if game_status == 'idle' %}
-                    <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 200px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; text-align: center;">
-                    <button type="submit" name="admin_draw" style="background: #22c55e; color: white; font-weight: bold; padding: 12px 25px; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px;">⚡ بدء السحب (15 ثانية)</button>
-                {% else %}
-                    <div style="color: #f59e0b; font-weight: bold;">⏳ السحب أو إعلان الفائز جاري حالياً...</div>
-                {% endif %}
-            </form>
-        {% endif %}
+    <div class="my-stats">
+        <h3 style="color: #38bdf8; margin-top: 0;">👤 ملخص حسابك</h3>
+        <p>الأرقام التي قمت بحجزها: <b style="color: #ffd700;">{% if my_bookings %}{{ my_bookings | join(', ') }}{% else %}لا توجد أرقام محجوزة{% endif %}</b></p>
+        <p>إجمالي التكلفة المدفوعة للحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
-
-    <script>
-        let slotInterval = null;
-        let lastStatus = "{{ game_status }}";
-        let isRefreshing = false;
-
-        function updateGameRealtime() {
-            if (isRefreshing) return;
-            fetch('/api/game_status')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status !== lastStatus && !isRefreshing) {
-                        isRefreshing = true;
-                        setTimeout(() => { location.reload(); }, 400);
-                        return;
-                    }
-                    let timerEl = document.getElementById('countdownTimer');
-                    let slotEl = document.getElementById('slotDisplay');
-                    let statusText = document.getElementById('drawStatusText');
-                    
-                    if (data.status === 'drawing') {
-                        timerEl.innerText = "⏳ العد التنازلي: " + data.remaining_seconds + " ثانية";
-                        statusText.innerText = "جاري تدوير الأرقام...";
-                        if (!slotInterval) {
-                            slotInterval = setInterval(() => {
-                                slotEl.innerText = Math.floor(Math.random() * 50) + 1;
-                            }, 80);
-                        }
-                    } else if (data.status === 'finished') {
-                        if (slotInterval) clearInterval(slotInterval);
-                        timerEl.innerText = "⏳ اللوحة مضاءة (" + data.remaining_seconds + " ثانية متبقية)";
-                        slotEl.innerText = data.winning_number;
-                        statusText.innerText = "الرقم الفائز:";
-                        let winBox = document.getElementById('box-' + data.winning_number);
-                        if (winBox) winBox.className = "number-box winning";
-                    }
-                });
-        }
-        setInterval(updateGameRealtime, 1000);
-    </script>
 </body>
 </html>
 """
