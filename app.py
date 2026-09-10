@@ -137,7 +137,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API معدل لضمان عدم حدوث أي سحب تلقائي بعد انتهاء الإضاءة
+# API محصن بالكامل ضد تداخل طلبات المديرين المتعددين
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -152,7 +152,7 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # 1. انتهاء فترة الـ 15 ثانية للتدوير -> الانتقال لحالة الفوز ومنح الجائزة وتفعيل الإضاءة الذهبية
+        # 1. انتهاء فترة الـ 15 ثانية للتدوير -> الانتقال لحالة الإضاءة الذهبية (finished)
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -160,25 +160,28 @@ def api_game_status():
                 winner_name = winner[0]
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
-            # بقاء اللوحة مضاءة لمدة 30 ثانية
             new_lighting_end = current_time + 30
             cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
             end_timestamp = new_lighting_end
 
-            # تصفير اللوحة وإطفاء الأرقام بعد 30 ثانية وإبقائها في وضع الاستعداد التام (idle) دون تكرار
+            # تصفير اللوحة وإبقائها في وضع الاستعداد (idle) بشكل نهائي وثابت دون تكرار
             def reset_board_after_30s():
                 time.sleep(30)
                 c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
                 c_cur = c_conn.cursor()
-                c_cur.execute("DELETE FROM golden_number_bookings")
-                c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
-                c_conn.commit()
+                # التأكد أن اللوحة لا تزال في وضع finished قبل التصفير لمنع أي تداخل
+                c_cur.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
+                st_row = c_cur.fetchone()
+                if st_row and st_row[0] == 'finished':
+                    c_cur.execute("DELETE FROM golden_number_bookings")
+                    c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
+                    c_cur.commit()
                 c_conn.close()
             threading.Thread(target=reset_board_after_30s, daemon=True).start()
 
-        # 2. إذا انتهت فترة الإضاءة (30 ثانية)
+        # 2. انتهاء فترة الإضاءة (30 ثانية) -> تحويلها لـ idle بشكل مؤكد
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -244,18 +247,18 @@ def game_one_page():
         elif 'admin_draw' in request.form and role == 'admin':
             cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
             st = cursor.fetchone()[0]
+            # السماح بالسحب حصرياً إذا كانت اللوحة في وضع الاستعداد (idle) لتجنب أي تداخل من مديرين متعددين
             if st == 'idle':
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
                 
-                # بدء السحب اليدوي بطلب من المدير فقط (15 ثانية)
                 end_timestamp = time.time() + 15
                 cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                                (winning_num, end_timestamp))
                 conn.commit()
-                msg = f"تم بدء السحب الحماسي (15 ثانية)..."
+                msg = f"تم بدء السحب الحماسي (15 ثانية) بواسطة المدير {username}..."
             else:
-                msg = "السحب جاري بالفعل أو أن اللوحة في مرحلة الإعلان!"
+                msg = "عذراً، السحب جاري بالفعل أو أن اللوحة في مرحلة الإعلان ولا يمكن بدء سحب جديد الآن!"
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -534,7 +537,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- كود الجافاسكريبت المحدث لضمان استقرار اللوحة في وضع الاستعداد وعدم إعادة التدوير إلا بأمر المدير -->
+    <!-- كود JavaScript محسّن لثبات الحالة وعدم حدوث أي سحب عشوائي -->
     <script>
         function playHypeMusicNote() {
             try {
