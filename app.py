@@ -12,7 +12,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين
+    # جدول المستخدمين (محفوظ بالكامل بكل حساباته وأرصدته وكلمات مروره)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,7 +143,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API عام لجلب الحالة الحية والعد التنازلي وقائمة الحجوزات لتحديث الشاشات فوراً عند الجميع
+# API عام لجلب الحالة الحية وتحديث الشاشات لجميع اللاعبين في نفس اللحظة
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -158,7 +158,7 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # فحص انتهاء الـ 30 ثانية وتحويل الأرباح تلقائياً
+        # فحص انتهاء الـ 30 ثانية وتحويل الجائزة تلقائياً للفائز
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -170,8 +170,8 @@ def api_game_status():
             conn.commit()
             status = 'finished'
 
-            # جدول تصفير اللوحة وإعادتها لوضع الخمول بعد 15 ثانية من عرض النتيجة
-            def reset_board():
+            # تصفير اللوحة وإطفاء الأرقام بعد 15 ثانية لتصبح جاهزة لحجز جديد
+            def reset_board_after_15s():
                 time.sleep(15)
                 c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
                 c_cur = c_conn.cursor()
@@ -179,7 +179,7 @@ def api_game_status():
                 c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
                 c_conn.commit()
                 c_conn.close()
-            threading.Thread(target=reset_board, daemon=True).start()
+            threading.Thread(target=reset_board_after_15s, daemon=True).start()
 
         remaining = int(end_timestamp - current_time) if status == 'drawing' else 0
         if remaining < 0: remaining = 0
@@ -237,11 +237,12 @@ def game_one_page():
             forced_num = request.form.get('forced_number')
             winning_num = int(forced_num) if forced_num else random.randint(1, 50)
             
+            # بدء العد التنازلي لمدة 30 ثانية
             end_timestamp = time.time() + 30
             cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                            (winning_num, end_timestamp))
             conn.commit()
-            msg = f"تم بدء السحب اليدوي لجميع اللاعبين (العد التنازلي 30 ثانية)..."
+            msg = f"تم بدء السحب الحماسي لجميع اللاعبين (30 ثانية)..."
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -442,14 +443,14 @@ GAME_ONE_PAGE = """
         .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
         .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 45px #ffd700; transform: scale(1.15); font-weight: bold; animation: pulse 0.8s infinite alternate; }
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 50px #ffd700; transform: scale(1.15); font-weight: bold; animation: pulse 0.8s infinite alternate; }
         @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.18); } }
         
         .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
         /* شاشة العرض الكبرى البارزة للرقم الرابح */
-        .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 70px; font-weight: bold; padding: 20px; width: 260px; margin: 20px auto; border-radius: 20px; box-shadow: 0 0 40px rgba(255,215,0,0.6); letter-spacing: 6px; text-shadow: 0 0 20px #ffd700; }
+        .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 75px; font-weight: bold; padding: 20px; width: 280px; margin: 20px auto; border-radius: 20px; box-shadow: 0 0 45px rgba(255,215,0,0.7); letter-spacing: 6px; text-shadow: 0 0 25px #ffd700; }
         
-        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 4px solid #fff; padding: 25px; border-radius: 20px; margin: 25px auto; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 0 50px rgba(255,215,0,0.9); animation: bounce 1s infinite alternate; }
+        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 4px solid #fff; padding: 25px; border-radius: 20px; margin: 25px auto; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 0 55px rgba(255,215,0,0.9); animation: bounce 1s infinite alternate; }
         @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
 
         .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
@@ -490,7 +491,7 @@ GAME_ONE_PAGE = """
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
         <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
-            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً عشوائياً...{% else %}انتظار أمر السحب من المدير (السحب اليدوي الحصري){% endif %}
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً عشوائياً...{% else %}انتظار أمر السحب اليدوي من المدير{% endif %}
         </p>
         
         <!-- شاشة العرض الكبرى للرقم الرابح -->
@@ -522,7 +523,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- جلب التحديثات الحية وتحديث الشاشة الكبرى واللون الذهبي لجميع اللاعبين -->
+    <!-- جلب التحديثات الحية وتحديث الشاشة الكبرى واللون الذهبي فوراً لجميع اللاعبين -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -592,7 +593,7 @@ GAME_ONE_PAGE = """
                             winBox.className = "number-box winning";
                         }
 
-                        // ظهور الإشعار الضخم لجميع اللاعبين
+                        // ظهور الإشعار الضخم والفاخر لجميع اللاعبين والحسابات
                         if (!winContainer.innerHTML.includes("مبروك ربح")) {
                             winContainer.innerHTML = `
                                 <div class="win-badge">
