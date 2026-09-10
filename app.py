@@ -136,7 +136,6 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API آمن ومستقر 100% بدون خيوط خلفية متداخلة
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -151,7 +150,6 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # 1. انتهاء فترة الـ 15 ثانية للتدوير -> الانتقال لحالة الإضاءة الذهبية (finished)
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -159,14 +157,12 @@ def api_game_status():
                 winner_name = winner[0]
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
-            # تحديد وقت انتهاء الـ 30 ثانية للإضاءة
             new_lighting_end = current_time + 30
             cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
             end_timestamp = new_lighting_end
 
-        # 2. انتهاء فترة الـ 30 ثانية للإضاءة -> تصفير اللوحة تماماً وعودتها لوضع idle
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -236,7 +232,6 @@ def game_one_page():
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
                 
-                # بدء السحب اليدوي بطلب من المدير (15 ثانية)
                 end_timestamp = time.time() + 15
                 cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                                (winning_num, end_timestamp))
@@ -635,3 +630,165 @@ ADMIN_PAGE = """
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
         .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; box-shadow: 0 0 30px rgba(52,211,153,0.3); }
         .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
+        button { padding: 10px 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-sell { background: #22c55e; color: black; }
+        .btn-buy { background: #ef4444; color: white; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; font-size: 14px; }
+        th { background: #252525; color: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة الإدارة العليا ({{ username }})</h2>
+        <div>
+            <a href="/create_user_page" class="back-btn" style="background: #10b981; margin-left: 10px;">➕ إنشاء حساب زبون جديد</a>
+            <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        </div>
+    </div>
+
+    <div class="vault-box">
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 رصيد الخزنة المركزية (الشركة)</h3>
+        <div style="font-size: 42px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="panel-box">
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع رصيد للحساب</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="sell">
+                <label>اختر الحساب (مدير أو زبون):</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} ({{ u[3] }}) - رصيده: ${{ u[2] }}</option>{% endfor %}
+                </select>
+                <label>المبلغ ($):</label>
+                <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
+                <button type="submit" class="btn-sell">إتمام عملية البيع</button>
+            </form>
+        </div>
+
+        <div class="panel-box">
+            <h3 style="color: #ef4444; margin-top: 0;">💸 شراء رصيد وإرجاعه للخزنة</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="buy_back">
+                <label>اختر الحساب (مدير أو زبون):</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} ({{ u[3] }}) - رصيده: ${{ u[2] }}</option>{% endfor %}
+                </select>
+                <label>المبلغ ($):</label>
+                <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
+                <button type="submit" class="btn-buy">إتمام الشراء للخزنة</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel-box" style="margin-top: 20px;">
+        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة الحسابات (المديرين والزبائن والـ player)</h3>
+        <table>
+            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة</th></tr>
+            {% for u in users_list %}
+            <tr>
+                <td><b>{{ u[0] }}</b></td>
+                <td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
+                <td><span style="padding: 3px 8px; border-radius: 4px; background: {% if u[3] == 'admin' %}#b8860b{% else %}#1f2937{% endif %};">{{ u[3] }}</span></td>
+                <td style="color: #34d399; font-weight: bold;">${{ u[2] }}</td>
+                <td>{{ u[4] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="panel-box" style="margin-top: 20px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">📋 سجل العمليات المالية الأخيرة</h3>
+        <table>
+            <tr><th>نوع العملية</th><th>المدير المسؤول</th><th>الهدف</th><th>المبلغ</th><th>التوقيت</th></tr>
+            {% for log in logs %}
+            <tr>
+                <td><b>{{ log[0] }}</b></td>
+                <td style="color: #ffd700;">{{ log[1] }}</td>
+                <td>{{ log[2] }}</td>
+                <td style="color: #34d399;">${{ log[3] }}</td>
+                <td>{{ log[4] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+CREATE_USER_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إنشاء حساب زبون جديد - Lira</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 350px; text-align: center; border: 1px solid #444; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #555; background: #252525; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #10b981; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px; }
+        .msg { color: #34d399; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2 style="color: #ffd700; margin-top: 0;">➕ إنشاء حساب زبون جديد</h2>
+        {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="text" name="new_user" placeholder="اسم المستخدم (مثال: customer1)" required>
+            <input type="text" name="new_pass" placeholder="كلمة المرور (الرمز السري)" required>
+            <button type="submit">إنشاء الحساب</button>
+        </form>
+        <a href="/admin_panel" class="back-btn">⬅️ العودة لوحة الإدارة</a>
+    </div>
+</body>
+</html>
+"""
+
+GAME_TWO_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><title>اللعبة الثانية</title></head>
+<body style="background:#0b0f19; color:#fff; text-align:center; padding:50px;">
+    <h1>🎰 اللعبة الثانية قيد البرمجة</h1>
+    <a href="/dashboard" style="color:#3b82f6;">⬅ العودة للرئيسية</a>
+</body>
+</html>
+"""
+
+LOGIN_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تسجيل الدخول - Lira</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 320px; text-align: center; border: 1px solid #333; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2 style="color: #ffd700; margin-top: 0;">👑 Lira | ليرة</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="POST">
+            <input type="text" name="username" placeholder="اسم المستخدم" required>
+            <input type="password" name="password" placeholder="كلمة المرور" required>
+            <button type="submit">دخول</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
