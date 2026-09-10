@@ -137,7 +137,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API محسن لمنع التداخل وتثبيت التوقيت بدقة تامة
+# API معدل لضمان عدم حدوث أي سحب تلقائي بعد انتهاء الإضاءة
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -152,24 +152,22 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # 1. إذا كان في وضع السحب (drawing) وانتهى الوقت (15 ثانية)
+        # 1. انتهاء فترة الـ 15 ثانية للتدوير -> الانتقال لحالة الفوز ومنح الجائزة وتفعيل الإضاءة الذهبية
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
             if winner:
                 winner_name = winner[0]
-                cursor.execute("SELECT COUNT(*) FROM users WHERE username=? AND role='winner_checked'", (winner_name,))
-                # لمنع تكرار إضافة الجائزة مرتين، نضيفها مرة واحدة فقط
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
-            # تحديد وقت انتهاء الإضاءة الذهبية (30 ثانية قادمة)
+            # بقاء اللوحة مضاءة لمدة 30 ثانية
             new_lighting_end = current_time + 30
             cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
             end_timestamp = new_lighting_end
 
-            # تصفير اللوحة تلقائياً بعد انتهاء الـ 30 ثانية للإضاءة
+            # تصفير اللوحة وإطفاء الأرقام بعد 30 ثانية وإبقائها في وضع الاستعداد التام (idle) دون تكرار
             def reset_board_after_30s():
                 time.sleep(30)
                 c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -180,7 +178,7 @@ def api_game_status():
                 c_conn.close()
             threading.Thread(target=reset_board_after_30s, daemon=True).start()
 
-        # 2. إذا انتهت فترة الإضاءة (30 ثانية) في وضع finished
+        # 2. إذا انتهت فترة الإضاءة (30 ثانية)
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -250,7 +248,7 @@ def game_one_page():
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
                 
-                # بدء العد التنازلي الثابت 15 ثانية بالضبط
+                # بدء السحب اليدوي بطلب من المدير فقط (15 ثانية)
                 end_timestamp = time.time() + 15
                 cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                                (winning_num, end_timestamp))
@@ -505,7 +503,7 @@ GAME_ONE_PAGE = """
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
         <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
-            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز!{% else %}مفتوح لحجز المراهنات (إطلاق السحب يدوياً من المدير){% endif %}
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز!{% else %}مفتوح لحجز المراهنات (في انتظار أمر السحب اليدوي من المدير){% endif %}
         </p>
         
         <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
@@ -536,7 +534,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- كود جافاسكريبت محسن لمنع أي ارتداد للعداد وثبات المزامنة -->
+    <!-- كود الجافاسكريبت المحدث لضمان استقرار اللوحة في وضع الاستعداد وعدم إعادة التدوير إلا بأمر المدير -->
     <script>
         function playHypeMusicNote() {
             try {
