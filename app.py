@@ -150,6 +150,7 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
+        # 1. انتهاء الـ 15 ثانية للتدوير -> الانتقال للإضاءة الذهبية (finished)
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -163,6 +164,7 @@ def api_game_status():
             status = 'finished'
             end_timestamp = new_lighting_end
 
+        # 2. انتهاء الـ 30 ثانية للإضاءة -> تصفير تام والعودة لوضع idle
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -228,6 +230,7 @@ def game_one_page():
         elif 'admin_draw' in request.form and role == 'admin':
             cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
             st = cursor.fetchone()[0]
+            # حماية صارمة: منع أي أمر سحب جديد إلا إذا كانت اللوحة في وضع الاستعداد (idle) حصرياً
             if st == 'idle':
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
@@ -238,7 +241,7 @@ def game_one_page():
                 conn.commit()
                 msg = f"تم بدء السحب الحماسي (15 ثانية) بواسطة المدير {username}..."
             else:
-                msg = "عذراً، السحب جاري بالفعل أو أن اللوحة في مرحلة الإعلان!"
+                msg = "عذراً، لا يمكن بدء سحب جديد الآن لأن اللوحة قيد السحب أو عرض الفائز!"
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -484,9 +487,9 @@ GAME_ONE_PAGE = """
     </div>
 
     <div class="draw-panel">
-        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
         <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
-            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز!{% else %}مفتوح لحجز المراهنات (في انتظار أمر السحب اليدوي من المدير){% endif %}
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز والإضاءة الذهبية نشطة!{% else %}مفتوح لحجز المراهنات (في انتظار أمر السحب اليدوي من المدير){% endif %}
         </p>
         
         <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
@@ -504,9 +507,15 @@ GAME_ONE_PAGE = """
 
         {% if role == 'admin' %}
             <form method="POST" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
-                <label style="color: #ffd700; font-weight: bold; font-size: 16px;">👑 (لوحة تحكم المدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
-                <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; margin-top: 10px; text-align: center; font-size: 16px;">
-                <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (15 ثانية للجميع)</button>
+                {% if game_status == 'idle' %}
+                    <label style="color: #ffd700; font-weight: bold; font-size: 16px;">👑 (لوحة تحكم المدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
+                    <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; margin-top: 10px; text-align: center; font-size: 16px;">
+                    <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (15 ثانية للجميع)</button>
+                {% else %}
+                    <div style="background: #2b2b2b; color: #f59e0b; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                        ⏳ {% if game_status == 'drawing' %}السحب جاري حالياً...{% else %}اللوحة في مرحلة إعلان الفائز والإضاءة الذهبية...{% endif %} (زر السحب معطل لحين انتهاء الجولة)
+                    </div>
+                {% endif %}
             </form>
         {% endif %}
     </div>
@@ -517,6 +526,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
+    <!-- كود JavaScript آمن ومحدث للتحديث التلقائي الفوري دون تكرار السحب -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -769,7 +779,7 @@ LOGIN_PAGE = """
     <meta charset="UTF-8">
     <title>تسجيل الدخول - Lira</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        body { font-family: Tahoma, sans-serif; background-core: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 320px; text-align: center; border: 1px solid #333; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
