@@ -12,7 +12,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين
+    # جدول المستخدمين (محفوظ بالكامل دون مسح أو تغيير للبيانات السابقة)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +68,7 @@ def init_db():
         )
     ''')
     
-    # إنشاء الـ 3 حسابات الرئيسية للمديرين بـ 100 ألف دولار لكل حساب وخصمها من الخزنة
+    # إنشاء الـ 3 حسابات الرئيسية للمديرين إن لم تكن موجودة مسبقاً
     main_admins = ['admin1', 'admin2', 'admin3']
     for adm in main_admins:
         cursor.execute("SELECT * FROM users WHERE username=?", (adm,))
@@ -186,6 +186,10 @@ def game_one_page():
                 msg = f"تم السحب بنجاح! الرقم الفائز هو {winning_num} وقد فاز به اللاعب: {winner_name} بجائزة $75!"
             else:
                 msg = f"تم السحب بنجاح! الرقم الفائز هو {winning_num} ولم يتم حجزه من أي لاعب."
+
+            # إعادة تصفير وإطفاء الأرقام لتصبح اللوحة جاهزة من جديد
+            cursor.execute("DELETE FROM golden_number_bookings")
+            conn.commit()
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -423,7 +427,6 @@ GAME_ONE_PAGE = """
         .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 20px; border-radius: 12px; margin-top: 25px; text-align: center; }
         .slot-machine { background: #000; border: 3px dashed #ffd700; color: #ffd700; font-size: 45px; font-weight: bold; padding: 15px; width: 220px; margin: 15px auto; border-radius: 10px; letter-spacing: 5px; }
         
-        /* أيقونة الفوز الذهبية الفاخرة المطلوبة */
         .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 22px; border-radius: 16px; margin: 20px auto; width: 85%; max-width: 480px; text-align: center; box-shadow: 0 0 45px rgba(255,215,0,0.8); animation: bounce 1s infinite alternate; }
         @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
 
@@ -442,7 +445,6 @@ GAME_ONE_PAGE = """
 
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
-    <!-- لوحة الأرقام الخشبية الفاخرة -->
     <div class="board-container">
         <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (سعر الحجز: $2 للرقم | الجائزة الكبرى: $75)</h3>
         <div class="board-grid">
@@ -463,10 +465,9 @@ GAME_ONE_PAGE = """
         </div>
     </div>
 
-    <!-- لوحة السحب وخانة الأرقام المارة -->
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin: 0;">🎰 شاشة السحب والتدوير التفاعلي</h3>
-        <p style="color: #cbd5e1; font-size: 14px;">اضغط على زر السحب لبدء مرور الأرقام السريع لتستقر على الرقم الفائز!</p>
+        <p style="color: #cbd5e1; font-size: 14px;">اضغط على زر السحب لبدء مرور الأرقام الحماسي لمدة 30 ثانية لتستقر على الرقم الفائز!</p>
         
         <div class="slot-machine" id="slotDisplay">{% if winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
 
@@ -481,7 +482,7 @@ GAME_ONE_PAGE = """
             <form method="POST" style="margin-top: 15px;" onsubmit="triggerSlotAnimation(event)">
                 <label style="color: #ffd700; font-weight: bold;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
                 <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 8px; width: 200px; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; margin-top: 8px;">
-                <button type="submit" name="admin_draw" style="background: #22c55e; color: black; font-weight: bold; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 10px auto;">⚡ بدء السحب الآن</button>
+                <button type="submit" name="admin_draw" id="drawBtn" style="background: #22c55e; color: black; font-weight: bold; padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 15px auto; font-size: 16px;">⚡ بدء السحب الحماسي (30 ثانية)</button>
             </form>
         {% endif %}
 
@@ -490,7 +491,6 @@ GAME_ONE_PAGE = """
         {% endif %}
     </div>
 
-    <!-- خانة خاصة بكل لاعب لمعرفة أرقامه وما صرفه -->
     <div class="my-stats">
         <h3 style="color: #38bdf8; margin-top: 0;">👤 ملخص حسابك في اللعبة</h3>
         <p>الأرقام التي قمت بحجزها: <b style="color: #ffd700;">{% if my_bookings %}{{ my_bookings | join(', ') }}{% else %}لا توجد أرقام محجوزة حتى الآن{% endif %}</b></p>
@@ -498,19 +498,54 @@ GAME_ONE_PAGE = """
     </div>
 
     <script>
+        function playHypeMusicAndSlot() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let notes = [261.63, 329.63, 392.00, 523.25, 587.33, 659.25, 783.99];
+            let duration = 30;
+
+            let musicInterval = setInterval(() => {
+                let osc = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], audioCtx.currentTime);
+                
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }, 120);
+
+            setTimeout(() => {
+                clearInterval(musicInterval);
+            }, duration * 1000);
+        }
+
         function triggerSlotAnimation(e) {
+            e.preventDefault();
+            let btn = document.getElementById('drawBtn');
+            btn.disabled = true;
+            btn.innerText = "⏳ جارِ السحب الحماسي (30 ثانية)...";
+            btn.style.background = "#555";
+
+            playHypeMusicAndSlot();
+
             let slot = document.getElementById('slotDisplay');
             let counter = 0;
+            let totalTicks = 300;
+            
             let slotInterval = setInterval(() => {
                 slot.innerText = Math.floor(Math.random() * 50) + 1;
                 counter++;
-                if(counter > 100) {
+                if(counter >= totalTicks) {
                     clearInterval(slotInterval);
-                    {% if winning_number %}
-                    slot.innerText = "{{ winning_number }}";
-                    {% endif %}
+                    e.target.submit();
                 }
-            }, 60);
+            }, 100);
         }
     </script>
 </body>
@@ -550,7 +585,6 @@ ADMIN_PAGE = """
     <div class="vault-box">
         <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 رصيد الخزنة المركزية (الشركة)</h3>
         <div style="font-size: 42px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
-        <p style="margin: 0; font-size: 13px; color: #e2e8f0;">تم تخصيص $100,000 لكل مدير (admin1, admin2, admin3) وخصمها تلقائياً من الخزنة المركزية.</p>
     </div>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -586,7 +620,7 @@ ADMIN_PAGE = """
     </div>
 
     <div class="panel-box" style="margin-top: 20px;">
-        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة الحسابات (المديرين والزبائن)</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">👥 جدول كافة الحسابات (المديرين والزبائن والـ player)</h3>
         <table>
             <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة</th></tr>
             {% for u in users_list %}
