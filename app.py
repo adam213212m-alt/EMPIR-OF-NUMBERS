@@ -383,46 +383,4 @@ def admin_panel():
     
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT username, password, balance, role, created_by FROM users")
-        all_users = cursor.fetchall()
-
-        cursor.execute("SELECT game_name, total_collected, total_payouts FROM financial_stats")
-        fin_data = cursor.fetchall()
-        
-        financial_report = []
-        total_net_profit = 0
-        for row in fin_data:
-            net = row['total_collected'] - row['total_payouts']
-            total_net_profit += net
-            financial_report.append({
-                'name': row['game_name'],
-                'collected': row['total_collected'],
-                'payouts': row['total_payouts'],
-                'net': net
-            })
-
-        cursor.execute("SELECT forced_admin_number FROM game_board_state WHERE id=1")
-        f_num = cursor.fetchone()[0]
-
-        cursor.execute("SELECT forced_admin_slot FROM game_three_state WHERE id=1")
-        f_slot = cursor.fetchone()[0]
-    
-    return render_template_string(ADMIN_PAGE, username=session['username'], all_users=all_users, financial_report=financial_report, total_net_profit=total_net_profit, f_num=f_num, f_slot=f_slot)
-
-@app.route('/pick_number/<int:num>', methods=['POST'])
-def pick_number(num):
-    if 'username' not in session:
-        return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
-    username = session['username']
-    
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-        balance = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT status, owner FROM game_board WHERE number=?", (num,))
-        row = cursor.fetchone()
-        if row:
-            status, owner = row['status'], row['owner']
-            if status == 'available':
-                cursor.
+        cursor.execute("SELECT username, password, balance
