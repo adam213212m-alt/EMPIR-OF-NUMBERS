@@ -116,7 +116,7 @@ def check_and_auto_draw_royal_game():
                     winning_slot = random.randint(1, 5)
                     
             if winning_slot:
-                banner_end_time = time.time() + 25 # عرض شاشة الفوز والإضاءة لمدة 5 ثوانٍ بعد الـ 20 ثانية
+                banner_end_time = time.time() + 6 # شاشة الاحتفال الضخمة تظهر لمدة 6 ثوانٍ كاملة أمام الجمهور
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
                     msg = f"🎉 مبروك للفائز {winner_owner} - ربح الرقم {winning_slot} جائزة 200$!"
@@ -255,7 +255,7 @@ def pick_royal_slot(slot_id):
                 
                 cursor.execute("SELECT COUNT(*) FROM royal_game_board WHERE status='available'")
                 if cursor.fetchone()[0] == 0:
-                    timer_end = time.time() + 20 # العد التنازلي الجديد: 20 ثانية بالضبط
+                    timer_end = time.time() + 20 # العد التنازلي الحقيقي بـ 20 ثانية
                     winning_slot = random.randint(1, 5)
                     cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=? WHERE id=1", 
                                    (timer_end, winning_slot))
@@ -555,7 +555,6 @@ ROYAL_GAME_PAGE = """
     <script>
         const currentUser = "{{ username }}";
 
-        // مشغل الصوت التفاعلي التلقائي للموقع (Web Audio API)
         let audioCtx = null;
         function playSound(type) {
             try {
@@ -572,7 +571,6 @@ ROYAL_GAME_PAGE = """
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.1);
                 } else if (type === 'win') {
-                    // نغمة احتفالية متسلسلة للفوز
                     let now = audioCtx.currentTime;
                     [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
                         let o = audioCtx.createOscillator();
@@ -609,7 +607,6 @@ ROYAL_GAME_PAGE = """
                     if(data.error) return;
                     document.getElementById('userBalanceBadge').innerText = '$' + data.balance;
 
-                    // تشغيل صوت دوران العجلة مع العد التنازلي
                     if(data.is_full && data.rem !== lastRem) {
                         playSound('tick');
                         lastRem = data.rem;
@@ -621,7 +618,7 @@ ROYAL_GAME_PAGE = """
                         let lockedCls = status === 'locked' ? 'locked' : '';
                         
                         // إضاءة الرقم الفائز باللون الأحمر لمدة 3 ثوانٍ كاملة
-                        if(data.winning_number === sId && data.rem > 22) {
+                        if(data.winning_number === sId && data.rem > 3) {
                             lockedCls += ' winner-highlight';
                         }
 
@@ -646,10 +643,10 @@ ROYAL_GAME_PAGE = """
                     } else {
                         countBanner.style.display = 'none';
                         wheel.style.display = 'none';
-                        if(data.winning_number > 0 && data.rem > 20) {
+                        if(data.winning_number > 0 && data.rem > 0) {
                             winModal.style.display = 'flex';
                             document.getElementById('winningNumText').innerText = data.winning_number;
-                            playSound('win'); // تشغيل صوت الفوز
+                            playSound('win');
                         } else {
                             winModal.style.display = 'none';
                         }
@@ -685,7 +682,7 @@ ROYAL_GAME_PAGE = """
         <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">جاري إعلان الفائز بالجوائز الكبرى...</div>
     </div>
 
-    <!-- نافذة الفوز الضخمة أمام أعين اللاعبين (رقم كبير وتحته مبروووك 200$) -->
+    <!-- نافذة الفوز الضخمة أمام أعين اللاعبين (رقم بحجم كبير وتحته مبروووك 200$) -->
     <div id="winModal" class="win-popup" style="display: none;">
         <div class="win-card">
             <div style="font-size: 50px; margin-bottom: 5px;">👑</div>
