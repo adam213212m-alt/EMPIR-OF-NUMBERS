@@ -69,7 +69,6 @@ def init_db():
         )
     ''')
     
-    # التأكد من وجود سجل أولي للعبة
     cursor.execute("SELECT COUNT(*) FROM game_draws WHERE game_name='golden_number'")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO game_draws (game_name, winning_number, status, draw_end_timestamp) VALUES ('golden_number', 0, 'idle', 0)")
@@ -144,28 +143,58 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API خاص بجلب حالة اللعبة الحية لجميع اللاعبين (لتحديث العد التنازلي والنتائج آنياً)
+# API عام لجلب الحالة الحية والعد التنازلي وقائمة الحجوزات لتحديث الشاشات فوراً عند الجميع
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
-    cursor.execute("SELECT winning_number, status, draw_end_timestamp FROM game_draws WHERE game_name='golden_number'")
-    row = cursor.fetchone()
-    conn.close()
     
     current_time = time.time()
-    winning_number = row[0]
-    status = row[1]
-    end_timestamp = row[2]
+    cursor.execute("SELECT winning_number, status, draw_end_timestamp FROM game_draws WHERE game_name='golden_number'")
+    row = cursor.fetchone()
     
-    remaining = int(end_timestamp - current_time) if status == 'drawing' else 0
-    if remaining < 0:
-        remaining = 0
+    if row:
+        winning_number = row[0]
+        status = row[1]
+        end_timestamp = row[2]
+        
+        # فحص تلقائي لانتهاء الـ 30 ثانية
+        if status == 'drawing' and current_time >= end_timestamp:
+            cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
+            winner = cursor.fetchone()
+            if winner:
+                winner_name = winner[0]
+                cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
+            
+            cursor.execute("UPDATE game_draws SET status='finished' WHERE game_name='golden_number'")
+            conn.commit()
+            status = 'finished'
+
+            # جدول تصفير اللوحة بعد 15 ثانية من انتهاء السحب
+            def reset_board():
+                time.sleep(15)
+                c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+                c_cur = c_conn.cursor()
+                c_cur.execute("DELETE FROM golden_number_bookings")
+                c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
+                c_conn.commit()
+                c_conn.close()
+            threading.Thread(target=reset_board, daemon=True).start()
+
+        remaining = int(end_timestamp - current_time) if status == 'drawing' else 0
+        if remaining < 0: remaining = 0
+
+    # جلب الحجوزات الحالية لتحديث اللوحة فوراً
+    cursor.execute("SELECT number, username FROM golden_number_bookings")
+    bookings = {r[0]: r[1] for r in cursor.fetchall()}
+
+    conn.close()
 
     return jsonify({
         "status": status,
         "winning_number": winning_number,
-        "remaining_seconds": remaining
+        "remaining_seconds": remaining,
+        "bookings": bookings
     })
 
 # اللعبة الأولى: الرقم الذهبي
@@ -180,38 +209,8 @@ def game_one_page():
     cursor = conn.cursor()
     
     msg = None
-    current_time = time.time()
-
-    # فحص تلقائي لإنهاء السحب أو إعادة تعيين اللوحة
-    cursor.execute("SELECT status, winning_number, draw_end_timestamp FROM game_draws WHERE game_name='golden_number'")
-    draw_row = cursor.fetchone()
-    if draw_row:
-        status, win_num, end_ts = draw_row[0], draw_row[1], draw_row[2]
-        if status == 'drawing' and current_time >= end_ts:
-            # انتهت الـ 30 ثانية، معالجة النتيجة وتحويل الأرباح
-            cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (win_num,))
-            winner = cursor.fetchone()
-            if winner:
-                winner_name = winner[0]
-                cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
-            
-            cursor.execute("UPDATE game_draws SET status='finished' WHERE game_name='golden_number'")
-            conn.commit()
-
-            # جدولة إعادة تعيين اللوحة بعد 15 ثانية من انتهاء السحب
-            def reset_board_after_delay():
-                time.sleep(15)
-                c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-                c_cur = c_conn.cursor()
-                c_cur.execute("DELETE FROM golden_number_bookings")
-                c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
-                c_conn.commit()
-                c_conn.close()
-            threading.Thread(target=reset_board_after_delay, daemon=True).start()
-
     if request.method == 'POST':
         if 'book_number' in request.form:
-            # السماح بالحجز فقط إذا كانت اللعبة في وضع الخمول (idle)
             cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
             current_status = cursor.fetchone()[0]
             if current_status == 'idle':
@@ -233,18 +232,17 @@ def game_one_page():
                 else:
                     msg = "رصيدك غير كافٍ لحجز هذا الرقم! يرجى شحن الرصيد."
             else:
-                msg = "عذراً، جاري السحب حالياً! يجدر الانتظار للجولة القادمة."
+                msg = "عذراً، جاري السحب حالياً! يرجى الانتظار للجولة القادمة."
         
         elif 'admin_draw' in request.form and role == 'admin':
             forced_num = request.form.get('forced_number')
             winning_num = int(forced_num) if forced_num else random.randint(1, 50)
             
-            # ضبط وقت انتهاء العد التنازلي بعد 30 ثانية
             end_timestamp = time.time() + 30
             cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                            (winning_num, end_timestamp))
             conn.commit()
-            msg = f"تم بدء السحب الحماسي لجميع اللاعبين (العد التنازلي 30 ثانية)..."
+            msg = f"تم بدء السحب لجميع اللاعبين (العد التنازلي 30 ثانية)..."
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -256,7 +254,7 @@ def game_one_page():
     my_bookings = [r[0] for r in cursor.fetchall()]
     my_spent = len(my_bookings) * 2.0
 
-    cursor.execute("SELECT winning_number, status, draw_end_timestamp FROM game_draws WHERE game_name='golden_number'")
+    cursor.execute("SELECT winning_number, status FROM game_draws WHERE game_name='golden_number'")
     draw_info = cursor.fetchone()
     winning_number = draw_info[0] if draw_info else None
     game_status = draw_info[1] if draw_info else 'idle'
@@ -350,10 +348,10 @@ def create_user_page():
         conn.close()
     return render_template_string(CREATE_USER_PAGE, msg=msg)
 
-# السحب التلقائي اليومي الساعة 9 مساءً
+# السحب التلقائي اليومي الساعة 9:00 مساءً بتوقيت بيروت (توقيت محلي EEST / UTC+3)
 def daily_auto_draw():
     while True:
-        now = datetime.now(timezone.utc) + timedelta(hours=3)
+        now = datetime.now(timezone(timedelta(hours=3))) # توقيت بيروت
         target_time = now.replace(hour=21, minute=0, second=0, microsecond=0)
         if now >= target_time:
             target_time += timedelta(days=1)
@@ -468,10 +466,10 @@ GAME_ONE_PAGE = """
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 20px; }
         @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
         
-        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
+        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
         .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 30px #ffd700; transform: scale(1.12); font-weight: bold; animation: pulse 0.8s infinite alternate; }
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 35px #ffd700; transform: scale(1.12); font-weight: bold; animation: pulse 0.8s infinite alternate; }
         @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
         
         .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 20px; border-radius: 12px; margin-top: 25px; text-align: center; }
@@ -497,10 +495,11 @@ GAME_ONE_PAGE = """
 
     <div class="board-container">
         <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (سعر الحجز: $2 للرقم | الجائزة الكبرى: $75)</h3>
-        <div class="board-grid">
+        <div class="board-grid" id="boardGrid">
+            <!-- يتم تعبئة اللوحة وتحديثها ديناميكياً عبر الجافاسكريبت لجميع اللاعبين -->
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
-                    <div id="box-{{ i }}" class="number-box booked {% if game_status == 'finished' and winning_number == i %}winning{% endif %}" title="محجوز من قبل: {{ bookings[i] }}">
+                    <div id="box-{{ i }}" class="number-box booked {% if game_status == 'finished' and winning_number == i %}winning{% endif %}">
                         {{ i }}<br><span style="font-size: 10px; color: #f87171;">({{ bookings[i] }})</span>
                     </div>
                 {% else %}
@@ -516,32 +515,34 @@ GAME_ONE_PAGE = """
     </div>
 
     <div class="draw-panel">
-        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة السحب والتدوير التفاعلي</h3>
+        <h3 style="color: #ffd700; margin: 0;">🎰 شاشة السحب والتدوير التفاعلي المشترك</h3>
         <p id="drawStatusText" style="color: #cbd5e1; font-size: 14px;">
-            {% if game_status == 'drawing' %}⏳ جاري العد التنازلي للسحب...{% else %}اضغط على زر السحب لبدء العد التنازلي المشترك للجميع!{% endif %}
+            {% if game_status == 'drawing' %}⏳ جاري السحب والعد التنازلي الحماسي...{% else %}انتظار بدء السحب (السحب التلقائي الساعة 9:00 مساءً بتوقيت بيروت){% endif %}
         </p>
         
         <div class="slot-machine" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
 
         <div id="countdownTimer" style="font-size: 24px; color: #ffd700; font-weight: bold; margin: 10px 0;"></div>
 
-        {% if user_won %}
-        <div class="win-badge">
-            <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربحت 75$</div>
-            <div style="font-size: 20px; margin-top: 8px; color: #111; font-weight: bold;">الرقم الرابح: {{ winning_number }}</div>
+        <div id="winNotificationContainer">
+            {% if user_won %}
+            <div class="win-badge">
+                <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربح الرقم {{ winning_number }} 75$</div>
+                <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
+            </div>
+            {% elif game_status == 'finished' and winning_number %}
+            <div class="win-badge">
+                <div style="font-size: 24px; font-weight: bold; color: #000;">مبروك ربح الرقم {{ winning_number }} 75$</div>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
         {% if role == 'admin' %}
             <form method="POST" style="margin-top: 15px;">
                 <label style="color: #ffd700; font-weight: bold;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
                 <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 8px; width: 200px; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; margin-top: 8px;">
-                <button type="submit" name="admin_draw" id="drawBtn" style="background: #22c55e; color: black; font-weight: bold; padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 15px auto; font-size: 16px;">⚡ بدء العد التنازلي للسحب (30 ثانية)</button>
+                <button type="submit" name="admin_draw" id="drawBtn" style="background: #22c55e; color: black; font-weight: bold; padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; display: block; margin: 15px auto; font-size: 16px;">⚡ بدء السحب اليدوي للجميع (30 ثانية)</button>
             </form>
-        {% endif %}
-
-        {% if game_status == 'finished' and not role == 'admin' %}
-            <div style="font-size: 20px; color: #34d399; font-weight: bold; margin-top: 10px;">🏆 الرقم الفائز في السحب: رقم {{ winning_number }}</div>
         {% endif %}
     </div>
 
@@ -551,7 +552,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- جلب التحديثات الحية من الخادم لجميع اللاعبين -->
+    <!-- نظام التحديث الحي (Real-time Sync) للجميع لحظياً -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -571,48 +572,75 @@ GAME_ONE_PAGE = """
         }
 
         let slotInterval = null;
+        let lastStatus = "{{ game_status }}";
 
-        function checkGameStatus() {
+        function updateGameRealtime() {
             fetch('/api/game_status')
                 .then(res => res.json())
                 .then(data => {
                     let timerEl = document.getElementById('countdownTimer');
                     let slotEl = document.getElementById('slotDisplay');
                     let statusText = document.getElementById('drawStatusText');
+                    let winContainer = document.getElementById('winNotificationContainer');
+
+                    // تحديث اللوحة والأرقام المحجوزة فوراً لجميع اللاعبين
+                    for (let i = 1; i <= 50; i++) {
+                        let box = document.getElementById('box-' + i);
+                        if (box) {
+                            if (data.bookings[i]) {
+                                if (box.tagName === 'BUTTON' || box.tagName === 'FORM') {
+                                    // تحويل زر الحجز إلى مربع محجوز فوراً
+                                    let parent = box.closest('form') || box;
+                                    parent.outerHTML = `<div id="box-${i}" class="number-box booked">${i}<br><span style="font-size: 10px; color: #f87171;">(${data.bookings[i]})</span></div>`;
+                                }
+                            }
+                        }
+                    }
 
                     if (data.status === 'drawing') {
-                        timerEl.innerText = "⏳ متبقي: " + data.remaining_seconds + " ثانية";
-                        statusText.innerText = "جاري السحب والتدوير الحماسي...";
+                        timerEl.innerText = "⏳ متبقي على السحب: " + data.remaining_seconds + " ثانية";
+                        statusText.innerText = "جاري تدوير 50 رقماً عشوائياً بحماس...";
                         
                         if (!slotInterval) {
                             slotInterval = setInterval(() => {
                                 slotEl.innerText = Math.floor(Math.random() * 50) + 1;
                                 playHypeMusicNote();
-                            }, 100);
+                            }, 80);
                         }
 
-                        if (data.remaining_seconds <= 0) {
-                            location.reload(); // تحديث الصفحة فور انتهاء العد لجلب النتيجة
+                        if (data.remaining_seconds <= 0 && lastStatus !== 'finished') {
+                            location.reload(); // إعادة تحميل لتثبيت النتيجة وتحديث الأرصدة
                         }
                     } else if (data.status === 'finished') {
                         if (slotInterval) clearInterval(slotInterval);
                         timerEl.innerText = "🎉 انتهى السحب!";
                         slotEl.innerText = data.winning_number;
-                        
-                        // تعليم الرقم الفائز بتمييز ذهبي فاخر على اللوحة فوراً
+                        statusText.innerText = "تم إعلان الرقم الفائز!";
+
+                        // تلوين الرقم الفائز باللون الذهبي الفاخر على اللوحة
                         let winBox = document.getElementById('box-' + data.winning_number);
                         if (winBox) {
                             winBox.className = "number-box winning";
+                        }
+
+                        if (!winContainer.innerHTML.includes("مبروك ربح")) {
+                            winContainer.innerHTML = `
+                                <div class="win-badge">
+                                    <div style="font-size: 26px; font-weight: bold; color: #000;">مبروك ربح الرقم ${data.winning_number} 75$</div>
+                                    <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
+                                </div>
+                            `;
                         }
                     } else {
                         if (slotInterval) clearInterval(slotInterval);
                         timerEl.innerText = "";
                     }
+                    lastStatus = data.status;
                 });
         }
 
-        // فحص الحالة كل ثانية لجميع اللاعبين
-        setInterval(checkGameStatus, 1000);
+        // تحديث مستمر كل ثانية لضمان رؤية جميع اللاعبين للأحداث في نفس اللحظة
+        setInterval(updateGameRealtime, 1000);
     </script>
 </body>
 </html>
