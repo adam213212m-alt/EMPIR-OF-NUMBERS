@@ -116,7 +116,7 @@ def check_and_auto_draw_royal_game():
                     winning_slot = random.randint(1, 5)
                     
             if winning_slot:
-                banner_end_time = time.time() + 35
+                banner_end_time = time.time() + 35 # عرض الاحتفال لمدة 5 ثوانٍ بعد الـ 30 ثانية
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
                     msg = f"🎉 مبروك للفائز {winner_owner} - ربح الرقم {winning_slot} جائزة 200$!"
@@ -126,6 +126,7 @@ def check_and_auto_draw_royal_game():
                 else:
                     msg = f"💎 انتهى السحب على الرقم {winning_slot} (ولم يكن محجوزاً)."
                 
+                # تصفير اللوحة وإبقاء الرقم الفائز مسجلاً مؤقتاً لتلوينه بالأحمر
                 cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL")
                 cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, winning_number=?, last_winner_msg=?, banner_end_time=?, forced_admin_slot='' WHERE id=1", (winning_slot, msg, banner_end_time))
                 conn.commit()
@@ -162,18 +163,24 @@ def api_sync_royal():
     cursor.execute("SELECT slot_id, status, owner FROM royal_game_board")
     royal_slots = cursor.fetchall()
 
-    cursor.execute("SELECT is_full, timer_end, winning_number, last_winner_msg FROM royal_game_state WHERE id=1")
+    cursor.execute("SELECT is_full, timer_end, winning_number, banner_end_time FROM royal_game_state WHERE id=1")
     state = cursor.fetchone()
     conn.close()
     
+    is_full = state[0]
+    timer_end = state[1]
+    winning_number = state[2]
+    banner_end_time = state[3]
+    
+    rem = max(0, int(timer_end - time.time())) if is_full else 0
+    show_winner = time.time() < banner_end_time
+
     return jsonify({
         'balance': balance,
         'royal_slots': royal_slots,
-        'is_full': state[0],
-        'timer_end': state[1],
-        'rem': max(0, int(state[1] - time.time())) if state[0] else 0,
-        'winning_number': state[2],
-        'msg': state[3]
+        'is_full': is_full,
+        'rem': rem,
+        'winning_number': winning_number if show_winner else 0
     })
 
 @app.route('/', methods=['GET', 'POST'])
@@ -249,21 +256,19 @@ def pick_royal_slot(slot_id):
                 
                 cursor.execute("SELECT COUNT(*) FROM royal_game_board WHERE status='available'")
                 if cursor.fetchone()[0] == 0:
-                    timer_end = time.time() + 30 # عد تنازلي دقيق بـ 30 ثانية حقيقية
+                    timer_end = time.time() + 30 # العد التنازلي الدقيق بـ 30 ثانية
                     winning_slot = random.randint(1, 5)
-                    cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=?, last_winner_msg=? WHERE id=1", 
-                                   (timer_end, winning_slot, "⚠️ اكتملت الأرقام! يبدأ العد التنازلي للسحب..."))
+                    cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=? WHERE id=1", 
+                                   (timer_end, winning_slot))
                     conn.commit()
             else:
                 conn.close()
                 return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 50$)!'})
         elif status == 'locked' and owner == username:
-            # التراجع المباشر والخاص بصاحب الحساب فقط واسترداد الـ 50$ فوراً
+            # التراجع المباشر والخاص بصاحب الحساب فقط واسترداد الـ 50$
             cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
             cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
             cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
-            cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, last_winner_msg=? WHERE id=1", 
-                           ("قام اللاعب بالتراجع عن رهانه واسترد رصيده.",))
             conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -526,21 +531,23 @@ ROYAL_GAME_PAGE = """
         
         .royal-box { background: linear-gradient(135deg, #181818, #262626); border: 3px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 850px; margin: 0 auto; text-align: center; }
         .slots-container { display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }
-        .slot-btn { background: #252525; border: 3px solid #ffd700; width: 120px; height: 120px; border-radius: 16px; color: #ffd700; font-size: 26px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; position: relative; }
+        .slot-btn { background: #252525; border: 3px solid #ffd700; width: 120px; height: 120px; border-radius: 16px; color: #ffd700; font-size: 26px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.3s; position: relative; }
         .slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; box-shadow: 0 0 15px rgba(0,255,0,0.5); }
+        .slot-btn.winner-highlight { background: #dc2626 !important; border-color: #f87171 !important; color: #fff !important; transform: scale(1.1); box-shadow: 0 0 30px #ef4444 !important; }
         .owner-tag { font-size: 11px; color: #ffcc00; margin-top: 4px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* شريط العد التنازلي البارز والواضح بـ 30 ثانية */
         .countdown-banner { background: linear-gradient(90deg, #991b1b, #ef4444, #991b1b); border: 2px solid #f87171; color: #fff; padding: 15px; border-radius: 12px; font-size: 21px; font-weight: bold; margin-bottom: 20px; box-shadow: 0 0 25px rgba(239,68,68,0.8); display: none; text-align: center; }
 
-        /* عجلة الحظ الدائرية والنقطة الثابتة بالاعلى */
+        /* عجلة الحظ الدائرية التي تدور بداخلها الأرقام الخمسة معاً بوضوح */
         .wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .wheel-outer { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 10px solid #ffd700; background: radial-gradient(circle, #222, #000); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 60px rgba(255,215,0,0.9); }
-        .pointer-dot { position: absolute; top: -22px; width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 28px solid #ef4444; z-index: 25; filter: drop-shadow(0 0 8px #ef4444); }
-        .spinning-wheel-text { font-size: 55px; font-weight: bold; color: #ffd700; animation: spinAnim 0.25s infinite linear; }
-        @keyframes spinAnim { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .wheel-outer { position: relative; width: 300px; height: 300px; border-radius: 50%; border: 10px solid #ffd700; background: radial-gradient(circle, #1a1a1a, #000); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 70px rgba(255,215,0,0.9); }
+        .pointer-dot { position: absolute; top: -22px; width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 28px solid #ef4444; z-index: 30; filter: drop-shadow(0 0 8px #ef4444); }
+        
+        .wheel-numbers-orbit { position: absolute; width: 100%; height: 100%; animation: orbitSpin 1s infinite linear; }
+        .orbit-num { position: absolute; font-size: 26px; font-weight: bold; color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+        @keyframes orbitSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* نافذة الفوز المذهبة والمطابقة لطلبك تماماً */
+        /* نافذة الفوز الفخمة والمنبثقة (رقم كبير وتحته مبروووك 200$) */
         .win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 10000; }
         .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 45px; border-radius: 22px; text-align: center; box-shadow: 0 0 80px rgba(255,215,0,0.95); width: 440px; animation: popUp 0.4s ease-out; }
         @keyframes popUp { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
@@ -571,6 +578,12 @@ ROYAL_GAME_PAGE = """
                     data.royal_slots.forEach(slot => {
                         let sId = slot[0], status = slot[1], owner = slot[2];
                         let lockedCls = status === 'locked' ? 'locked' : '';
+                        
+                        // تعليم الرقم الفائز باللون الأحمر لمدة 3 ثوانٍ
+                        if(data.winning_number === sId && data.rem > 27) {
+                            lockedCls += ' winner-highlight';
+                        }
+
                         let ownerTag = owner ? `<span class="owner-tag">👤 ${owner}</span>` : '<span style="font-size:11px; color:#38bdf8;">متاح 50$</span>';
                         let actionTitle = (status === 'locked' && owner === currentUser) ? 'اضغط للتراجع واسترداد الـ 50$' : 'اختر الرقم';
                         
@@ -589,12 +602,10 @@ ROYAL_GAME_PAGE = """
                         countBanner.style.display = 'block';
                         document.getElementById('remTimerText').innerText = data.rem;
                         wheel.style.display = 'flex';
-                        let rndNum = Math.floor(Math.random() * 5) + 1;
-                        document.getElementById('spinningDigit').innerText = rndNum;
                     } else {
                         countBanner.style.display = 'none';
                         wheel.style.display = 'none';
-                        if(data.winning_number > 0 && data.rem > 0) {
+                        if(data.winning_number > 0 && data.rem > 25) {
                             winModal.style.display = 'flex';
                             document.getElementById('winningNumText').innerText = data.winning_number;
                         } else {
@@ -616,24 +627,29 @@ ROYAL_GAME_PAGE = """
         <a href="/dashboard" class="back-btn">⬅ العودة للوحة التحكم الرئيسية</a>
     </div>
 
-    <!-- عجلة الحظ الدائرية مع النقطة الثابتة الحمراء بالأعلى -->
+    <!-- عجلة الحظ الدائرية التي تدور بداخلها الأرقام الخمسة معاً بوضوح والنقطة الثابتة -->
     <div id="wheelOverlay" class="wheel-overlay" style="display: none;">
-        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 العجلة تدور بوضوح.. انتظر الرقم تحت النقطة الثابتة!</div>
+        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 الأرقام الخمسة تدور داخل العجلة.. انتظر اختيار الفائز!</div>
         <div class="wheel-outer">
             <div class="pointer-dot"></div>
-            <div id="spinningDigit" class="spinning-wheel-text">7</div>
+            <div class="wheel-numbers-orbit">
+                <div class="orbit-num" style="top: 20px; left: 130px;">1</div>
+                <div class="orbit-num" style="top: 70px; right: 45px;">2</div>
+                <div class="orbit-num" style="bottom: 50px; right: 65px;">3</div>
+                <div class="orbit-num" style="bottom: 50px; left: 65px;">4</div>
+                <div class="orbit-num" style="top: 70px; left: 45px;">5</div>
+            </div>
         </div>
         <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">جاري إعلان الفائز بالجوائز الكبرى...</div>
     </div>
 
-    <!-- نافذة الفوز المطابقة لطلبك تماماً (مبروووك الرقم وتحتها 200$) -->
+    <!-- نافذة الفوز الفخمة والمطابقة تماماً لطلبك (رقم بحجم كبير وتحته مبروووك 200$) -->
     <div id="winModal" class="win-popup" style="display: none;">
         <div class="win-card">
             <div style="font-size: 50px; margin-bottom: 5px;">👑</div>
-            <h2 style="color: #ffd700; margin: 0; font-size: 28px;">مبروووك لقد فاز الرقم!</h2>
-            <div id="winningNumText" style="font-size: 48px; font-weight: bold; color: #fff; margin: 10px 0;">3</div>
-            <div style="font-size: 32px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.6); padding: 12px; border-radius: 12px; border: 2px solid #00ff00; box-shadow: 0 0 20px #00ff00; margin-top: 5px;">200$</div>
-            <p style="color: #cbd5e1; font-size: 14px; margin-top: 20px;">تم تحويل الـ 200$ إلى رصيد الفائز مباشرة!</p>
+            <div id="winningNumText" style="font-size: 80px; font-weight: bold; color: #ffd700; text-shadow: 0 0 20px #ffd700; margin: 0;">3</div>
+            <h2 style="color: #fff; margin: 10px 0 5px 0; font-size: 32px;">مبروووك 200$</h2>
+            <p style="color: #34d399; font-size: 15px; font-weight: bold; margin-top: 15px;">تم تحويل الربح إلى رصيد حساب الفائز فوراً!</p>
         </div>
     </div>
 
@@ -641,7 +657,6 @@ ROYAL_GAME_PAGE = """
         <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الرقم: 50$ | الجائزة: 200$)</h2>
         <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">لا يمكن اختيار الرقم إلا لمرة واحدة لشخص واحد، ويمكنك التراجع عن حجزك واسترداد أموالك بنفسك.</p>
         
-        <!-- شريط العد التنازلي البارز (30 ثانية دقيقة) -->
         <div id="countdownBanner" class="countdown-banner">
             ⏳ اكتملت الحجوزات! سيبدأ السحب خلال <span id="remTimerText" style="color: #ffd700; font-size: 26px;">30</span> ثانية!
         </div>
@@ -840,7 +855,7 @@ LOGIN_PAGE = """
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 320px; text-align: center; border: 1px solid #333; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin0-top: 10px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 16px; }
         .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; background: rgba(239,68,68,0.2); padding: 8px; border-radius: 6px; }
     </style>
 </head>
