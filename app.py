@@ -249,7 +249,7 @@ def pick_royal_slot(slot_id):
                 
                 cursor.execute("SELECT COUNT(*) FROM royal_game_board WHERE status='available'")
                 if cursor.fetchone()[0] == 0:
-                    timer_end = time.time() + 30 # عد تنازلي دقيق بـ 30 ثانية
+                    timer_end = time.time() + 30 # عد تنازلي دقيق بـ 30 ثانية حقيقية
                     winning_slot = random.randint(1, 5)
                     cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=?, last_winner_msg=? WHERE id=1", 
                                    (timer_end, winning_slot, "⚠️ اكتملت الأرقام! يبدأ العد التنازلي للسحب..."))
@@ -258,7 +258,7 @@ def pick_royal_slot(slot_id):
                 conn.close()
                 return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 50$)!'})
         elif status == 'locked' and owner == username:
-            # التراجع المباشر من صاحب الحساب لنفسه واسترداد الـ 50$
+            # التراجع المباشر والخاص بصاحب الحساب فقط واسترداد الـ 50$ فوراً
             cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
             cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
             cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
@@ -530,19 +530,19 @@ ROYAL_GAME_PAGE = """
         .slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; box-shadow: 0 0 15px rgba(0,255,0,0.5); }
         .owner-tag { font-size: 11px; color: #ffcc00; margin-top: 4px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* شريط العد التنازلي الواضح والفاخر */
-        .countdown-banner { background: linear-gradient(90deg, #991b1b, #b91c1c, #991b1b); border: 2px solid #ef4444; color: #fff; padding: 15px; border-radius: 12px; font-size: 20px; font-weight: bold; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239,68,68,0.7); display: none; text-align: center; }
+        /* شريط العد التنازلي البارز والواضح بـ 30 ثانية */
+        .countdown-banner { background: linear-gradient(90deg, #991b1b, #ef4444, #991b1b); border: 2px solid #f87171; color: #fff; padding: 15px; border-radius: 12px; font-size: 21px; font-weight: bold; margin-bottom: 20px; box-shadow: 0 0 25px rgba(239,68,68,0.8); display: none; text-align: center; }
 
-        /* عجلة الحظ الدائرية والنقطة الثابتة */
+        /* عجلة الحظ الدائرية والنقطة الثابتة بالاعلى */
         .wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .wheel-outer { position: relative; width: 260px; height: 260px; border-radius: 50%; border: 8px solid #ffd700; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(255,215,0,0.8); }
-        .pointer-dot { position: absolute; top: -20px; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid #ef4444; z-index: 20; filter: drop-shadow(0 0 5px #ef4444); }
-        .spinning-wheel-text { font-size: 50px; font-weight: bold; color: #ffd700; animation: spinAnim 0.3s infinite linear; }
+        .wheel-outer { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 10px solid #ffd700; background: radial-gradient(circle, #222, #000); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 60px rgba(255,215,0,0.9); }
+        .pointer-dot { position: absolute; top: -22px; width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 28px solid #ef4444; z-index: 25; filter: drop-shadow(0 0 8px #ef4444); }
+        .spinning-wheel-text { font-size: 55px; font-weight: bold; color: #ffd700; animation: spinAnim 0.25s infinite linear; }
         @keyframes spinAnim { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* نافذة الفوز المذهبة والمنبثقة */
+        /* نافذة الفوز المذهبة والمطابقة لطلبك تماماً */
         .win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 0 70px rgba(255,215,0,0.95); width: 420px; animation: popUp 0.4s ease-out; }
+        .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 45px; border-radius: 22px; text-align: center; box-shadow: 0 0 80px rgba(255,215,0,0.95); width: 440px; animation: popUp 0.4s ease-out; }
         @keyframes popUp { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
     <script>
@@ -550,7 +550,7 @@ ROYAL_GAME_PAGE = """
 
         function pickSlot(slotId, status, owner) {
             if (status === 'locked' && owner === currentUser) {
-                if(!confirm("هل تريد حقاً التراجع عن حجز هذا الرقم واسترداد مبلغ 50$ إلى رصيدك؟")) return;
+                if(!confirm("هل تريد حقاً التراجع عن حجز هذا الرقم واسترداد مبلغ 50$ إلى رصيدك الشخصي؟")) return;
             }
             fetch('/pick_royal_slot/' + slotId, { method: 'POST' })
                 .then(res => res.json())
@@ -603,7 +603,7 @@ ROYAL_GAME_PAGE = """
                     }
                 });
         }
-        setInterval(syncRoyal, 1500);
+        setInterval(syncRoyal, 1000);
     </script>
 </head>
 <body>
@@ -616,35 +616,34 @@ ROYAL_GAME_PAGE = """
         <a href="/dashboard" class="back-btn">⬅ العودة للوحة التحكم الرئيسية</a>
     </div>
 
-    <!-- عجلة الحظ الدائرية والنقطة الثابتة الحمراء -->
+    <!-- عجلة الحظ الدائرية مع النقطة الثابتة الحمراء بالأعلى -->
     <div id="wheelOverlay" class="wheel-overlay" style="display: none;">
-        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 العجلة تدور بوضوح.. انتظر الرقم الرابح تحت السهم!</div>
+        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 العجلة تدور بوضوح.. انتظر الرقم تحت النقطة الثابتة!</div>
         <div class="wheel-outer">
             <div class="pointer-dot"></div>
             <div id="spinningDigit" class="spinning-wheel-text">7</div>
         </div>
-        <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">جاري سحب الجائزة الكبرى (200$)...</div>
+        <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">جاري إعلان الفائز بالجوائز الكبرى...</div>
     </div>
 
-    <!-- نافذة الفوز الفخمة والمنبثقة -->
+    <!-- نافذة الفوز المطابقة لطلبك تماماً (مبروووك الرقم وتحتها 200$) -->
     <div id="winModal" class="win-popup" style="display: none;">
         <div class="win-card">
-            <div style="font-size: 55px; margin-bottom: 10px;">🎉</div>
-            <h2 style="color: #ffd700; margin: 0; font-size: 32px; text-shadow: 0 0 10px #ffd700;">مبروووك!</h2>
-            <div style="font-size: 18px; color: #cbd5e1; margin-top: 10px;">الرقم الفائز:</div>
-            <div id="winningNumText" style="font-size: 50px; font-weight: bold; color: #fff; margin: 5px 0;">3</div>
-            <div style="font-size: 28px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.6); padding: 12px; border-radius: 10px; border: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00;">200$</div>
-            <p style="color: #38bdf8; font-size: 13px; margin-top: 15px;">تم تحويل جائزة الـ 200$ إلى رصيد الفائز مباشرة!</p>
+            <div style="font-size: 50px; margin-bottom: 5px;">👑</div>
+            <h2 style="color: #ffd700; margin: 0; font-size: 28px;">مبروووك لقد فاز الرقم!</h2>
+            <div id="winningNumText" style="font-size: 48px; font-weight: bold; color: #fff; margin: 10px 0;">3</div>
+            <div style="font-size: 32px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.6); padding: 12px; border-radius: 12px; border: 2px solid #00ff00; box-shadow: 0 0 20px #00ff00; margin-top: 5px;">200$</div>
+            <p style="color: #cbd5e1; font-size: 14px; margin-top: 20px;">تم تحويل الـ 200$ إلى رصيد الفائز مباشرة!</p>
         </div>
     </div>
 
     <div class="royal-box">
-        <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الحجز: 50$ | الجائزة: 200$)</h2>
-        <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">الرقم يُحجز لمرة واحدة فقط لشخص واحد، ويمكنك الضغط على رقمك المحجوز في أي وقت للتراجع واسترداد أموالك.</p>
+        <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الرقم: 50$ | الجائزة: 200$)</h2>
+        <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">لا يمكن اختيار الرقم إلا لمرة واحدة لشخص واحد، ويمكنك التراجع عن حجزك واسترداد أموالك بنفسك.</p>
         
-        <!-- شريط العد التنازلي الفاخر (يظهر عند اكتمال الأرقام) -->
+        <!-- شريط العد التنازلي البارز (30 ثانية دقيقة) -->
         <div id="countdownBanner" class="countdown-banner">
-            ⏳ اكتملت الأرقام! سيتم السحب وإعلان الفائز خلال <span id="remTimerText" style="color: #ffd700; font-size: 24px;">30</span> ثانية!
+            ⏳ اكتملت الحجوزات! سيبدأ السحب خلال <span id="remTimerText" style="color: #ffd700; font-size: 26px;">30</span> ثانية!
         </div>
 
         <div id="slotsContainer" class="slots-container"></div>
@@ -675,10 +674,10 @@ ROULETTE_PAGE = """
         .r-cell.black { background: #1f2937; }
         .r-cell.green { background: #16a34a; }
 
-        .bet-options { display: flex; justify-content: center; gap: 15px; flex-wrap: wheel; margin-top: 25px; }
+        .bet-options { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 25px; }
         .casino-btn { padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; color: white; }
         .btn-red { background: #dc2626; }
-        .btn-black { background: #1f2937; border: 1px solid #555; }
+        .btn-black { background: #1f1f1f; border: 1px solid #555; }
         .btn-green { background: #16a34a; }
     </style>
     <script>
@@ -841,7 +840,7 @@ LOGIN_PAGE = """
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 320px; text-align: center; border: 1px solid #333; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin0-top: 10px; font-size: 16px; }
         .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; background: rgba(239,68,68,0.2); padding: 8px; border-radius: 6px; }
     </style>
 </head>
