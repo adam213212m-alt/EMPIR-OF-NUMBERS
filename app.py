@@ -93,37 +93,37 @@ def init_db():
             timer_end REAL DEFAULT 0,
             last_winner_msg TEXT DEFAULT '',
             banner_end_time REAL DEFAULT 0,
-            forced_admin_slot TEXT DEFAULT ''
+            forced_admin_slot TEXT DEFAULT '',
+            winning_slot INTEGER DEFAULT 1
         )
     ''')
     try:
-        cursor.execute("ALTER TABLE game_three_state ADD COLUMN forced_admin_slot TEXT DEFAULT ''")
+        cursor.execute("ALTER TABLE game_three_state ADD COLUMN winning_slot INTEGER DEFAULT 1")
     except sqlite3.OperationalError:
         pass
 
     cursor.execute('SELECT COUNT(*) FROM game_three_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO game_three_state (id, is_full, timer_end, last_winner_msg, banner_end_time, forced_admin_slot) VALUES (1, 0, 0, "بانتظار اكتمال الأرقام الفاخرة...", 0, "")')
+        cursor.execute('INSERT INTO game_three_state (id, is_full, timer_end, last_winner_msg, banner_end_time, forced_admin_slot, winning_slot) VALUES (1, 0, 0, "بانتظار اكتمال الأرقام الفاخرة...", 0, "", 1)')
 
-    # روليت الكازينو 3D
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS roulette_state (
             id INTEGER PRIMARY KEY,
             phase TEXT DEFAULT 'betting',
             phase_end_time REAL DEFAULT 0,
-            winning_number INTEGER DEFAULT -1,
+            winning_number INTEGER DEFAULT 0,
             last_msg TEXT DEFAULT 'ابدأ الرهان (بحد أقصى 21 رقماً)'
         )
     ''')
     cursor.execute('SELECT COUNT(*) FROM roulette_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO roulette_state (id, phase, phase_end_time, winning_number, last_msg) VALUES (1, "betting", ?, -1, "طاولة الروليت مفتوحة للرهانات (30 ثانية)")', (time.time() + 30,))
+        cursor.execute('INSERT INTO roulette_state (id, phase, phase_end_time, winning_number, last_msg) VALUES (1, "betting", ?, 0, "طاولة الروليت مفتوحة للرهانات (30 ثانية)")', (time.time() + 30,))
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS roulette_bets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT,
-            numbers_list TEXT, -- أرقام مفصولة بفواصل، بحد أقصى 21 رقماً
+            numbers_list TEXT,
             amount_per_number REAL
         )
     ''')
@@ -238,7 +238,7 @@ def check_and_auto_draw_game_three():
                 banner_end_time = time.time() + 25
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
-                    msg = f"🏆 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$!"
+                    msg = f"🏆 مبروك الرقم الفاخر {winning_slot} - الفائز {winner_owner} ربح 200$!"
                     cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                                    ("اللعبة الملكية الفاخرة (200$)", f"الخانة {winning_slot} - الفائز: {winner_owner} (200$)", time.strftime('%Y-%m-%d %H:%M')))
                     cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 200.0 WHERE game_name=?", ("اللعبة الملكية الفاخرة (200$)",))
@@ -246,7 +246,7 @@ def check_and_auto_draw_game_three():
                     msg = f"💎 مبروك الرقم الفاخر {winning_slot} (ولم يكن محجوزاً)."
                 
                 cursor.execute("UPDATE game_three SET status='available', owner=NULL")
-                cursor.execute("UPDATE game_three_state SET is_full=0, timer_end=0, last_winner_msg=?, banner_end_time=?, forced_admin_slot='' WHERE id=1", (msg, banner_end_time))
+                cursor.execute("UPDATE game_three_state SET is_full=0, timer_end=0, last_winner_msg=?, banner_end_time=?, forced_admin_slot='', winning_slot=? WHERE id=1", (msg, banner_end_time, winning_slot))
                 conn.commit()
     conn.close()
 
@@ -267,7 +267,7 @@ def process_roulette_rounds():
             winning_num = random.randint(0, 36)
             spin_end = now + 6
             cursor.execute("UPDATE roulette_state SET phase='spinning', phase_end_time=?, winning_number=?, last_msg=? WHERE id=1", 
-                           (spin_end, winning_num, "🎡 توقفت الرهانات! العجلة تدور الآن..."))
+                           (spin_end, winning_num, "🎡 توقفت الرهانات! الكرة البيضاء تستقر على الرقم الفائز..."))
             conn.commit()
             
         elif phase == 'spinning':
@@ -282,7 +282,6 @@ def process_roulette_rounds():
             for uname, nums_str, amt in bets:
                 chosen_nums = [int(n) for n in nums_str.split(',') if n.strip().isdigit()]
                 if win_num in chosen_nums:
-                    # معادلة الربح: إذا أصاب الرقم، يربح أضعاف قيمة الرهان على الرقم (مثلاً ×35)
                     payout = amt * 35
                     cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (payout, uname))
                     cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + ? WHERE game_name=?", (payout, "روليت الكازينو 3D"))
@@ -365,10 +364,12 @@ def api_sync():
     cursor.execute("SELECT slot_id, status, owner FROM game_three")
     g3_slots = cursor.fetchall()
 
-    cursor.execute("SELECT is_full, timer_end, last_winner_msg FROM game_three_state WHERE id=1")
+    cursor.execute("SELECT is_full, timer_end, last_winner_msg, winning_slot FROM game_three_state WHERE id=1")
     g3_state = cursor.fetchone()
     g3_is_full = g3_state[0]
     g3_timer_end = g3_state[1]
+    g3_msg = g3_state[2]
+    g3_win_slot = g3_state[3]
     g3_rem = max(0, int(g3_timer_end - time.time())) if g3_is_full else 0
 
     cursor.execute("SELECT phase, phase_end_time, winning_number, last_msg FROM roulette_state WHERE id=1")
@@ -388,6 +389,7 @@ def api_sync():
         'g3_slots': g3_slots,
         'g3_is_full': g3_is_full,
         'g3_rem': g3_rem,
+        'g3_win_slot': g3_win_slot,
         'r_phase': r_phase,
         'r_rem': r_rem,
         'r_win': r_win,
@@ -564,7 +566,6 @@ def pick_game_three(slot_id):
     conn.close()
     return jsonify({'success': True})
 
-# مسار الرهان المطور للروليت بحد أقصى 21 رقماً
 @app.route('/place_roulette_3d_bet', methods=['POST'])
 def place_roulette_3d_bet():
     if 'username' not in session:
@@ -572,9 +573,9 @@ def place_roulette_3d_bet():
     
     username = session['username']
     data = request.get_json()
-    numbers = data.get('numbers', []) # قائمة الأرقام المختارة
+    numbers = data.get('numbers', [])
     try:
-        amount_per_num = float(data.amount) if hasattr(data, 'amount') else float(data.get('amount_per_number', 1))
+        amount_per_num = float(data.get('amount_per_number', 1))
     except ValueError:
         amount_per_num = 1.0
 
@@ -796,27 +797,25 @@ DASHBOARD_PAGE = """
         .refresh-btn { background: #3b82f6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .admin-link-btn { background: #fbbf24; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        .install-pwa-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 8px 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: none; }
         
         .main-container { margin-top: 20px; display: grid; grid-template-columns: 3fr 1fr; gap: 20px; }
         @media (max-width: 1100px) { .main-container { grid-template-columns: 1fr; } }
         
         .luxury-game-section { background: linear-gradient(135deg, #064e3b, #022c22, #0f172a); border: 3px solid #34d399; padding: 25px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 0 30px rgba(52,211,153,0.3); }
         .luxury-game-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-        . luxury-game-section h2 { color: #34d399; margin: 0; font-size: 22px; }
+        .luxury-game-section h2 { color: #34d399; margin: 0; font-size: 22px; }
         
-        /* طاولة الكازينو الـ 3D الحية */
+        /* طاولة روليت الكازينو 3D */
         .casino-3d-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px; align-items: center; }
         @media (max-width: 900px) { .casino-3d-layout { grid-template-columns: 1fr; } }
         
-        .wheel-3d-container { perspective: 1000px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 14px; border: 2px solid #fbbf24; }
-        .wheel-3d { width: 200px; height: 200px; border-radius: 50%; border: 6px solid #fbbf24; background: radial-gradient(circle, #064e3b, #022c22); position: relative; box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 20px #fbbf24; display: flex; align-items: center; justify-content: center; transform: rotateX(25deg); }
-        .wheel-ball { position: absolute; width: 14px; height: 14px; background: #fff; border-radius: 50%; top: 10px; box-shadow: 0 0 10px #fff; animation: spinBall 2s infinite linear; }
-        @keyframes spinBall { 0% { transform: rotate(0deg) translate(80px) rotate(0deg); } 100% { transform: rotate(360deg) translate(80px) rotate(-360deg); } }
+        .wheel-3d-container { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 14px; border: 2px solid #fbbf24; }
+        .wheel-3d { width: 170px; height: 170px; border-radius: 50%; border: 6px solid #fbbf24; background: radial-gradient(circle, #064e3b, #022c22); position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; }
+        .wheel-ball-3d { position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px #fff; transition: all 1.5s ease-out; top: 15px; left: 75px; }
 
-        .casino-table-3d { background: #0f172a; border: 2px solid #38bdf8; border-radius: 14px; padding: 15px; box-shadow: inset 0 0 15px rgba(56,189,248,0.2); }
+        .casino-table-3d { background: #0f172a; border: 2px solid #38bdf8; border-radius: 14px; padding: 15px; }
         .roulette-grid-3d { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin: 15px 0; }
-        .roulette-cell-3d { background: #1e293b; border: 1px solid #475569; color: white; padding: 12px 5px; text-align: center; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 15px; transition: all 0.2s; }
+        .roulette-cell-3d { background: #1e293b; border: 1px solid #475569; color: white; padding: 10px 4px; text-align: center; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
         .roulette-cell-3d.red { background: #b91c1c; border-color: #ef4444; }
         .roulette-cell-3d.black { background: #0f172a; border-color: #334155; }
         .roulette-cell-3d.green { background: #047857; border-color: #10b981; grid-column: span 12; }
@@ -824,9 +823,23 @@ DASHBOARD_PAGE = """
 
         .bet-controls-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
         .confirm-bet-btn { background: #fbbf24; color: #000; font-weight: bold; padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 15px; }
+        .quick-btn { background: #334155; color: #fff; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold; }
+        .quick-btn.red-btn { background: #b91c1c; border-color: #ef4444; }
+        .quick-btn.black-btn { background: #111827; border-color: #374151; }
+
+        /* اللعبة الملكية الفاخرة بالصف الثاني بجانب عجلة الحظ الذهبية */
+        .royal-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 20px; border-radius: 16px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 2fr; gap: 20px; align-items: center; }
+        @media (max-width: 900px) { .royal-game-section { grid-template-columns: 1fr; } }
         
-        .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .golden-wheel-box { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; border: 2px solid #fbbf24; }
+        .golden-wheel { width: 150px; height: 150px; border-radius: 50%; border: 5px solid #fbbf24; background: radial-gradient(circle, #31103d, #0f172a); position: relative; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(251,191,36,0.6); }
+        .golden-ball { position: absolute; width: 10px; height: 10px; background: #fff; border-radius: 50%; top: 10px; left: 70px; box-shadow: 0 0 8px #fff; }
         
+        .luxury-slots-container { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 90px; height: 90px; border-radius: 12px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .luxury-slot-btn.locked { background: linear-gradient(145deg, #991b1b, #7f1d1d); border-color: #f87171; }
+        .luxury-owner { font-size: 10px; color: #fde047; margin-top: 4px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
         .games-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; margin-top: 20px; }
         @media (max-width: 1000px) { .games-grid { grid-template-columns: 1fr; } }
         
@@ -852,6 +865,8 @@ DASHBOARD_PAGE = """
     </style>
     <script>
         let selectedRouletteNumbers = [];
+        const redNumbersList = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+        const blackNumbersList = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
 
         function toggleRouletteNumber(num) {
             const index = selectedRouletteNumbers.indexOf(num);
@@ -864,32 +879,17 @@ DASHBOARD_PAGE = """
                 }
                 selectedRouletteNumbers.push(num);
             }
-            
-            // تحديث الواجهة البصرية للأرقام المختارة
-            document.querySelectorAll('.roulette-cell-3d').forEach(btn => {
-                let n = parseInt(btn.getAttribute('data-num'));
-                if(selectedRouletteNumbers.includes(n)) {
-                    btn.classList.add('selected');
-                } else {
-                    btn.classList.remove('selected');
-                }
-            });
-            
-            document.getElementById('selectedCountBadge').innerText = selectedRouletteNumbers.length;
+            updateRouletteSelectionUI();
         }
 
-        // اختيار شبكة سريعة (مثلاً النصف الأول أو مجموعة أرقام)
-        function selectGridQuick(type) {
+        function selectColorQuick(color) {
             selectedRouletteNumbers = [];
-            if(type === 'red') {
-                const reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
-                selectedRouletteNumbers = reds.slice(0, 21); // تقييد بـ 21 رقماً كحد أقصى
-            } else if(type === 'first21') {
-                for(let i=1; i<=21; i++) selectedRouletteNumbers.push(i);
-            } else if(type === 'even') {
-                for(let i=2; i<=42; i+=2) if(i<=36 && selectedRouletteNumbers.length < 21) selectedRouletteNumbers.push(i);
-            }
-            
+            let targetList = (color === 'red') ? redNumbersList : blackNumbersList;
+            selectedRouletteNumbers = targetList.slice(0, 21);
+            updateRouletteSelectionUI();
+        }
+
+        function updateRouletteSelectionUI() {
             document.querySelectorAll('.roulette-cell-3d').forEach(btn => {
                 let n = parseInt(btn.getAttribute('data-num'));
                 if(selectedRouletteNumbers.includes(n)) {
@@ -898,7 +898,8 @@ DASHBOARD_PAGE = """
                     btn.classList.remove('selected');
                 }
             });
-            document.getElementById('selectedCountBadge').innerText = selectedRouletteNumbers.length;
+            const badge = document.getElementById('selectedCountBadge');
+            if(badge) badge.innerText = selectedRouletteNumbers.length;
         }
 
         function submitRouletteBets() {
@@ -917,17 +918,21 @@ DASHBOARD_PAGE = """
             .then(res => res.json())
             .then(data => {
                 alert(data.msg);
-                if(data.success) {
-                    selectedRouletteNumbers = [];
-                    document.querySelectorAll('.roulette-cell-3d').forEach(b => b.classList.remove('selected'));
-                    document.getElementById('selectedCountBadge').innerText = '0';
-                }
                 syncData();
             });
         }
 
         function pickNumber(num) {
             fetch('/pick_number/' + num, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.success && data.msg) alert(data.msg);
+                    syncData();
+                });
+        }
+
+        function pickSlot(slotId) {
+            fetch('/pick_game_three/' + slotId, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
                     if(!data.success && data.msg) alert(data.msg);
@@ -967,13 +972,43 @@ DASHBOARD_PAGE = """
                     const mySpentEl = document.getElementById('myTotalSpent');
                     if(mySpentEl) mySpentEl.innerText = '$' + data.user_spent;
 
+                    const g3Container = document.getElementById('g3SlotsContainer');
+                    if(g3Container && data.g3_slots) {
+                        let g3Html = '';
+                        data.g3_slots.forEach(slot => {
+                            let sId = slot[0];
+                            let sStatus = slot[1];
+                            let sOwner = slot[2];
+                            let lockedCls = sStatus === 'locked' ? 'locked' : '';
+                            let ownerTag = sOwner ? `<span class="luxury-owner">${sOwner}</span>` : '';
+                            g3Html += `<button type="button" onclick="pickSlot(${sId})" class="luxury-slot-btn ${lockedCls}">
+                                          <span style="font-size: 16px;">رقم ${sId}</span>
+                                          <span style="font-size: 10px; color: #38bdf8;">50$</span>
+                                          ${ownerTag}
+                                       </button>`;
+                        });
+                        g3Container.innerHTML = g3Html;
+                    }
+
+                    const goldenBall = document.getElementById('goldenBall');
+                    if(goldenBall && data.g3_win_slot) {
+                        let angle = (data.g3_win_slot - 1) * 72;
+                        goldenBall.style.transform = `rotate(${angle}deg) translate(50px) rotate(-${angle}deg)`;
+                    }
+
                     const rStatusText = document.getElementById('rouletteStatusText');
                     const rMsg = document.getElementById('rouletteMsg');
+                    const ball3d = document.getElementById('rouletteBall3d');
+                    
                     if(rStatusText) {
                         if(data.r_phase === 'betting') {
-                            rStatusText.innerHTML = `🟢 فتح الرهان 3D (متبقي: <span style="color:#fbbf24">${data.r_rem}</span> ثانية)`;
+                            rStatusText.innerHTML = `🟢 فتح الرهان (متبقي: <span style="color:#fbbf24">${data.r_rem}</span> ثانية)`;
                         } else {
-                            rStatusText.innerHTML = `🎡 عجلة الكازينو تدور الآن...`;
+                            rStatusText.innerHTML = `🎡 العجلة تدور والكرة البيضاء تستقر...`;
+                            if(ball3d) {
+                                let rAngle = (data.r_win * 9.73);
+                                ball3d.style.transform = `rotate(${rAngle}deg) translate(65px) rotate(-${rAngle}deg)`;
+                            }
                         }
                     }
                     if(rMsg) rMsg.innerText = data.r_msg;
@@ -1006,7 +1041,7 @@ DASHBOARD_PAGE = """
 
     <div class="main-container">
         <div>
-            <!-- طاولة روليت الكازينو الحية 3D -->
+            <!-- 1. طاولة روليت الكازينو 3D الحية (الصف الأول) -->
             <div class="luxury-game-section">
                 <div class="luxury-game-top">
                     <div>
@@ -1014,47 +1049,66 @@ DASHBOARD_PAGE = """
                         <p style="color: #a7f3d0; font-size: 13px; margin: 5px 0 0 0;" id="rouletteStatusText">🟢 فتح باب الرهان (30 ثانية)</p>
                     </div>
                     <div style="background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 8px; border: 1px solid #34d399; font-size: 14px; color: #fbbf24;" id="rouletteMsg">
-                        اختر أرقامك الفردية أو عبر الشبكة (الحد الأقصى 21 رقماً)
+                        أرقامك المختارة تبقى مضاءة طوال فترة السحب
                     </div>
                 </div>
 
                 <div class="casino-3d-layout">
-                    <!-- عجلة الكازينو ثلاثية الأبعاد المرئية -->
+                    <!-- عجلة الكازينو الحية مع الكرة البيضاء -->
                     <div class="wheel-3d-container">
-                        <div style="color: #fbbf24; font-weight: bold; margin-bottom: 12px; font-size: 14px;">عجلة الكازينو الحية 3D</div>
+                        <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px; font-size: 13px;">عجلة الكازينو والكرة البيضاء</div>
                         <div class="wheel-3d">
-                            <div class="wheel-ball"></div>
-                            <div style="font-size: 24px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #fbbf24;">🎡</div>
+                            <div id="rouletteBall3d" class="wheel-ball-3d"></div>
+                            <div style="font-size: 22px; font-weight: bold; color: #fff;">🎰</div>
                         </div>
-                        <div style="color: #94a3b8; font-size: 12px; margin-top: 10px;">دوران واقعي بالبث الحي</div>
                     </div>
 
-                    <!-- طاولة الرهانات والتفاعل -->
+                    <!-- طاولة الرهانات والأرقام من 0 إلى 36 -->
                     <div class="casino-table-3d">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                            <span style="color: #38bdf8; font-size: 14px; font-weight: bold;">اختر أرقاماً فردية أو كشبكة:</span>
-                            <div>
-                                <button onclick="selectGridQuick('first21')" style="background:#334155; color:#fff; border:1px solid #38bdf8; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">أول 21 رقماً</button>
-                                <button onclick="selectGridQuick('red')" style="background:#b91c1c; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">الأحمر</button>
+                            <span style="color: #38bdf8; font-size: 13px; font-weight: bold;">اختر أرقامك أو استخدم الرهان السريع:</span>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="quick-btn red-btn" onclick="selectColorQuick('red')">رهان كل الأحمر</button>
+                                <button type="button" class="quick-btn black-btn" onclick="selectColorQuick('black')">رهان كل الأسود</button>
                             </div>
                         </div>
 
                         <div class="roulette-grid-3d">
-                            <button class="roulette-cell-3d green" onclick="toggleRouletteNumber(0)" data-num="0">0 (صفر أخضر)</button>
+                            <button type="button" class="roulette-cell-3d green" onclick="toggleRouletteNumber(0)" data-num="0">0 (أخضر)</button>
                             {% set red_nums = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
                             {% for i in range(1, 37) %}
                                 {% if i in red_nums %}
-                                    <button class="roulette-cell-3d red" onclick="toggleRouletteNumber({{ i }})" data-num="{{ i }}">{{ i }}</button>
+                                    <button type="button" class="roulette-cell-3d red" onclick="toggleRouletteNumber({{ i }})" data-num="{{ i }}">{{ i }}</button>
                                 {% else %}
-                                    <button class="roulette-cell-3d black" onclick="toggleRouletteNumber({{ i }})" data-num="{{ i }}">{{ i }}</button>
+                                    <button type="button" class="roulette-cell-3d black" onclick="toggleRouletteNumber({{ i }})" data-num="{{ i }}">{{ i }}</button>
                                 {% endif %}
                             {% endfor %}
                         </div>
 
                         <div class="bet-controls-bar">
                             <div style="font-size: 14px;">المختارة: <span id="selectedCountBadge" style="color: #fbbf24; font-weight: bold;">0</span> / 21 رقماً</div>
-                            <button class="confirm-bet-btn" onclick="submitRouletteBets()">تأكيد الرهان الحي</button>
+                            <button type="button" class="confirm-bet-btn" onclick="submitRouletteBets()">تأكيد الرهان</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. اللعبة الملكية الفاخرة وعجلة الحظ الذهبية (الصف الثاني) -->
+            <div class="royal-game-section">
+                <div class="golden-wheel-box">
+                    <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px; font-size: 13px;">عجلة الحظ الذهبية (1 إلى 5)</div>
+                    <div class="golden-wheel">
+                        <div id="goldenBall" class="golden-ball"></div>
+                        <div style="font-size: 20px; font-weight: bold; color: #fbbf24;">👑</div>
+                    </div>
+                    <div style="color: #38bdf8; font-size: 11px; margin-top: 8px;">تستقر على الرقم الفائز</div>
+                </div>
+
+                <div>
+                    <h2 style="color: #fbbf24; margin: 0 0 5px 0; font-size: 20px;">💎 اللعبة الملكية الفاخرة (جائزة 200$)</h2>
+                    <p style="color: #cbd5e1; font-size: 12px; margin: 0 0 15px 0;">اختر خانة بقيمة 50$ (5 خانات كبرى)</p>
+                    <div id="g3SlotsContainer" class="luxury-slots-container">
+                        <!-- تحديث تلقائي -->
                     </div>
                 </div>
             </div>
@@ -1124,7 +1178,6 @@ ADMIN_PAGE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم الأدمن</title>
-    <link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; margin: 0; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; border: 2px solid #fbbf24; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
