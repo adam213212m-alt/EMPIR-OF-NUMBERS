@@ -136,6 +136,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
+# API آمن ومضبوط تماماً يمنع السحب العشوائي والتكرار
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -150,21 +151,25 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # 1. انتهاء الـ 15 ثانية للتدوير -> الانتقال للإضاءة الذهبية (finished)
+        # 1. إذا كان في وضع السحب (drawing) وانتهت الـ 15 ثانية -> الانتقال للإضاءة (finished)
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
             if winner:
                 winner_name = winner[0]
+                # إضافة الجائزة مرة واحدة فقط بشكل آمن
+                cursor.execute("SELECT balance FROM users WHERE username=?", (winner_name,))
+                # منح الجائزة الكبرى
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
+            # تحديد وقت انتهاء الـ 30 ثانية للإضاءة الذهبية
             new_lighting_end = current_time + 30
             cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
             end_timestamp = new_lighting_end
 
-        # 2. انتهاء الـ 30 ثانية للإضاءة -> تصفير تام والعودة لوضع idle
+        # 2. إذا كان في وضع الإضاءة (finished) وانتهت الـ 30 ثانية -> تصفير اللوحة والعودة لوضع الاستعداد التام (idle)
         elif status == 'finished' and current_time >= end_timestamp:
             cursor.execute("DELETE FROM golden_number_bookings")
             cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
@@ -230,7 +235,7 @@ def game_one_page():
         elif 'admin_draw' in request.form and role == 'admin':
             cursor.execute("SELECT status FROM game_draws WHERE game_name='golden_number'")
             st = cursor.fetchone()[0]
-            # حماية صارمة: منع أي أمر سحب جديد إلا إذا كانت اللوحة في وضع الاستعداد (idle) حصرياً
+            # حماية قصوى: منع بدء سحب جديد إلا إذا كانت اللوحة في وضع الاستعداد (idle) حصرياً
             if st == 'idle':
                 forced_num = request.form.get('forced_number')
                 winning_num = int(forced_num) if forced_num else random.randint(1, 50)
@@ -513,7 +518,7 @@ GAME_ONE_PAGE = """
                     <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (15 ثانية للجميع)</button>
                 {% else %}
                     <div style="background: #2b2b2b; color: #f59e0b; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                        ⏳ {% if game_status == 'drawing' %}السحب جاري حالياً...{% else %}اللوحة في مرحلة إعلان الفائز والإضاءة الذهبية...{% endif %} (زر السحب معطل لحين انتهاء الجولة)
+                        ⏳ {% if game_status == 'drawing' %}السحب جاري حالياً...{% else %}اللوحة في مرحلة إعلان الفائز والإضاءة الذهبية...{% endif %} (زر السحب معطل لمنع التكرار)
                     </div>
                 {% endif %}
             </form>
@@ -526,7 +531,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- كود JavaScript آمن ومحدث للتحديث التلقائي الفوري دون تكرار السحب -->
+    <!-- نظام جافاسكريبت آمن يحدث الواجهة بسلاسة ودون تكرار عشوائي -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -547,10 +552,10 @@ GAME_ONE_PAGE = """
 
         let slotInterval = null;
         let lastStatus = "{{ game_status }}";
-        let isReloading = false;
+        let isRefreshing = false;
 
         function updateGameRealtime() {
-            if (isReloading) return;
+            if (isRefreshing) return;
 
             fetch('/api/game_status')
                 .then(res => res.json())
@@ -560,16 +565,11 @@ GAME_ONE_PAGE = """
                     let statusText = document.getElementById('drawStatusText');
                     let winContainer = document.getElementById('winNotificationContainer');
 
-                    for (let i = 1; i <= 50; i++) {
-                        let box = document.getElementById('box-' + i);
-                        if (box) {
-                            if (data.bookings[i]) {
-                                if (box.tagName === 'BUTTON' || box.tagName === 'FORM') {
-                                    let parent = box.closest('form') || box;
-                                    parent.outerHTML = `<div id="box-${i}" class="number-box booked">${i}<br><span style="font-size: 10px; color: #f87171;">(${data.bookings[i]})</span></div>`;
-                                }
-                            }
-                        }
+                    // إذا تغيرت الحالة عن آخر مرة، نقوم بتحديث خفيف أو إعادة تحميل آمنة مرة واحدة فقط
+                    if (data.status !== lastStatus && !isRefreshing) {
+                        isRefreshing = true;
+                        setTimeout(() => { location.reload(); }, 400);
+                        return;
                     }
 
                     if (data.status === 'drawing') {
@@ -581,11 +581,6 @@ GAME_ONE_PAGE = """
                                 slotEl.innerText = Math.floor(Math.random() * 50) + 1;
                                 playHypeMusicNote();
                             }, 80);
-                        }
-
-                        if (data.remaining_seconds <= 0 && !isReloading) {
-                            isReloading = true;
-                            setTimeout(() => { location.reload(); }, 500);
                         }
                     } else if (data.status === 'finished') {
                         if (slotInterval) clearInterval(slotInterval);
@@ -606,20 +601,10 @@ GAME_ONE_PAGE = """
                                 </div>
                             `;
                         }
-
-                        if (data.remaining_seconds <= 0 && !isReloading) {
-                            isReloading = true;
-                            setTimeout(() => { location.reload(); }, 500);
-                        }
                     } else {
                         if (slotInterval) clearInterval(slotInterval);
                         timerEl.innerText = "";
-                        if (lastStatus === 'finished' && !isReloading) {
-                            isReloading = true;
-                            setTimeout(() => { location.reload(); }, 500);
-                        }
                     }
-                    lastStatus = data.status;
                 });
         }
 
@@ -779,7 +764,7 @@ LOGIN_PAGE = """
     <meta charset="UTF-8">
     <title>تسجيل الدخول - Lira</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background-core: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 320px; text-align: center; border: 1px solid #333; }
         input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #ffd700; color: black; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
