@@ -17,7 +17,7 @@ class LiraApp(ctk.CTk):
         self.current_user = ctk.StringVar(value="")
         self.user_balance = ctk.DoubleVar(value=150.0) # الرصيد الافتتاحي تجريبي
 
-        # بدء عرض الصفحة الأولى (تسجيل الدخول - خلف الكواليس)
+        # بدء عرض الصفحة الأولى (تسجيل الدخول)
         self.show_login_page()
 
     def clear_window(self):
@@ -92,12 +92,12 @@ class LiraApp(ctk.CTk):
         games_data = [
             ("اللعبة الملكية (3D)", self.open_royal_game),
             ("روليت الكازينو الملكي", self.open_roulette_game),
-            ("لعبة الحظ السريع", lambda: print("قريباً")),
-            ("سباق الخيل التفاعلي", lambda: print("قريباً")),
-            ("عجلة الثروة الكبرى", lambda: print("قريباً")),
-            ("صناديق المفاجآت الذهبية", lambda: print("قريباً")),
-            ("تحدي الأرقام الفائزة", lambda: print("قريباً")),
-            ("البوكر الملكي المباشر", lambda: print("قريباً"))
+            ("لعبة الحظ السريع", lambda: print("لعبة قيد التطوير")),
+            ("سباق الخيل التفاعلي", lambda: print("لعبة قيد التطوير")),
+            ("عجلة الثروة الكبرى", lambda: print("لعبة قيد التطوير")),
+            ("صناديق المفاجآت الذهبية", lambda: print("لعبة قيد التطوير")),
+            ("تحدي الأرقام الفائزة", lambda: print("لعبة قيد التطوير")),
+            ("البوكر الملكي المباشر", lambda: print("لعبة قيد التطوير"))
         ]
 
         for i, (game_name, command_func) in enumerate(games_data):
@@ -107,6 +107,7 @@ class LiraApp(ctk.CTk):
             card = ctk.CTkFrame(grid_frame, fg_color="#1f1f1f", corner_radius=15, border_width=2, border_color="#333333")
             card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
 
+            # تم تصحيح الربط هنا لضمان الاستجابة الفورية عند النقر
             icon_btn = ctk.CTkButton(card, text="🎮\n[ LOGO ]", font=("Arial", 22), 
                                      fg_color="#262626", hover_color="#383838", text_color="#ffd700",
                                      corner_radius=12, command=command_func)
@@ -161,9 +162,9 @@ class LiraApp(ctk.CTk):
         self.start_draw_btn.configure(state="disabled", text="جاري حجز الأرقام وبدء العد السريع...")
         
         def animate_numbers(counter=0):
-            if counter < 30:
+            if counter < 20: # تقليل عدد الخطوات لتكون الحركة سريعة وواضحة
                 for box in self.digit_labels:
-                    box.configure(text=str(random.randint(0, 9)))
+                    box.configure(text=str(random.randint(0, 9)), fg_color="#252525")
                 self.winning_box.configure(text=str(random.randint(0, 9)))
                 self.after(100, lambda: animate_numbers(counter + 1))
             else:
@@ -239,7 +240,7 @@ class LiraApp(ctk.CTk):
                 self.user_balance.set(max(0.0, self.user_balance.get() - loss))
                 self.roulette_result_label.configure(text=f"❌ هاردلك! لقد خسر الرهان بقيمة ${loss}.", text_color="#ff4444")
 
-        self.after(2500, finish_spin)
+        self.after(2000, finish_spin)
 
 if __name__ == "__main__":
     app = LiraApp()
