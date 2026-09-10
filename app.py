@@ -11,7 +11,6 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين والحسابات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +22,6 @@ def init_db():
         )
     ''')
     
-    # جدول اللعبة الملكية (5 أرقام، قيمة المربع 50$ والجائزة 200$)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS royal_game_board (
             slot_id INTEGER PRIMARY KEY,
@@ -56,7 +54,6 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO royal_game_state (id, is_full, timer_end, winning_number, last_winner_msg, banner_end_time, forced_admin_slot) VALUES (1, 0, 0, 0, "بانتظار اكتمال الأرقام الملكية الفاخرة...", 0, "")')
 
-    # سجِلات الفائزين والإحصائيات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS winners_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +75,6 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
-    # الأدمن والحسابات
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -120,7 +116,7 @@ def check_and_auto_draw_royal_game():
                     winning_slot = random.randint(1, 5)
                     
             if winning_slot:
-                banner_end_time = time.time() + 30
+                banner_end_time = time.time() + 35
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
                     msg = f"🎉 مبروك للفائز {winner_owner} - ربح الرقم {winning_slot} جائزة 200$!"
@@ -218,7 +214,6 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# صفحة اللعبة الملكية المنفردة بالكامل
 @app.route('/royal_game_page')
 def royal_game_page():
     if 'username' not in session:
@@ -246,7 +241,7 @@ def pick_royal_slot(slot_id):
     if row:
         status, owner = row[0], row[1]
         if status == 'available':
-            if balance >= 50.0: # التكلفة 50$
+            if balance >= 50.0:
                 cursor.execute("UPDATE royal_game_board SET status='locked', owner=? WHERE slot_id=?", (username, slot_id))
                 cursor.execute("UPDATE users SET balance = balance - 50.0 WHERE username=?", (username,))
                 cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
@@ -254,25 +249,25 @@ def pick_royal_slot(slot_id):
                 
                 cursor.execute("SELECT COUNT(*) FROM royal_game_board WHERE status='available'")
                 if cursor.fetchone()[0] == 0:
-                    timer_end = time.time() + 15
+                    timer_end = time.time() + 30 # عد تنازلي دقيق بـ 30 ثانية
                     winning_slot = random.randint(1, 5)
                     cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=?, last_winner_msg=? WHERE id=1", 
-                                   (timer_end, winning_slot, "⚠️ اكتملت الأرقام! تدور عجلة الحظ الآن..."))
+                                   (timer_end, winning_slot, "⚠️ اكتملت الأرقام! يبدأ العد التنازلي للسحب..."))
                     conn.commit()
             else:
                 conn.close()
                 return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 50$)!'})
         elif status == 'locked' and owner == username:
+            # التراجع المباشر من صاحب الحساب لنفسه واسترداد الـ 50$
             cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
             cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
             cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
             cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, last_winner_msg=? WHERE id=1", 
-                           ("تم إلغاء حجز، في انتظار اكتمال الخانات...",))
+                           ("قام اللاعب بالتراجع عن رهانه واسترد رصيده.",))
             conn.commit()
     conn.close()
     return jsonify({'success': True})
 
-# صفحة روليت الكازينو العالمي المنفردة والاحترافية
 @app.route('/roulette_page')
 def roulette_page():
     if 'username' not in session:
@@ -290,7 +285,7 @@ def spin_roulette_api():
         return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
     username = session['username']
     data = request.json
-    bet_type = data.get('type') # 'red', 'black', 'even', 'odd', 'number'
+    bet_type = data.get('type')
     bet_value = data.get('value')
     bet_amount = float(data.get('amount', 25.0))
     
@@ -332,7 +327,7 @@ def spin_roulette_api():
     elif bet_type == 'number':
         if int(bet_value) == winning_num:
             won = True
-            payout = bet_amount * 35 # ربح الرقم الفردي في الكازينوهات العالمية
+            payout = bet_amount * 35
             
     if won:
         cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (payout, username))
@@ -431,7 +426,6 @@ def change_password():
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# الصفحة الثانية: لوحة التحكم والـ 8 أيقونات الفاخرة
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -479,7 +473,6 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الـ 8 أيقونات المربعة الفاخرة (تنتقل كل واحدة لصفحة منفردة) -->
     <div class="icons-grid">
         <a href="/royal_game_page" class="icon-card">
             <div class="icon-logo">👑</div>
@@ -518,7 +511,6 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# صفحة اللعبة الملكية المنفردة (عجلة الحظ، 50$ للتكلفة، 200$ للجائزة والنقطة الثابتة)
 ROYAL_GAME_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -534,23 +526,32 @@ ROYAL_GAME_PAGE = """
         
         .royal-box { background: linear-gradient(135deg, #181818, #262626); border: 3px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 850px; margin: 0 auto; text-align: center; }
         .slots-container { display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }
-        .slot-btn { background: #252525; border: 3px solid #ffd700; width: 120px; height: 120px; border-radius: 16px; color: #ffd700; font-size: 26px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; }
-        .slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; }
-        .owner-tag { font-size: 12px; color: #ffcc00; margin-top: 6px; }
+        .slot-btn { background: #252525; border: 3px solid #ffd700; width: 120px; height: 120px; border-radius: 16px; color: #ffd700; font-size: 26px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; position: relative; }
+        .slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; box-shadow: 0 0 15px rgba(0,255,0,0.5); }
+        .owner-tag { font-size: 11px; color: #ffcc00; margin-top: 4px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* نافذة عجلة الحظ الدائرية مع النقطة الثابتة */
+        /* شريط العد التنازلي الواضح والفاخر */
+        .countdown-banner { background: linear-gradient(90deg, #991b1b, #b91c1c, #991b1b); border: 2px solid #ef4444; color: #fff; padding: 15px; border-radius: 12px; font-size: 20px; font-weight: bold; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239,68,68,0.7); display: none; text-align: center; }
+
+        /* عجلة الحظ الدائرية والنقطة الثابتة */
         .wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .wheel-outer { position: relative; width: 300px; height: 300px; border-radius: 50%; border: 10px solid #ffd700; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(255,215,0,0.8); }
-        .pointer-dot { position: absolute; top: -18px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ef4444; z-index: 20; filter: drop-shadow(0 0 8px #ef4444); }
-        .wheel-inner-text { font-size: 55px; font-weight: bold; color: #ffd700; animation: pulseNum 0.5s infinite alternate; }
-        @keyframes pulseNum { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+        .wheel-outer { position: relative; width: 260px; height: 260px; border-radius: 50%; border: 8px solid #ffd700; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(255,215,0,0.8); }
+        .pointer-dot { position: absolute; top: -20px; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 25px solid #ef4444; z-index: 20; filter: drop-shadow(0 0 5px #ef4444); }
+        .spinning-wheel-text { font-size: 50px; font-weight: bold; color: #ffd700; animation: spinAnim 0.3s infinite linear; }
+        @keyframes spinAnim { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* نافذة الفوز الفخمة */
-        .win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 0 60px rgba(255,215,0,0.9); width: 400px; }
+        /* نافذة الفوز المذهبة والمنبثقة */
+        .win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 0 70px rgba(255,215,0,0.95); width: 420px; animation: popUp 0.4s ease-out; }
+        @keyframes popUp { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
     <script>
-        function pickSlot(slotId) {
+        const currentUser = "{{ username }}";
+
+        function pickSlot(slotId, status, owner) {
+            if (status === 'locked' && owner === currentUser) {
+                if(!confirm("هل تريد حقاً التراجع عن حجز هذا الرقم واسترداد مبلغ 50$ إلى رصيدك؟")) return;
+            }
             fetch('/pick_royal_slot/' + slotId, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
@@ -570,23 +571,28 @@ ROYAL_GAME_PAGE = """
                     data.royal_slots.forEach(slot => {
                         let sId = slot[0], status = slot[1], owner = slot[2];
                         let lockedCls = status === 'locked' ? 'locked' : '';
-                        let ownerTag = owner ? `<span class="owner-tag">${owner}</span>` : '';
-                        html += `<button type="button" onclick="pickSlot(${sId})" class="slot-btn ${lockedCls}">
+                        let ownerTag = owner ? `<span class="owner-tag">👤 ${owner}</span>` : '<span style="font-size:11px; color:#38bdf8;">متاح 50$</span>';
+                        let actionTitle = (status === 'locked' && owner === currentUser) ? 'اضغط للتراجع واسترداد الـ 50$' : 'اختر الرقم';
+                        
+                        html += `<button type="button" title="${actionTitle}" onclick="pickSlot(${sId}, '${status}', '${owner}')" class="slot-btn ${lockedCls}">
                                     <span>${sId}</span>
-                                    <span style="font-size:12px; color:#38bdf8;">50$</span>
                                     ${ownerTag}
                                  </button>`;
                     });
                     document.getElementById('slotsContainer').innerHTML = html;
 
+                    const countBanner = document.getElementById('countdownBanner');
                     const wheel = document.getElementById('wheelOverlay');
                     const winModal = document.getElementById('winModal');
 
                     if(data.is_full) {
+                        countBanner.style.display = 'block';
+                        document.getElementById('remTimerText').innerText = data.rem;
                         wheel.style.display = 'flex';
                         let rndNum = Math.floor(Math.random() * 5) + 1;
-                        document.getElementById('spinningNumber').innerText = rndNum;
+                        document.getElementById('spinningDigit').innerText = rndNum;
                     } else {
+                        countBanner.style.display = 'none';
                         wheel.style.display = 'none';
                         if(data.winning_number > 0 && data.rem > 0) {
                             winModal.style.display = 'flex';
@@ -610,37 +616,43 @@ ROYAL_GAME_PAGE = """
         <a href="/dashboard" class="back-btn">⬅ العودة للوحة التحكم الرئيسية</a>
     </div>
 
-    <!-- نافذة عجلة الحظ الدورية مع النقطة الثابتة الحمراء -->
+    <!-- عجلة الحظ الدائرية والنقطة الثابتة الحمراء -->
     <div id="wheelOverlay" class="wheel-overlay" style="display: none;">
-        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 عجلة الحظ تدور لاختيار الرقم الرابح...</div>
+        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 العجلة تدور بوضوح.. انتظر الرقم الرابح تحت السهم!</div>
         <div class="wheel-outer">
             <div class="pointer-dot"></div>
-            <div id="spinningNumber" class="wheel-inner-text">1</div>
+            <div id="spinningDigit" class="spinning-wheel-text">7</div>
         </div>
-        <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">ترقب إعلان الفائز بالـ 200$ الفورية!</div>
+        <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">جاري سحب الجائزة الكبرى (200$)...</div>
     </div>
 
-    <!-- نافذة الفوز الفخمة -->
+    <!-- نافذة الفوز الفخمة والمنبثقة -->
     <div id="winModal" class="win-popup" style="display: none;">
         <div class="win-card">
             <div style="font-size: 55px; margin-bottom: 10px;">🎉</div>
-            <h2 style="color: #ffd700; margin: 0; font-size: 28px;">مبروك لقد ربح الرقم!</h2>
-            <div id="winningNumText" style="font-size: 45px; font-weight: bold; color: #fff; margin: 15px 0;">7</div>
-            <div style="font-size: 26px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.5); padding: 12px; border-radius: 10px; border: 1px solid #00ff00;">200$</div>
-            <p style="color: #cbd5e1; font-size: 13px; margin-top: 15px;">تم تحويل الجائزة إلى رصيد الفائز مباشرة!</p>
+            <h2 style="color: #ffd700; margin: 0; font-size: 32px; text-shadow: 0 0 10px #ffd700;">مبروووك!</h2>
+            <div style="font-size: 18px; color: #cbd5e1; margin-top: 10px;">الرقم الفائز:</div>
+            <div id="winningNumText" style="font-size: 50px; font-weight: bold; color: #fff; margin: 5px 0;">3</div>
+            <div style="font-size: 28px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.6); padding: 12px; border-radius: 10px; border: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00;">200$</div>
+            <p style="color: #38bdf8; font-size: 13px; margin-top: 15px;">تم تحويل جائزة الـ 200$ إلى رصيد الفائز مباشرة!</p>
         </div>
     </div>
 
     <div class="royal-box">
-        <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الرقم: 50$ | الجائزة الكبرى: 200$)</h2>
-        <p style="color: #cbd5e1; font-size: 14px;">عند حجز الأرقام الخمسة بالكامل، تدور عجلة الحظ تلقائياً ويتم إعلان الفائز!</p>
+        <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الحجز: 50$ | الجائزة: 200$)</h2>
+        <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">الرقم يُحجز لمرة واحدة فقط لشخص واحد، ويمكنك الضغط على رقمك المحجوز في أي وقت للتراجع واسترداد أموالك.</p>
+        
+        <!-- شريط العد التنازلي الفاخر (يظهر عند اكتمال الأرقام) -->
+        <div id="countdownBanner" class="countdown-banner">
+            ⏳ اكتملت الأرقام! سيتم السحب وإعلان الفائز خلال <span id="remTimerText" style="color: #ffd700; font-size: 24px;">30</span> ثانية!
+        </div>
+
         <div id="slotsContainer" class="slots-container"></div>
     </div>
 </body>
 </html>
 """
 
-# صفحة روليت الكازينو العالمي المنفردة والواقعية بالكامل
 ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
