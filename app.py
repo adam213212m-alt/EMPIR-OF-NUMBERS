@@ -7,9 +7,6 @@ from datetime import datetime, timezone, timedelta
 app = Flask(__name__)
 app.secret_key = 'empire_lira_platforms_2026'
 
-def get_beirut_time():
-    return datetime.now(timezone(timedelta(hours=3)))
-
 def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -26,7 +23,7 @@ def init_db():
         )
     ''')
     
-    # جدول اللعبة الأولى (اللعبة الملكية ثلاثية الأبعاد بـ 5 أرقام)
+    # جدول اللعبة الملكية (5 أرقام، قيمة المربع 50$ والجائزة 200$)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS royal_game_board (
             slot_id INTEGER PRIMARY KEY,
@@ -44,21 +41,22 @@ def init_db():
             id INTEGER PRIMARY KEY,
             is_full INTEGER DEFAULT 0,
             timer_end REAL DEFAULT 0,
+            winning_number INTEGER DEFAULT 0,
             last_winner_msg TEXT DEFAULT '',
             banner_end_time REAL DEFAULT 0,
             forced_admin_slot TEXT DEFAULT ''
         )
     ''')
     try:
-        cursor.execute("ALTER TABLE royal_game_state ADD COLUMN forced_admin_slot TEXT DEFAULT ''")
+        cursor.execute("ALTER TABLE royal_game_state ADD COLUMN winning_number INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
 
     cursor.execute('SELECT COUNT(*) FROM royal_game_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO royal_game_state (id, is_full, timer_end, last_winner_msg, banner_end_time, forced_admin_slot) VALUES (1, 0, 0, "بانتظار اكتمال الأرقام الملكية الفاخرة...", 0, "")')
+        cursor.execute('INSERT INTO royal_game_state (id, is_full, timer_end, winning_number, last_winner_msg, banner_end_time, forced_admin_slot) VALUES (1, 0, 0, 0, "بانتظار اكتمال الأرقام الملكية الفاخرة...", 0, "")')
 
-    # جدول سجِلات الفائزين
+    # سجِلات الفائزين والإحصائيات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS winners_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +66,6 @@ def init_db():
         )
     ''')
 
-    # جدول الإحصائيات المالية
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS financial_stats (
             game_name TEXT PRIMARY KEY,
@@ -81,34 +78,24 @@ def init_db():
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
-    # حساب الأدمن الرئيسي
+    # الأدمن والحسابات
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                        ('admin', 'admin123', 1000000.0, 'admin', 'system'))
 
-    for adam_name in ['adam1', 'adam2']:
-        cursor.execute("SELECT * FROM users WHERE username=?", (adam_name,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
-                           (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
-
-    # إنشاء الحسابات الـ 100 التلقائية
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
-        row = cursor.fetchone()
-        if not row:
-            fixed_rand_pass = f"us11${random.randint(100, 999)}"
+        if not cursor.fetchone():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, 'class_b', 'admin')", 
-                           (uname, fixed_rand_pass))
+                           (uname, f"us11${random.randint(100, 999)}"))
 
     conn.commit()
     conn.close()
 
 init_db()
 
-# دالة التحقق التلقائي للعبة الملكية
 def check_and_auto_draw_royal_game():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -133,18 +120,18 @@ def check_and_auto_draw_royal_game():
                     winning_slot = random.randint(1, 5)
                     
             if winning_slot:
-                banner_end_time = time.time() + 25
+                banner_end_time = time.time() + 30
                 if winner_owner:
                     cursor.execute("UPDATE users SET balance = balance + 200.0 WHERE username=?", (winner_owner,))
-                    msg = f"🎉 مبروك الرقم {winning_slot} - الفائز {winner_owner} ربح 200$ فوراً!"
+                    msg = f"🎉 مبروك للفائز {winner_owner} - ربح الرقم {winning_slot} جائزة 200$!"
                     cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
                                    ("👑 اللعبة الملكية الفاخرة (200$)", f"الخانة {winning_slot} - الفائز: {winner_owner} (200$)", time.strftime('%Y-%m-%d %H:%M')))
                     cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + 200.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
                 else:
-                    msg = f"💎 مبروك الرقم الفاخر {winning_slot} (ولم يكن محجوزاً لأحد)."
+                    msg = f"💎 انتهى السحب على الرقم {winning_slot} (ولم يكن محجوزاً)."
                 
                 cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL")
-                cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, last_winner_msg=?, banner_end_time=?, forced_admin_slot='' WHERE id=1", (msg, banner_end_time))
+                cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, winning_number=?, last_winner_msg=?, banner_end_time=?, forced_admin_slot='' WHERE id=1", (winning_slot, msg, banner_end_time))
                 conn.commit()
     conn.close()
 
@@ -165,42 +152,32 @@ def manifest():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-@app.route('/api/sync')
-def api_sync():
+@app.route('/api/sync_royal')
+def api_sync_royal():
     if 'username' not in session:
         return jsonify({'error': 'unauthorized'})
-    
     check_and_auto_draw_royal_game()
-
-    username = session['username']
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    res = cursor.fetchone()
-    balance = res[0] if res else 0
+    cursor.execute("SELECT balance FROM users WHERE username=?", (session['username'],))
+    balance = cursor.fetchone()[0]
 
     cursor.execute("SELECT slot_id, status, owner FROM royal_game_board")
     royal_slots = cursor.fetchall()
 
-    cursor.execute("SELECT is_full, timer_end, last_winner_msg FROM royal_game_state WHERE id=1")
-    royal_state = cursor.fetchone()
-    royal_is_full = royal_state[0]
-    royal_timer_end = royal_state[1]
-    royal_msg = royal_state[2]
-    royal_rem = max(0, int(royal_timer_end - time.time())) if royal_is_full else 0
-
-    cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
-    winners = cursor.fetchall()
-
+    cursor.execute("SELECT is_full, timer_end, winning_number, last_winner_msg FROM royal_game_state WHERE id=1")
+    state = cursor.fetchone()
     conn.close()
+    
     return jsonify({
         'balance': balance,
         'royal_slots': royal_slots,
-        'royal_is_full': royal_is_full,
-        'royal_rem': royal_rem,
-        'royal_msg': royal_msg,
-        'winners': winners
+        'is_full': state[0],
+        'timer_end': state[1],
+        'rem': max(0, int(state[1] - time.time())) if state[0] else 0,
+        'winning_number': state[2],
+        'msg': state[3]
     })
 
 @app.route('/', methods=['GET', 'POST'])
@@ -209,13 +186,11 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        
         conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
         user = cursor.fetchone()
         conn.close()
-        
         if user:
             session.clear()
             session['username'] = user[1]
@@ -225,7 +200,6 @@ def login():
             return redirect(url_for('dashboard'))
         else:
             error = f"خطأ: اسم المستخدم '{username}' أو كلمة المرور غير صحيحة!"
-            
     return render_template_string(LOGIN_PAGE, error=error)
 
 @app.route('/logout')
@@ -237,95 +211,24 @@ def logout():
 def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
-    username = session['username']
-    role = session['role']
-    password = session['password'] if role == 'admin' else '******'
-
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    res = cursor.fetchone()
-    user_balance = res[0] if res else 0
-    session['balance'] = user_balance
+    cursor.execute("SELECT balance FROM users WHERE username=?", (session['username'],))
+    balance = cursor.fetchone()[0]
     conn.close()
+    return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-    return render_template_string(DASHBOARD_PAGE, 
-                                  username=username,
-                                  password=password,
-                                  role=role, 
-                                  balance=user_balance)
-
-@app.route('/roulette_page')
-def roulette_page():
+# صفحة اللعبة الملكية المنفردة بالكامل
+@app.route('/royal_game_page')
+def royal_game_page():
     if 'username' not in session:
         return redirect(url_for('login'))
-    username = session['username']
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    res = cursor.fetchone()
-    user_balance = res[0] if res else 0
+    cursor.execute("SELECT balance FROM users WHERE username=?", (session['username'],))
+    balance = cursor.fetchone()[0]
     conn.close()
-    return render_template_string(ROULETTE_PAGE, username=username, balance=user_balance)
-
-@app.route('/spin_roulette_api', methods=['POST'])
-def spin_roulette_api():
-    if 'username' not in session:
-        return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
-    username = session['username']
-    data = request.json
-    bet_choice = data.get('choice') # 'red', 'black', 'number'
-    bet_amount = float(data.get('amount', 25.0))
-    
-    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    res = cursor.fetchone()
-    balance = res[0] if res else 0
-    
-    if balance < bet_amount:
-        conn.close()
-        return jsonify({'success': False, 'msg': 'رصيدك لا يكفي للمراهنة!'})
-        
-    # خصم قيمة الرهان مؤقتاً وتسجيله
-    cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (bet_amount, username))
-    cursor.execute("UPDATE financial_stats SET total_collected = total_collected + ? WHERE game_name=?", (bet_amount, "🎰 روليت الكازينو العالمي"))
-    
-    # قرص روليت الحقيقي (0 إلى 36)
-    winning_num = random.randint(0, 36)
-    red_numbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
-    
-    if winning_num == 0:
-        winning_color = 'green'
-    elif winning_num in red_numbers:
-        winning_color = 'red'
-    else:
-        winning_color = 'black'
-        
-    won = False
-    payout = 0
-    if bet_choice == winning_color:
-        won = True
-        payout = bet_amount * 2
-        cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (payout, username))
-        cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + ? WHERE game_name=?", (payout, "🎰 روليت الكازينو العالمي"))
-        cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
-                       ("🎰 روليت الكازينو العالمي", f"الفائز {username} ربح ${payout} (رقم الحظ {winning_num})", time.strftime('%Y-%m-%d %H:%M')))
-                       
-    conn.commit()
-    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-    new_balance = cursor.fetchone()[0]
-    conn.close()
-    
-    return jsonify({
-        'success': True,
-        'winning_number': winning_num,
-        'winning_color': winning_color,
-        'won': won,
-        'payout': payout,
-        'new_balance': new_balance
-    })
+    return render_template_string(ROYAL_GAME_PAGE, username=session['username'], balance=balance)
 
 @app.route('/pick_royal_slot/<int:slot_id>', methods=['POST'])
 def pick_royal_slot(slot_id):
@@ -343,61 +246,133 @@ def pick_royal_slot(slot_id):
     if row:
         status, owner = row[0], row[1]
         if status == 'available':
-            if balance >= 40.0:
+            if balance >= 50.0: # التكلفة 50$
                 cursor.execute("UPDATE royal_game_board SET status='locked', owner=? WHERE slot_id=?", (username, slot_id))
-                cursor.execute("UPDATE users SET balance = balance - 40.0 WHERE username=?", (username,))
-                cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 40.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
+                cursor.execute("UPDATE users SET balance = balance - 50.0 WHERE username=?", (username,))
+                cursor.execute("UPDATE financial_stats SET total_collected = total_collected + 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
                 conn.commit()
                 
                 cursor.execute("SELECT COUNT(*) FROM royal_game_board WHERE status='available'")
                 if cursor.fetchone()[0] == 0:
-                    timer_end = time.time() + 30
-                    cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, last_winner_msg=? WHERE id=1", 
-                                   (timer_end, "⚠️ اكتملت الأرقام الخمسة! يبدأ سحب الـ 200$ خلال 30 ثانية..."))
+                    timer_end = time.time() + 15
+                    winning_slot = random.randint(1, 5)
+                    cursor.execute("UPDATE royal_game_state SET is_full=1, timer_end=?, winning_number=?, last_winner_msg=? WHERE id=1", 
+                                   (timer_end, winning_slot, "⚠️ اكتملت الأرقام! تدور عجلة الحظ الآن..."))
                     conn.commit()
             else:
                 conn.close()
-                return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 40$)!'})
+                return jsonify({'success': False, 'msg': 'رصيدك لا يكفي (تكلفة الحجز 50$)!'})
         elif status == 'locked' and owner == username:
             cursor.execute("UPDATE royal_game_board SET status='available', owner=NULL WHERE slot_id=?", (slot_id,))
-            cursor.execute("UPDATE users SET balance = balance + 40.0 WHERE username=?", (username,))
-            cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 40.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
+            cursor.execute("UPDATE users SET balance = balance + 50.0 WHERE username=?", (username,))
+            cursor.execute("UPDATE financial_stats SET total_collected = total_collected - 50.0 WHERE game_name=?", ("👑 اللعبة الملكية الفاخرة (200$)",))
             cursor.execute("UPDATE royal_game_state SET is_full=0, timer_end=0, last_winner_msg=? WHERE id=1", 
                            ("تم إلغاء حجز، في انتظار اكتمال الخانات...",))
             conn.commit()
     conn.close()
     return jsonify({'success': True})
 
+# صفحة روليت الكازينو العالمي المنفردة والاحترافية
+@app.route('/roulette_page')
+def roulette_page():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (session['username'],))
+    balance = cursor.fetchone()[0]
+    conn.close()
+    return render_template_string(ROULETTE_PAGE, username=session['username'], balance=balance)
+
+@app.route('/spin_roulette_api', methods=['POST'])
+def spin_roulette_api():
+    if 'username' not in session:
+        return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
+    username = session['username']
+    data = request.json
+    bet_type = data.get('type') # 'red', 'black', 'even', 'odd', 'number'
+    bet_value = data.get('value')
+    bet_amount = float(data.get('amount', 25.0))
+    
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    balance = cursor.fetchone()[0]
+    
+    if balance < bet_amount:
+        conn.close()
+        return jsonify({'success': False, 'msg': 'رصيدك لا يكفي للمراهنة!'})
+        
+    cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (bet_amount, username))
+    cursor.execute("UPDATE financial_stats SET total_collected = total_collected + ? WHERE game_name=?", (bet_amount, "🎰 روليت الكازينو العالمي"))
+    
+    winning_num = random.randint(0, 36)
+    red_numbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
+    
+    if winning_num == 0:
+        winning_color = 'green'
+    elif winning_num in red_numbers:
+        winning_color = 'red'
+    else:
+        winning_color = 'black'
+        
+    won = False
+    payout = 0
+    
+    if bet_type == 'color':
+        if bet_value == winning_color:
+            won = True
+            payout = bet_amount * 2
+    elif bet_type == 'parity':
+        if winning_num != 0:
+            is_even = (winning_num % 2 == 0)
+            if (bet_value == 'even' and is_even) or (bet_value == 'odd' and not is_even):
+                won = True
+                payout = bet_amount * 2
+    elif bet_type == 'number':
+        if int(bet_value) == winning_num:
+            won = True
+            payout = bet_amount * 35 # ربح الرقم الفردي في الكازينوهات العالمية
+            
+    if won:
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (payout, username))
+        cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + ? WHERE game_name=?", (payout, "🎰 روليت الكازينو العالمي"))
+        cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
+                       ("🎰 روليت الكازينو العالمي", f"الفائز {username} ربح ${payout} (الرقم {winning_num})", time.strftime('%Y-%m-%d %H:%M')))
+                       
+    conn.commit()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    new_balance = cursor.fetchone()[0]
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'winning_number': winning_num,
+        'winning_color': winning_color,
+        'won': won,
+        'payout': payout,
+        'new_balance': new_balance
+    })
+
 @app.route('/admin_panel')
 def admin_panel():
     if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
-    
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT username, password, balance, role, created_by FROM users")
     all_users = cursor.fetchall()
-
     cursor.execute("SELECT game_name, total_collected, total_payouts FROM financial_stats")
     fin_data = cursor.fetchall()
-    
     financial_report = []
     total_net_profit = 0
     for name, collected, payouts in fin_data:
         net = collected - payouts
         total_net_profit += net
-        financial_report.append({
-            'name': name,
-            'collected': collected,
-            'payouts': payouts,
-            'net': net
-        })
-
+        financial_report.append({'name': name, 'collected': collected, 'payouts': payouts, 'net': net})
     cursor.execute("SELECT forced_admin_slot FROM royal_game_state WHERE id=1")
     f_slot = cursor.fetchone()[0]
-
     conn.close()
-    
     return render_template_string(ADMIN_PAGE, username=session['username'], all_users=all_users, financial_report=financial_report, total_net_profit=total_net_profit, f_slot=f_slot)
 
 @app.route('/admin_set_forced', methods=['POST'])
@@ -456,221 +431,216 @@ def change_password():
     conn.close()
     return redirect(url_for('admin_panel'))
 
-# الواجهة الرئيسية المحدثة (التي تضم الصفحة الثانية والـ 8 أيقونات الفاخرة)
+# الصفحة الثانية: لوحة التحكم والـ 8 أيقونات الفاخرة
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة Lira - لوحة التحكم والألعاب التفاعلية</title>
+    <title>منصة Lira - لوحة التحكم والألعاب</title>
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/color/512/crown.png">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #ffd700; }
         .logo-area { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .logo-img { width: 45px; height: 45px; filter: drop-shadow(0 0 8px rgba(255,215,0,0.8)); }
-        .logo-area h1 { margin: 0; color: #ffd700; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .logo-img { width: 45px; height: 45px; }
+        .logo-area h1 { margin: 0; color: #ffd700; font-size: 24px; }
         .user-creds { background: #1f1f1f; padding: 6px 12px; border-radius: 6px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .refresh-btn { background: #3b82f6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
         .admin-link-btn { background: #ffd700; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        .install-pwa-btn { background: linear-gradient(135deg, #ffd700, #daa520); color: #000; padding: 8px 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; display: none; }
         
-        /* شبكة الأيقونات الـ 8 الفاخرة */
-        .icons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px; }
+        .icons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 40px; }
         @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .icons-grid { grid-template-columns: 1fr; } }
         
-        .icon-card { background: #1f1f1f; border: 2px solid #333; border-radius: 16px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; }
+        .icon-card { background: #1f1f1f; border: 2px solid #333; border-radius: 16px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-5px); box-shadow: 0 8px 25px rgba(255,215,0,0.3); }
-        .icon-logo { font-size: 45px; margin-bottom: 12px; }
+        .icon-logo { font-size: 50px; margin-bottom: 12px; }
         .icon-title { color: #ffffff; font-size: 16px; font-weight: bold; }
-
-        /* حاوية اللعبة الملكية داخل الصفحة الرئيسية أو كقسم تفاعلي فاخر */
-        .royal-game-section { background: linear-gradient(135deg, #181818, #262626); border: 3px solid #ffd700; padding: 25px; border-radius: 20px; margin-top: 30px; }
-        .royal-slots-container { display: flex; justify-content: center; gap: 15px; margin: 25px 0; flex-wrap: wrap; }
-        .royal-slot-btn { background: #252525; border: 2px solid #ffd700; width: 110px; height: 110px; border-radius: 14px; color: #ffd700; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .royal-slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; }
-        .owner-tag { font-size: 11px; color: #ffcc00; margin-top: 6px; }
-
-        /* شاشة العد السريع 3D */
-        .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .digits-3d-box { display: flex; gap: 15px; margin: 25px 0; flex-wrap: wrap; justify-content: center; }
-        .digit-box { width: 80px; height: 80px; background: #252525; border: 3px solid #ffd700; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
     </style>
-    <script>
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            const installBtn = document.getElementById('installAppBtn');
-            if(installBtn) installBtn.style.display = 'block';
-        });
-
-        function installApp() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => { deferredPrompt = null; });
-            }
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-
-        function pickRoyalSlot(slotId) {
-            fetch('/pick_royal_slot/' + slotId, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if(!data.success && data.msg) alert(data.msg);
-                    syncData();
-                });
-        }
-
-        function syncData() {
-            fetch('/api/sync')
-                .then(response => response.json())
-                .then(data => {
-                    if(data.error) return;
-                    
-                    const balanceEl = document.getElementById('userBalanceBadge');
-                    if(balanceEl) balanceEl.innerText = '$' + data.balance;
-
-                    const royalContainer = document.getElementById('royalSlotsContainer');
-                    if(royalContainer && data.royal_slots) {
-                        let html = '';
-                        data.royal_slots.forEach(slot => {
-                            let sId = slot[0];
-                            let sStatus = slot[1];
-                            let sOwner = slot[2];
-                            let lockedCls = sStatus === 'locked' ? 'locked' : '';
-                            let ownerTag = sOwner ? `<span class="owner-tag">${sOwner}</span>` : '';
-                            html += `<button type="button" onclick="pickRoyalSlot(${sId})" class="royal-slot-btn ${lockedCls}">
-                                        <span>${sId}</span>
-                                        ${ownerTag}
-                                     </button>`;
-                        });
-                        royalContainer.innerHTML = html;
-                    }
-
-                    const wheelOverlay = document.getElementById('bigWheelOverlay');
-                    if(data.royal_is_full) {
-                        if(wheelOverlay) {
-                            wheelOverlay.style.display = 'flex';
-                            const wTimer = document.getElementById('wheelTimer');
-                            if(wTimer) wTimer.innerText = data.royal_rem;
-                        }
-                    } else {
-                        if(wheelOverlay) wheelOverlay.style.display = 'none';
-                    }
-                }).catch(err => {});
-        }
-
-        setInterval(syncData, 2000);
-    </script>
 </head>
 <body>
-    <!-- نافذة العد السريع 3D للعبة الأولى -->
-    <div id="bigWheelOverlay" class="big-wheel-overlay" style="display: none;">
-        <div style="color: #ffd700; font-size: 30px; font-weight: bold; margin-bottom: 10px; text-shadow: 0 0 15px #ffd700;">👑 جاري السحب الملكي السريع (3D)...</div>
-        <div class="digits-3d-box">
-            <div class="digit-box">7</div>
-            <div class="digit-box">7</div>
-            <div class="digit-box">7</div>
-            <div class="digit-box">7</div>
-            <div class="digit-box">7</div>
-        </div>
-        <div style="color: #38bdf8; font-size: 22px; font-weight: bold; margin-top: 15px;">⏳ متبقي <span id="wheelTimer" style="color: #ffd700;">0</span> ثانية لإعلان الرقم الرابح وجائزة الـ 200$!</div>
-    </div>
-
-    <!-- رأس الصفحة الثانية (Header) -->
     <div class="header">
         <div class="logo-area">
             <img src="https://img.icons8.com/color/512/crown.png" alt="Logo" class="logo-img">
             <h1>منصة Lira الفاخرة</h1>
-            <button id="installAppBtn" class="install-pwa-btn" onclick="installApp()">📲 تثبيت كـ App</button>
-            <div class="user-creds">
-                👤 <b>{{ username }}</b>
-                {% if role == 'admin' %} | 🔑 <b>{{ password }}</b>{% endif %}
-            </div>
+            <div class="user-creds">👤 <b>{{ username }}</b> {% if role == 'admin' %} | 🔑 <b>{{ role }}</b>{% endif %}</div>
             <div class="balance-badge">الرصيد: <span id="userBalanceBadge">${{ balance }}</span></div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=الرجاء%20شحن%20رصيد%20حسابي%20بمنصة%20Lira%20باسم%20المستخدم:%20{{ username }}" target="_blank">💬 شراء رصيد (واتساب)</a>
-            {% if role == 'admin' %}
-            <a href="/admin_panel" class="admin-link-btn">👑 لوحة الأدمن</a>
-            {% endif %}
-            <button class="refresh-btn" onclick="location.reload();">🔄 تحديث الألعاب</button>
+            {% if role == 'admin' %}<a href="/admin_panel" class="admin-link-btn">👑 لوحة الأدمن</a>{% endif %}
+            <button class="refresh-btn" onclick="location.reload();">🔄 تحديث</button>
             <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
     </div>
 
-    <!-- الصفحة الثانية: الـ 8 أيقونات المربعة الفاخرة -->
+    <!-- الـ 8 أيقونات المربعة الفاخرة (تنتقل كل واحدة لصفحة منفردة) -->
     <div class="icons-grid">
-        <!-- الأيقونة الأولى: اللعبة الملكية 3D -->
-        <a href="#royalGameSection" class="icon-card">
+        <a href="/royal_game_page" class="icon-card">
             <div class="icon-logo">👑</div>
             <div class="icon-title">اللعبة الملكية (3D)</div>
         </a>
-
-        <!-- الأيقونة الثانية: روليت الكازينو العالمي -->
         <a href="/roulette_page" class="icon-card">
             <div class="icon-logo">🎰</div>
             <div class="icon-title">روليت الكازينو الملكي</div>
         </a>
-
-        <!-- الأيقونات الـ 6 الأخرى -->
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
             <div class="icon-logo">⚡</div>
             <div class="icon-title">لعبة الحظ السريع</div>
         </div>
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
-            <div class="icon-card-logo" style="font-size: 45px; margin-bottom: 12px;">🏇</div>
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
+            <div class="icon-logo">🏇</div>
             <div class="icon-title">سباق الخيل التفاعلي</div>
         </div>
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
             <div class="icon-logo">🎡</div>
             <div class="icon-title">عجلة الثروة الكبرى</div>
         </div>
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
             <div class="icon-logo">🎁</div>
             <div class="icon-title">صناديق المفاجآت الذهبية</div>
         </div>
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
             <div class="icon-logo">🔢</div>
             <div class="icon-title">تحدي الأرقام الفائزة</div>
         </div>
-        <div class="icon-card" onclick="alert('لعبة قيد التطوير والتحديث القريب')">
+        <div class="icon-card" onclick="alert('لعبة قيد التفعيل قريباً')">
             <div class="icon-logo">🃏</div>
             <div class="icon-title">البوكر الملكي المباشر</div>
-        </div>
-    </div>
-
-    <!-- تفاصيل اللعبة الأولى (اللعبة الملكية 3D بـ 5 مربعات ومربع الرقم الرابح) -->
-    <div id="royalGameSection" class="royal-game-section">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-            <div>
-                <h2 style="color: #ffd700; margin: 0;">👑 اللعبة الملكية الحصرية (3D) - جائزة 200$</h2>
-                <p style="color: #cbd5e1; font-size: 13px; margin: 5px 0 0 0;">اختر رقمك من المربعات الخمسة المنفصلة (التكلفة: 40$)</p>
-            </div>
-            <div style="background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 12px; border: 1px solid #ffd700; text-align: center;">
-                <div style="font-size: 14px; color: #ffd700; font-weight: bold;">🎯 مربع الرقم الرابح الجانبي</div>
-            </div>
-        </div>
-
-        <div id="royalSlotsContainer" class="royal-slots-container">
-            <!-- يتم تعبئتها ديناميكياً -->
         </div>
     </div>
 </body>
 </html>
 """
 
-# صفحة اللعبة الثانية (روليت الكازينو العالمي مطابقة تماماً لكازينوهات العالم)
+# صفحة اللعبة الملكية المنفردة (عجلة الحظ، 50$ للتكلفة، 200$ للجائزة والنقطة الثابتة)
+ROYAL_GAME_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اللعبة الملكية - منصة Lira</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; }
+        .back-btn { background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-bottom: 20px; }
+        
+        .royal-box { background: linear-gradient(135deg, #181818, #262626); border: 3px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 850px; margin: 0 auto; text-align: center; }
+        .slots-container { display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }
+        .slot-btn { background: #252525; border: 3px solid #ffd700; width: 120px; height: 120px; border-radius: 16px; color: #ffd700; font-size: 26px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.2s; }
+        .slot-btn.locked { background: #006400; border-color: #00ff00; color: #fff; }
+        .owner-tag { font-size: 12px; color: #ffcc00; margin-top: 6px; }
+
+        /* نافذة عجلة الحظ الدائرية مع النقطة الثابتة */
+        .wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .wheel-outer { position: relative; width: 300px; height: 300px; border-radius: 50%; border: 10px solid #ffd700; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(255,215,0,0.8); }
+        .pointer-dot { position: absolute; top: -18px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ef4444; z-index: 20; filter: drop-shadow(0 0 8px #ef4444); }
+        .wheel-inner-text { font-size: 55px; font-weight: bold; color: #ffd700; animation: pulseNum 0.5s infinite alternate; }
+        @keyframes pulseNum { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
+
+        /* نافذة الفوز الفخمة */
+        .win-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .win-card { background: linear-gradient(135deg, #1f1f1f, #332700); border: 4px solid #ffd700; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 0 60px rgba(255,215,0,0.9); width: 400px; }
+    </style>
+    <script>
+        function pickSlot(slotId) {
+            fetch('/pick_royal_slot/' + slotId, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(!data.success && data.msg) alert(data.msg);
+                    syncRoyal();
+                });
+        }
+
+        function syncRoyal() {
+            fetch('/api/sync_royal')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.error) return;
+                    document.getElementById('userBalanceBadge').innerText = '$' + data.balance;
+
+                    let html = '';
+                    data.royal_slots.forEach(slot => {
+                        let sId = slot[0], status = slot[1], owner = slot[2];
+                        let lockedCls = status === 'locked' ? 'locked' : '';
+                        let ownerTag = owner ? `<span class="owner-tag">${owner}</span>` : '';
+                        html += `<button type="button" onclick="pickSlot(${sId})" class="slot-btn ${lockedCls}">
+                                    <span>${sId}</span>
+                                    <span style="font-size:12px; color:#38bdf8;">50$</span>
+                                    ${ownerTag}
+                                 </button>`;
+                    });
+                    document.getElementById('slotsContainer').innerHTML = html;
+
+                    const wheel = document.getElementById('wheelOverlay');
+                    const winModal = document.getElementById('winModal');
+
+                    if(data.is_full) {
+                        wheel.style.display = 'flex';
+                        let rndNum = Math.floor(Math.random() * 5) + 1;
+                        document.getElementById('spinningNumber').innerText = rndNum;
+                    } else {
+                        wheel.style.display = 'none';
+                        if(data.winning_number > 0 && data.rem > 0) {
+                            winModal.style.display = 'flex';
+                            document.getElementById('winningNumText').innerText = data.winning_number;
+                        } else {
+                            winModal.style.display = 'none';
+                        }
+                    }
+                });
+        }
+        setInterval(syncRoyal, 1500);
+    </script>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">👑 اللعبة الملكية الحصرية (3D)</h2>
+        <div><span class="balance-badge" style="background:#065f46; color:#34d399; padding:8px 15px; border-radius:8px; font-weight:bold;">الرصيد: <span id="userBalanceBadge">${{ balance }}</span></span></div>
+    </div>
+    
+    <div style="max-width: 850px; margin: 20px auto;">
+        <a href="/dashboard" class="back-btn">⬅ العودة للوحة التحكم الرئيسية</a>
+    </div>
+
+    <!-- نافذة عجلة الحظ الدورية مع النقطة الثابتة الحمراء -->
+    <div id="wheelOverlay" class="wheel-overlay" style="display: none;">
+        <div style="color: #ffd700; font-size: 26px; font-weight: bold; margin-bottom: 25px; text-shadow: 0 0 10px #ffd700;">🎡 عجلة الحظ تدور لاختيار الرقم الرابح...</div>
+        <div class="wheel-outer">
+            <div class="pointer-dot"></div>
+            <div id="spinningNumber" class="wheel-inner-text">1</div>
+        </div>
+        <div style="color: #38bdf8; font-size: 18px; margin-top: 25px;">ترقب إعلان الفائز بالـ 200$ الفورية!</div>
+    </div>
+
+    <!-- نافذة الفوز الفخمة -->
+    <div id="winModal" class="win-popup" style="display: none;">
+        <div class="win-card">
+            <div style="font-size: 55px; margin-bottom: 10px;">🎉</div>
+            <h2 style="color: #ffd700; margin: 0; font-size: 28px;">مبروك لقد ربح الرقم!</h2>
+            <div id="winningNumText" style="font-size: 45px; font-weight: bold; color: #fff; margin: 15px 0;">7</div>
+            <div style="font-size: 26px; font-weight: bold; color: #34d399; background: rgba(0,100,0,0.5); padding: 12px; border-radius: 10px; border: 1px solid #00ff00;">200$</div>
+            <p style="color: #cbd5e1; font-size: 13px; margin-top: 15px;">تم تحويل الجائزة إلى رصيد الفائز مباشرة!</p>
+        </div>
+    </div>
+
+    <div class="royal-box">
+        <h2 style="color: #ffd700; margin-top: 0;">اختر رقمك الملكي (قيمة الرقم: 50$ | الجائزة الكبرى: 200$)</h2>
+        <p style="color: #cbd5e1; font-size: 14px;">عند حجز الأرقام الخمسة بالكامل، تدور عجلة الحظ تلقائياً ويتم إعلان الفائز!</p>
+        <div id="slotsContainer" class="slots-container"></div>
+    </div>
+</body>
+</html>
+"""
+
+# صفحة روليت الكازينو العالمي المنفردة والواقعية بالكامل
 ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -680,21 +650,31 @@ ROULETTE_PAGE = """
     <title>روليت الكازينو العالمي - منصة Lira</title>
     <link rel="manifest" href="/manifest.json">
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; }
-        .roulette-container { background: #0f2b1d; border: 3px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 800px; margin: 30px auto; text-align: center; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
-        .wheel-display { font-size: 26px; font-weight: bold; background: #081810; padding: 30px; border-radius: 15px; border: 2px dashed #ffd700; color: #fff; margin-bottom: 25px; }
-        .bet-buttons { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
-        .bet-btn { padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 10px; border: none; cursor: pointer; color: #fff; }
-        .bet-red { background: #cc0000; } .bet-black { background: #222222; border: 1px solid #555; }
+        body { font-family: Tahoma, sans-serif; background-color: #071f14; color: #f8fafc; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #04120c; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; }
         .back-btn { background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-bottom: 20px; }
+        
+        .roulette-arena { background: #0b2e1f; border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 900px; margin: 0 auto; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
+        .wheel-screen { font-size: 24px; font-weight: bold; background: #04120c; padding: 25px; border-radius: 15px; border: 2px solid #ffd700; color: #fff; margin-bottom: 25px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+        
+        .table-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin: 20px 0; }
+        .r-cell { background: #111; border: 1px solid #ffd700; height: 50px; font-weight: bold; font-size: 16px; color: #fff; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .r-cell.red { background: #dc2626; }
+        .r-cell.black { background: #1f2937; }
+        .r-cell.green { background: #16a34a; }
+
+        .bet-options { display: flex; justify-content: center; gap: 15px; flex-wrap: wheel; margin-top: 25px; }
+        .casino-btn { padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; color: white; }
+        .btn-red { background: #dc2626; }
+        .btn-black { background: #1f2937; border: 1px solid #555; }
+        .btn-green { background: #16a34a; }
     </style>
     <script>
-        function spin(choice) {
+        function playRoulette(type, val) {
             fetch('/spin_roulette_api', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({choice: choice, amount: 25.0})
+                body: JSON.stringify({type: type, value: val, amount: 25.0})
             })
             .then(res => res.json())
             .then(data => {
@@ -702,12 +682,12 @@ ROULETTE_PAGE = """
                     alert(data.msg);
                     return;
                 }
-                const display = document.getElementById('wheelDisplay');
-                display.innerHTML = `🎡 تدور الكرة في القرص...`;
+                const screen = document.getElementById('wheelScreen');
+                screen.innerHTML = `🎡 تدور عجلة الروليت داخل الكازينو...`;
                 setTimeout(() => {
-                    let colorName = data.winning_color === 'red' ? 'أحمر' : (data.winning_color === 'black' ? 'أسود' : 'أخضر (صفر الكازينو)');
-                    display.innerHTML = `🎯 استقرت الكرة على الرقم: ${data.winning_number} (${colorName})<br>` + 
-                                        (data.won ? `<span style="color: #00ff00;">🎉 مبروك! ربحت $${data.payout}</span>` : `<span style="color: #ff4444;">❌ هاردلك! خسر الرهان $25</span>`);
+                    let colName = data.winning_color === 'red' ? 'أحمر' : (data.winning_color === 'black' ? 'أسود' : 'أخضر (صفر الكازينو)');
+                    screen.innerHTML = `🎯 استقرت الكرة على: الرقم ${data.winning_number} (${colName})<br>` +
+                                       (data.won ? `<span style="color: #4ade80;">🎉 مبروك! ربحت $${data.payout}</span>` : `<span style="color: #f87171;">❌ هاردلك! خسر الرهان $25</span>`);
                     document.getElementById('userBalanceBadge').innerText = '$' + data.new_balance;
                 }, 2000);
             });
@@ -716,21 +696,34 @@ ROULETTE_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎰 روليت الكازينو العالمي المباشر</h2>
-        <div>
-            <span style="background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold;">رصيدك: <span id="userBalanceBadge">${{ balance }}</span></span>
-        </div>
+        <h2 style="color: #ffd700; margin: 0;">🎰 طاولة روليت الكازينو العالمي المباشر</h2>
+        <div><span style="background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold;">الرصيد: <span id="userBalanceBadge">${{ balance }}</span></span></div>
     </div>
-    <div style="max-width: 800px; margin: 20px auto;">
+    
+    <div style="max-width: 900px; margin: 20px auto;">
         <a href="/dashboard" class="back-btn">⬅ العودة للوحة التحكم الرئيسية</a>
     </div>
-    <div class="roulette-container">
-        <div id="wheelDisplay" class="wheel-display">
-            🎡 [ قرص الروليت الدوار جاهز ]<br>اختر نوع الرهان (تكلفة الرهان: 25$)
+
+    <div class="roulette-arena">
+        <div id="wheelScreen" class="wheel-screen">
+            🎡 [ طاولة الروليت جاهزة ]<br>اختر نوع الرهان أو الرقم (قيمة الرهان: 25$)
         </div>
-        <div class="bet-buttons">
-            <button class="bet-btn bet-red" onclick="spin('red')">رهان أحمر (Red)</button>
-            <button class="bet-btn bet-black" onclick="spin('black')">رهان أسود (Black)</button>
+
+        <div style="color: #ffd700; font-weight: bold; margin-bottom: 10px;">اختر رهان الألوان أو الصفر:</div>
+        <div class="bet-options">
+            <button class="casino-btn btn-red" onclick="playRoulette('color', 'red')">رهان أحمر (x2)</button>
+            <button class="casino-btn btn-black" onclick="playRoulette('color', 'black')">رهان أسود (x2)</button>
+            <button class="casino-btn btn-green" onclick="playRoulette('number', 0)">رهان الصفر 0 (x35)</button>
+        </div>
+
+        <div style="color: #ffd700; font-weight: bold; margin: 25px 0 10px 0;">أو اختر رقماً مباشراً (ربح مضاعف x35):</div>
+        <div class="table-grid">
+            <script>
+                for(let i=0; i<=36; i++) {
+                    let c = (i === 0) ? 'green' : ([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(i) ? 'red' : 'black');
+                    document.write(`<div class="r-cell ${c}" onclick="playRoulette('number', ${i})">${i}</div>`);
+                }
+            </script>
         </div>
     </div>
 </body>
@@ -744,10 +737,9 @@ ADMIN_PAGE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة تحكم الأدمن</title>
-    <link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; margin: 0; }
-        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
         .admin-panel { background: #1f1f1f; padding: 25px; border-radius: 12px; border: 2px solid #ffd700; max-width: 950px; margin: 0 auto; }
         input, select { width: 100%; padding: 10px; border-radius: 6px; background: #252525; color: white; border: 1px solid #475569; box-sizing: border-box; }
         button { padding: 10px 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
@@ -833,7 +825,6 @@ LOGIN_PAGE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - منصة Lira</title>
-    <link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); width: 320px; text-align: center; border: 1px solid #333; }
