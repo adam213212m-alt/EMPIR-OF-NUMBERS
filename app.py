@@ -109,4 +109,79 @@ scheduler.start()
 
 @app.route('/manifest.json')
 def manifest():
-    manifest_data = '{"name
+    manifest_data = '{"name": "Lira ليرة", "short_name": "Lira", "start_url": "/", "display": "standalone", "background_color": "#0b0f19", "theme_color": "#ffd700"}'
+    return app.response_class(manifest_data, status=200, mimetype='application/json')
+
+@app.route('/sw.js')
+def service_worker():
+    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
+        user = cursor.fetchone()
+        conn.close()
+        if user:
+            session.clear()
+            session['username'] = user['username']
+            session['password'] = user['password']
+            session['balance'] = user['balance']
+            session['role'] = user['role']
+            return redirect(url_for('dashboard'))
+        else:
+            error = f"خطأ: اسم المستخدم '{username}' أو كلمة المرور غير صحيحة!"
+    return render_template_string(LOGIN_PAGE, error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE username=?", (session['username'],))
+    row = cursor.fetchone()
+    balance = row['balance'] if row else 0
+    conn.close()
+    return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
+
+LOGIN_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><title>تسجيل الدخول</title></head>
+<body style="background:#0b0f19; color:#fff; text-align:center; padding:50px;">
+    <h2>تسجيل الدخول</h2>
+    {% if error %}<p style="color:red;">{{ error }}</p>{% endif %}
+    <form method="POST">
+        <input type="text" name="username" placeholder="اسم المستخدم" required><br><br>
+        <input type="password" name="password" placeholder="كلمة المرور" required><br><br>
+        <button type="submit">دخول</button>
+    </form>
+</body>
+</html>
+"""
+
+DASHBOARD_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><title>لوحة التحكم</title></head>
+<body style="background:#0b0f19; color:#fff; text-align:center; padding:50px;">
+    <h1>مرحباً {{ username }}</h1>
+    <p>الرصيد: ${{ balance }}</p>
+    <a href="/logout" style="color:red;">تسجيل الخروج</a>
+</body>
+</html>
+"""
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
