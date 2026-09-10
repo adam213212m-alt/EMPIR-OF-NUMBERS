@@ -2,16 +2,19 @@ from flask import Flask, render_template_string, request, redirect, url_for, ses
 import sqlite3
 import random
 import time
+import os
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'empire_safe_accounts_final_secure_2026'
 
+DB_NAME = 'empire_stable.db'
+
 def get_beirut_time():
     return datetime.now(timezone(timedelta(hours=3)))
 
 def get_db():
-    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -163,7 +166,7 @@ def check_auto_draw_board():
         if not state:
             return
             
-        forced_num, last_draw_date = state[0], state[1]
+        forced_num, last_draw_date = state['forced_admin_number'], state['last_draw_date']
         
         if last_draw_date == date_str:
             return
@@ -173,12 +176,13 @@ def check_auto_draw_board():
             winning_number = int(forced_num)
             cursor.execute("SELECT owner FROM game_board WHERE number=?", (winning_number,))
             res = cursor.fetchone()
-            winner_owner = res[0] if (res and res[0]) else None
+            winner_owner = res['owner'] if (res and res['owner']) else None
         else:
             cursor.execute("SELECT number, owner FROM game_board WHERE status='locked'")
             locked = cursor.fetchall()
             if locked:
-                winning_number, winner_owner = random.choice(locked)
+                chosen = random.choice(locked)
+                winning_number, winner_owner = chosen['number'], chosen['owner']
             else:
                 winning_number = random.randint(1, 50)
                 
@@ -202,21 +206,22 @@ def check_and_auto_draw_game_three():
         cursor = conn.cursor()
         cursor.execute("SELECT is_full, timer_end, forced_admin_slot FROM game_three_state WHERE id=1")
         state = cursor.fetchone()
-        if state and state[0] == 1:
-            timer_end = state[1]
-            forced_slot = state[2]
+        if state and state['is_full'] == 1:
+            timer_end = state['timer_end']
+            forced_slot = state['forced_admin_slot']
             if time.time() >= timer_end:
                 winning_slot, winner_owner = None, None
                 if forced_slot and forced_slot.isdigit():
                     winning_slot = int(forced_slot)
                     cursor.execute("SELECT owner FROM game_three WHERE slot_id=?", (winning_slot,))
                     res = cursor.fetchone()
-                    winner_owner = res[0] if (res and res[0]) else None
+                    winner_owner = res['owner'] if (res and res['owner']) else None
                 else:
                     cursor.execute("SELECT slot_id, owner FROM game_three WHERE status='locked'")
                     locked_slots = cursor.fetchall()
                     if locked_slots:
-                        winning_slot, winner_owner = random.choice(locked_slots)
+                        chosen = random.choice(locked_slots)
+                        winning_slot, winner_owner = chosen['slot_id'], chosen['owner']
                     else:
                         winning_slot = random.randint(1, 5)
                         
@@ -249,9 +254,9 @@ def get_or_create_scratch_game(username):
             conn.commit()
             return nums, [], 'playing', "اكشف 3 مربعات متطابقة واربح 20$!"
         else:
-            hidden_numbers = list(map(int, row[0].split(','))) if row[0] else []
-            selected_boxes = list(map(int, row[1].split(','))) if row[1] else []
-            return hidden_numbers, selected_boxes, row[2], row[3]
+            hidden_numbers = list(map(int, row['hidden_numbers'].split(','))) if row['hidden_numbers'] else []
+            selected_boxes = list(map(int, row['selected_boxes'].split(','))) if row['selected_boxes'] else []
+            return hidden_numbers, selected_boxes, row['game_status'], row['message']
 
 @app.route('/manifest.json')
 def manifest():
@@ -286,13 +291,13 @@ def api_sync():
         
         cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
         res = cursor.fetchone()
-        balance = res[0] if res else 0
+        balance = res['balance'] if res else 0
 
         cursor.execute("SELECT number, status, owner FROM game_board")
         board = cursor.fetchall()
 
         cursor.execute("SELECT number FROM game_board WHERE owner=?", (username,))
-        user_locked = [row[0] for row in cursor.fetchall()]
+        user_locked = [row['number'] for row in cursor.fetchall()]
         user_spent = len(user_locked) * 2.0
 
         cursor.execute("SELECT slot_id, status, owner FROM game_three")
@@ -300,13 +305,13 @@ def api_sync():
 
         cursor.execute("SELECT is_full, timer_end, last_winner_msg FROM game_three_state WHERE id=1")
         g3_state = cursor.fetchone()
-        g3_is_full = g3_state[0]
-        g3_timer_end = g3_state[1]
-        g3_msg = g3_state[2]
+        g3_is_full = g3_state['is_full']
+        g3_timer_end = g3_state['timer_end']
+        g3_msg = g3_state['last_winner_msg']
         g3_rem = max(0, int(g3_timer_end - time.time())) if g3_is_full else 0
 
         cursor.execute("SELECT last_winner_msg FROM game_board_state WHERE id=1")
-        board_msg = cursor.fetchone()[0]
+        board_msg = cursor.fetchone()['last_winner_msg']
 
         cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
         winners = cursor.fetchall()
@@ -318,69 +323,4 @@ def api_sync():
         'user_spent': user_spent,
         'g3_slots': [dict(row) for row in g3_slots],
         'g3_is_full': g3_is_full,
-        'g3_rem': g3_rem,
-        'g3_msg': g3_msg,
-        'board_msg': board_msg,
-        'winners': [dict(row) for row in winners]
-    })
-
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    error = None
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
-        
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
-            user = cursor.fetchone()
-        
-        if user:
-            session.clear()
-            session['username'] = user['username']
-            session['role'] = user['role']
-            return redirect(url_for('dashboard'))
-        else:
-            error = f"خطأ: اسم المستخدم '{username}' أو كلمة المرور غير صحيحة!"
-            
-    return render_template_string(LOGIN_PAGE, error=error)
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-@app.route('/dashboard')
-def dashboard():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    username = session['username']
-    role = session['role']
-
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
-        res = cursor.fetchone()
-        user_balance = res[0] if res else 0
-
-    hidden_nums, selected_boxes, scratch_status, scratch_msg = get_or_create_scratch_game(username)
-
-    return render_template_string(DASHBOARD_PAGE, 
-                                  username=username,
-                                  role=role, 
-                                  balance=user_balance,
-                                  hidden_nums=hidden_nums,
-                                  selected_boxes=selected_boxes,
-                                  scratch_status=scratch_status,
-                                  scratch_msg=scratch_msg)
-
-@app.route('/admin_panel')
-def admin_panel():
-    if 'username' not in session or session.get('role') != 'admin':
-        return redirect(url_for('dashboard'))
-    
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT username, password, balance
+        'g3_rem': g
