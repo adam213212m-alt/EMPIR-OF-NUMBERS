@@ -1,5 +1,6 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template_string, request, redirect, url_for, session
 import sqlite3
+import random
 import time
 
 app = Flask(__name__)
@@ -50,13 +51,23 @@ def init_db():
         )
     ''')
 
-    main_admins = ['admin1', 'admin2', 'admin3']
-    for adm in main_admins:
-        cursor.execute("SELECT * FROM users WHERE username=?", (adm,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 100000.0, 'admin', 'system')", 
-                           (adm, 'admin123'))
-            cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - 100000.0 WHERE id=1")
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS temp_draw_state (
+            id INTEGER PRIMARY KEY,
+            winning_number INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'idle',
+            reset_time REAL DEFAULT 0
+        )
+    ''')
+    cursor.execute('SELECT COUNT(*) FROM temp_draw_state')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('INSERT INTO temp_draw_state (id, winning_number, status, reset_time) VALUES (1, 0, "idle", 0)')
+
+    # إبقاء حساب المدير الوحيد admin1 فقط
+    cursor.execute("SELECT * FROM users WHERE username='admin1'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES ('admin1', 'admin123', 100000.0, 'admin', 'system')", ())
+        cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - 100000.0 WHERE id=1")
 
     conn.commit()
     conn.close()
@@ -127,8 +138,24 @@ def game_one_page():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
+    current_time = time.time()
+    cursor.execute("SELECT winning_number, status, reset_time FROM temp_draw_state WHERE id=1")
+    draw_row = cursor.fetchone()
+    winning_number = draw_row[0]
+    draw_status = draw_row[1]
+    reset_time = draw_row[2]
+
+    # التحقق التلقائي من انتهاء وقت عرض الرقم الذهبي وإعادة تصفير اللوحة بالكامل
+    if draw_status == 'finished' and current_time >= reset_time:
+        cursor.execute("DELETE FROM golden_number_bookings")
+        cursor.execute("UPDATE temp_draw_state SET winning_number=0, status='idle', reset_time=0 WHERE id=1")
+        conn.commit()
+        winning_number = 0
+        draw_status = 'idle'
+
     msg = None
     if request.method == 'POST':
+        # 1. حجز رقم جديد
         if 'book_number' in request.form:
             number = int(request.form.get('number'))
             cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
@@ -147,6 +174,40 @@ def game_one_page():
             else:
                 msg = "رصيدك غير كافٍ لحجز هذا الرقم!"
 
+        # 2. التراجع عن حجز الرقم الخاص باللاعب
+        elif 'cancel_booking' in request.form:
+            number_to_cancel = int(request.form.get('number'))
+            cursor.execute("SELECT username FROM golden_number_bookings WHERE number=? AND username=?", (number_to_cancel, username))
+            booking_row = cursor.fetchone()
+            if booking_row:
+                cursor.execute("DELETE FROM golden_number_bookings WHERE number=? AND username=?", (number_to_cancel, username))
+                cursor.execute("UPDATE users SET balance = balance + 2.0 WHERE username=?", (username,))
+                conn.commit()
+                msg = f"تم إلغاء حجز الرقم {number_to_cancel} واستعادة رسوم الحجز ($2) بنجاح!"
+            else:
+                msg = "لا يمكنك إلغاء حجز هذا الرقم لأنه غير محجوز باسمك!"
+
+        # 3. سحب المدير على جائزة 75$
+        elif 'admin_draw' in request.form and role == 'admin':
+            cursor.execute("SELECT number FROM golden_number_bookings")
+            booked_nums = [r[0] for r in cursor.fetchall()]
+            if booked_nums:
+                win_num = random.choice(booked_nums)
+                cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (win_num,))
+                winner_user = cursor.fetchone()[0]
+                
+                # منح الجائزة الكبرى
+                cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_user,))
+                
+                new_reset_time = current_time + 10 # يضيء لمدة 10 ثوانٍ ثم يتم التصفير
+                cursor.execute("UPDATE temp_draw_state SET winning_number=?, status='finished', reset_time=? WHERE id=1", (win_num, new_reset_time))
+                conn.commit()
+                winning_number = win_num
+                draw_status = 'finished'
+                msg = f"🎉 مبروك! فاز الرقم {win_num} (اللاعب: {winner_user}) بجائزة 75$!"
+            else:
+                msg = "تنبيه: لا توجد أرقام محجوزة حالياً لإجراء السحب!"
+
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
 
@@ -159,7 +220,8 @@ def game_one_page():
 
     conn.close()
     return render_template_string(GAME_ONE_PAGE, username=username, role=role, balance=balance, 
-                                  bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, msg=msg)
+                                  bookings=bookings, my_bookings=my_bookings, my_spent=my_spent, 
+                                  winning_number=winning_number, draw_status=draw_status, msg=msg)
 
 @app.route('/game_two_page')
 def game_two_page():
@@ -236,7 +298,7 @@ def create_user_page():
         conn.close()
     return render_template_string(CREATE_USER_PAGE, msg=msg)
 
-# قوالب HTML و CSS المعدلة بدون أي أنظمة سحب
+# قوالب HTML و CSS
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -246,7 +308,6 @@ DASHBOARD_PAGE = """
     <title>Lira ليرة - لوحة التحكم</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #ffd700; }
@@ -284,7 +345,7 @@ DASHBOARD_PAGE = """
     <div class="icons-grid">
         <a href="/game_one_page" class="icon-card">
             <div class="icon-logo">🏆</div>
-            <div class="icon-title">لوحة الحجوزات (الرقم الذهبي)</div>
+            <div class="icon-title">لوحة الرقم الذهبي والحجوزات</div>
         </a>
         <a href="/game_two_page" class="icon-card">
             <div class="icon-logo">🎰</div>
@@ -301,7 +362,7 @@ GAME_ONE_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>لوحة الحجوزات - Lira</title>
+    <title>لعبة الرقم الذهبي - Lira</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <style>
@@ -310,16 +371,20 @@ GAME_ONE_PAGE = """
         .board-container { background: #120e06; border: 4px solid #b8860b; padding: 20px; border-radius: 16px; margin-top: 25px; text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 20px; }
         @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
-        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; }
+        .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
-        .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
+        .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; }
+        .number-box.my-booked { background: #064e3b; border-color: #34d399; color: #34d399; cursor: pointer; }
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; transform: scale(1.15); animation: pulse 0.5s infinite alternate; }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.18); } }
+        .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 20px; border-radius: 16px; margin-top: 25px; text-align: center; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         .my-stats { background: #162032; border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; margin-top: 25px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لوحة الحجوزات الرقمية</h2>
+        <h2 style="color: #ffd700; margin: 0;">👑 لعبة الرقم الذهبي</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <div style="color: #34d399; font-weight: bold;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
@@ -329,28 +394,54 @@ GAME_ONE_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
     <div class="board-container">
-        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر وحجز الأرقام (تكلفة الحجز: $2 للرقم)</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أو اضغط على أرقامك الملونة بالأخضر للتراجع (السعر: $2 | الجائزة: $75)</h3>
         <div class="board-grid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
-                    <div id="box-{{ i }}" class="number-box booked">
-                        {{ i }}<br><span style="font-size: 10px; color: #f87171;">({{ bookings[i] }})</span>
-                    </div>
+                    {% if bookings[i] == username %}
+                        <form method="POST" style="margin: 0;">
+                            <input type="hidden" name="number" value="{{ i }}">
+                            <button type="submit" name="cancel_booking" class="number-box my-booked {% if draw_status == 'finished' and winning_number == i %}winning{% endif %}" style="width: 100%;" title="اضغط للتراجع واسترداد $2">
+                                {{ i }}<br><span style="font-size: 9px; color: #a7f3d0;">(أنت - إلغاء)</span>
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="number-box booked {% if draw_status == 'finished' and winning_number == i %}winning{% endif %}">
+                            {{ i }}<br><span style="font-size: 9px; color: #f87171;">({{ bookings[i] }})</span>
+                        </div>
+                    {% endif %}
                 {% else %}
                     <form method="POST" style="margin: 0;">
                         <input type="hidden" name="number" value="{{ i }}">
-                        <button type="submit" name="book_number" id="box-{{ i }}" class="number-box" style="width: 100%;" title="اضغط للحجز بـ $2">{{ i }}</button>
+                        <button type="submit" name="book_number" class="number-box" style="width: 100%;" title="اضغط للحجز بـ $2">{{ i }}</button>
                     </form>
                 {% endif %}
             {% endfor %}
         </div>
     </div>
 
+    {% if role == 'admin' %}
+    <div class="draw-panel">
+        <h3 style="color: #ffd700; margin-top: 0;">👑 لوحة تحكم المدير (السحب على جائزة 75$)</h3>
+        <form method="POST">
+            <button type="submit" name="admin_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">🎲 سحب عشوائي وإعلان الفائز ($75)</button>
+        </form>
+    </div>
+    {% endif %}
+
     <div class="my-stats">
         <h3 style="color: #38bdf8; margin-top: 0;">👤 ملخص حسابك</h3>
-        <p>الأرقام التي قمت بحجزها: <b style="color: #ffd700;">{% if my_bookings %}{{ my_bookings | join(', ') }}{% else %}لا توجد أرقام محجوزة{% endif %}</b></p>
+        <p>الأرقام المحجوزة باسمك: <b style="color: #ffd700;">{% if my_bookings %}{{ my_bookings | join(', ') }}{% else %}لا توجد أرقام محجوزة{% endif %}</b></p>
         <p>إجمالي التكلفة المدفوعة للحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
+
+    {% if draw_status == 'finished' and winning_number %}
+    <script>
+        setTimeout(() => {
+            window.location.href = "/game_one_page";
+        }, 10000);
+    </script>
+    {% endif %}
 </body>
 </html>
 """
@@ -361,7 +452,7 @@ ADMIN_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة إدارة المديرين - Lira</title>
+    <title>لوحة إدارة المدير - Lira</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
@@ -490,6 +581,9 @@ LOGIN_PAGE = """
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول</button>
         </form>
+        <div style="margin-top: 15px; font-size: 13px; color: #94a3b8;">
+            مدير النظام الافتراضي: <b>admin1</b> | الكلمة: <b>admin123</b>
+        </div>
     </div>
 </body>
 </html>
