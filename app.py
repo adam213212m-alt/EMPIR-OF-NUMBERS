@@ -12,7 +12,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين (محفوظ بالكامل بكل حساباته وأرصدته وكلمات مروره)
+    # جدول المستخدمين
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,7 +143,7 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_PAGE, username=session['username'], role=session['role'], balance=balance)
 
-# API عام لجلب الحالة الحية وتحديث الشاشات لجميع اللاعبين في نفس اللحظة
+# API عام وموحد يغذي كافة الحسابات واللاعبين بالحالة الحية والرقم الفائز فوراً
 @app.route('/api/game_status')
 def api_game_status():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
@@ -158,7 +158,7 @@ def api_game_status():
         status = row[1]
         end_timestamp = row[2]
         
-        # فحص انتهاء الـ 30 ثانية وتحويل الجائزة تلقائياً للفائز
+        # 1. انتهاء فترة الـ 15 ثانية للتدوير -> الانتقال لحالة الفوز ومنح الجائزة وتفعيل الإضاءة الذهبية لجميع الشاشات
         if status == 'drawing' and current_time >= end_timestamp:
             cursor.execute("SELECT username FROM golden_number_bookings WHERE number=?", (winning_number,))
             winner = cursor.fetchone()
@@ -166,22 +166,32 @@ def api_game_status():
                 winner_name = winner[0]
                 cursor.execute("UPDATE users SET balance = balance + 75.0 WHERE username=?", (winner_name,))
             
-            cursor.execute("UPDATE game_draws SET status='finished' WHERE game_name='golden_number'")
+            # بقاء الرقم واللوحة مضاءة لمدة 30 ثانية أمام جميع الحسابات
+            new_lighting_end = current_time + 30
+            cursor.execute("UPDATE game_draws SET status='finished', draw_end_timestamp=? WHERE game_name='golden_number'", (new_lighting_end,))
             conn.commit()
             status = 'finished'
+            end_timestamp = new_lighting_end
 
-            # تصفير اللوحة وإطفاء الأرقام بعد 15 ثانية لتصبح جاهزة لحجز جديد
-            def reset_board_after_15s():
-                time.sleep(15)
+            # تصفير اللوحة تلقائياً بعد 30 ثانية لتصبح جاهزة للجولة التالية للجميع
+            def reset_board_after_30s():
+                time.sleep(30)
                 c_conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
                 c_cur = c_conn.cursor()
                 c_cur.execute("DELETE FROM golden_number_bookings")
                 c_cur.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
                 c_conn.commit()
                 c_conn.close()
-            threading.Thread(target=reset_board_after_15s, daemon=True).start()
+            threading.Thread(target=reset_board_after_30s, daemon=True).start()
 
-        remaining = int(end_timestamp - current_time) if status == 'drawing' else 0
+        # 2. انتهاء فترة الـ 30 ثانية للإضاءة -> تصفير اللوحة وإعادتها لوضع الاستعداد لجميع اللاعبين
+        elif status == 'finished' and current_time >= end_timestamp:
+            cursor.execute("DELETE FROM golden_number_bookings")
+            cursor.execute("UPDATE game_draws SET status='idle', winning_number=0, draw_end_timestamp=0 WHERE game_name='golden_number'")
+            conn.commit()
+            status = 'idle'
+
+        remaining = int(end_timestamp - current_time) if status in ['drawing', 'finished'] else 0
         if remaining < 0: remaining = 0
 
     cursor.execute("SELECT number, username FROM golden_number_bookings")
@@ -237,12 +247,12 @@ def game_one_page():
             forced_num = request.form.get('forced_number')
             winning_num = int(forced_num) if forced_num else random.randint(1, 50)
             
-            # بدء العد التنازلي لمدة 30 ثانية
-            end_timestamp = time.time() + 30
+            # بدء العد التنازلي لمدة 15 ثانية للتدوير لجميع اللاعبين
+            end_timestamp = time.time() + 15
             cursor.execute("UPDATE game_draws SET winning_number=?, status='drawing', draw_end_timestamp=? WHERE game_name='golden_number'",
                            (winning_num, end_timestamp))
             conn.commit()
-            msg = f"تم بدء السحب الحماسي لجميع اللاعبين (30 ثانية)..."
+            msg = f"تم بدء السحب الحماسي (15 ثانية) لجميع الحسابات..."
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
@@ -304,7 +314,7 @@ def admin_panel():
                                (current_admin, target_user, amount, time.strftime('%Y-%m-%d %H:%M')))
                 conn.commit()
             elif action == 'buy_back' and user_row[0] >= amount:
-                cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (amount, target_user))
+                cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (target_user, amount))
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (amount,))
                 cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('شراء رصيد (إلى الخزنة)', ?, ?, ?, ?)", 
                                (current_admin, target_user, amount, time.strftime('%Y-%m-%d %H:%M')))
@@ -443,11 +453,12 @@ GAME_ONE_PAGE = """
         .number-box { background: #000; border: 3px solid #ffd700; border-radius: 8px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.3s; box-shadow: inset 0 0 10px rgba(255,215,0,0.3); }
         .number-box:hover { background: #1a1500; transform: scale(1.05); }
         .number-box.booked { background: #3b0000; border-color: #ef4444; color: #f87171; cursor: not-allowed; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #fff !important; box-shadow: 0 0 50px #ffd700; transform: scale(1.15); font-weight: bold; animation: pulse 0.8s infinite alternate; }
-        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.18); } }
+        
+        /* إضاءة الرقم الفائز باللون الذهبي الفاخر لجميع الشاشات */
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; border-color: #ffffff !important; box-shadow: 0 0 60px #ffd700; transform: scale(1.18); font-weight: bold; animation: pulse 0.6s infinite alternate; }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.22); } }
         
         .draw-panel { background: #1f1f1f; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
-        /* شاشة العرض الكبرى البارزة للرقم الرابح */
         .big-winning-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 75px; font-weight: bold; padding: 20px; width: 280px; margin: 20px auto; border-radius: 20px; box-shadow: 0 0 45px rgba(255,215,0,0.7); letter-spacing: 6px; text-shadow: 0 0 25px #ffd700; }
         
         .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 4px solid #fff; padding: 25px; border-radius: 20px; margin: 25px auto; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 0 55px rgba(255,215,0,0.9); animation: bounce 1s infinite alternate; }
@@ -491,10 +502,9 @@ GAME_ONE_PAGE = """
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin: 0;">🎰 شاشة العرض الكبرى للسحب الحماسي</h3>
         <p id="drawStatusText" style="color: #cbd5e1; font-size: 16px; margin-top: 10px;">
-            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً عشوائياً...{% else %}انتظار أمر السحب اليدوي من المدير{% endif %}
+            {% if game_status == 'drawing' %}⏳ جاري تدوير الـ 50 رقماً (15 ثانية)...{% elif game_status == 'finished' %}🎉 تم إعلان الرقم الفائز!{% else %}مفتوح لحجز المراهنات (إطلاق السحب يدوياً من المدير){% endif %}
         </p>
         
-        <!-- شاشة العرض الكبرى للرقم الرابح -->
         <div class="big-winning-screen" id="slotDisplay">{% if game_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
 
         <div id="countdownTimer" style="font-size: 26px; color: #ffd700; font-weight: bold; margin: 15px 0;"></div>
@@ -502,17 +512,17 @@ GAME_ONE_PAGE = """
         <div id="winNotificationContainer">
             {% if game_status == 'finished' and winning_number %}
             <div class="win-badge">
-                <div style="font-size: 32px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك ربح الرقم {{ winning_number }} 75$</div>
-                <div style="font-size: 20px; margin-top: 10px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
+                <div style="font-size: 28px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك فاز الرقم {{ winning_number }} بمبلغ 75$</div>
+                <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">الرقم مضاء باللون الذهبي لمدة 30 ثانية لجميع اللاعبين!</div>
             </div>
             {% endif %}
         </div>
 
         {% if role == 'admin' %}
-            <form method="POST" style="margin-top: 20px;">
-                <label style="color: #ffd700; font-weight: bold; font-size: 16px;">(خاص بالمدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
+            <form method="POST" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
+                <label style="color: #ffd700; font-weight: bold; font-size: 16px;">👑 (لوحة تحكم المدير) تحديد الرقم الفائز مسبقاً أو تركه عشوائياً:</label><br>
                 <input type="number" name="forced_number" placeholder="رقم من 1 إلى 50 (اختياري)" min="1" max="50" style="padding: 10px; width: 220px; border-radius: 6px; background: #252525; color: white; border: 1px solid #ffd700; margin-top: 10px; text-align: center; font-size: 16px;">
-                <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (30 ثانية)</button>
+                <button type="submit" name="admin_draw" id="drawBtn" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 14px 35px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 15px auto; font-size: 18px; box-shadow: 0 4px 15px rgba(34,197,94,0.4);">⚡ بدء السحب الآن (15 ثانية للجميع)</button>
             </form>
         {% endif %}
     </div>
@@ -523,7 +533,7 @@ GAME_ONE_PAGE = """
         <p>إجمالي الرصيد الذي تم صرفه على الحجوزات: <b style="color: #ef4444;">${{ my_spent }}</b></p>
     </div>
 
-    <!-- جلب التحديثات الحية وتحديث الشاشة الكبرى واللون الذهبي فوراً لجميع اللاعبين -->
+    <!-- نظام التزامن الشامل لجميع الحسابات واللاعبين -->
     <script>
         function playHypeMusicNote() {
             try {
@@ -554,7 +564,7 @@ GAME_ONE_PAGE = """
                     let statusText = document.getElementById('drawStatusText');
                     let winContainer = document.getElementById('winNotificationContainer');
 
-                    // تحديث الحجوزات على اللوحة فوراً لجميع اللاعبين
+                    // تحديث المراهنات والحجوزات لجميع اللاعبين فوراً
                     for (let i = 1; i <= 50; i++) {
                         let box = document.getElementById('box-' + i);
                         if (box) {
@@ -568,8 +578,8 @@ GAME_ONE_PAGE = """
                     }
 
                     if (data.status === 'drawing') {
-                        timerEl.innerText = "⏳ العد التنازلي: " + data.remaining_seconds + " ثانية";
-                        statusText.innerText = "جاري تدوير الأرقام الـ 50 عشوائياً...";
+                        timerEl.innerText = "⏳ العد التنازلي للتدوير: " + data.remaining_seconds + " ثانية";
+                        statusText.innerText = "جاري تدوير الـ 50 رقماً عشوائياً أمام الجميع...";
                         
                         if (!slotInterval) {
                             slotInterval = setInterval(() => {
@@ -583,33 +593,41 @@ GAME_ONE_PAGE = """
                         }
                     } else if (data.status === 'finished') {
                         if (slotInterval) clearInterval(slotInterval);
-                        timerEl.innerText = "🎉 تم السحب بنجاح!";
+                        timerEl.innerText = "⏳ اللوحة مضاءة باللون الذهبي لجميع اللاعبين (" + data.remaining_seconds + " ثانية متبقية)";
                         slotEl.innerText = data.winning_number;
-                        statusText.innerText = "الرقم الفائز بالقرعة الكبرى:";
+                        statusText.innerText = "الرقم الفائز بالقرعة:";
 
-                        // إضاءة الرقم الفائز باللون الذهبي الفاخر على اللوحة الأساسية
+                        // إضاءة الرقم باللون الذهبي الفاخر لجميع الشاشات في نفس اللحظة
                         let winBox = document.getElementById('box-' + data.winning_number);
                         if (winBox) {
                             winBox.className = "number-box winning";
                         }
 
-                        // ظهور الإشعار الضخم والفاخر لجميع اللاعبين والحسابات
-                        if (!winContainer.innerHTML.includes("مبروك ربح")) {
+                        // ظهور رسالة الفوز الكبرى لجميع الحسابات
+                        if (!winContainer.innerHTML.includes("مبروك فاز الرقم")) {
                             winContainer.innerHTML = `
                                 <div class="win-badge">
-                                    <div style="font-size: 32px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك ربح الرقم ${data.winning_number} 75$</div>
-                                    <div style="font-size: 20px; margin-top: 10px; color: #111; font-weight: bold;">ألف مبروك الفوز بالجائزة الكبرى!</div>
+                                    <div style="font-size: 28px; font-weight: bold; color: #000; text-shadow: 0 2px 4px rgba(255,255,255,0.4);">مبروك فاز الرقم ${data.winning_number} بمبلغ 75$</div>
+                                    <div style="font-size: 18px; margin-top: 8px; color: #111; font-weight: bold;">الرقم مضاء باللون الذهبي لمدة 30 ثانية لجميع اللاعبين!</div>
                                 </div>
                             `;
+                        }
+
+                        if (data.remaining_seconds <= 0) {
+                            location.reload();
                         }
                     } else {
                         if (slotInterval) clearInterval(slotInterval);
                         timerEl.innerText = "";
+                        if (lastStatus === 'finished') {
+                            location.reload();
+                        }
                     }
                     lastStatus = data.status;
                 });
         }
 
+        // استعلام دوري كل ثانية لضمان تطابق الرؤية والتزامن التام لجميع الحسابات
         setInterval(updateGameRealtime, 1000);
     </script>
 </body>
