@@ -11,7 +11,7 @@ def init_db():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
     
-    # جدول المستخدمين (فقط حساب الأدمن)
+    # جدول المستخدمين
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,21 +23,33 @@ def init_db():
         )
     ''')
 
-    # سجل الفائزين
+    # جدول خزنة البرنامج المركزية (مليون دولار خاص بالبرنامج)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS winners_log (
+        CREATE TABLE IF NOT EXISTS system_vault (
+            id INTEGER PRIMARY KEY,
+            vault_balance REAL DEFAULT 1000000.0
+        )
+    ''')
+    cursor.execute('SELECT COUNT(*) FROM system_vault')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('INSERT INTO system_vault (id, vault_balance) VALUES (1, 1000000.0)')
+
+    # سجل الحركات المالية (للمراقبة)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS financial_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            game_name TEXT,
-            winner_info TEXT,
-            win_time TEXT
+            action_type TEXT,
+            target_user TEXT,
+            amount REAL,
+            log_time TEXT
         )
     ''')
     
-    # إنشاء حساب الأدمن الأساسي فقط برصيد تجريبي مفتوح
+    # إنشاء حساب الأدمن الأساسي (برصيد شخصي صفر أو منفصل تماماً)
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
-                       ('admin', 'admin123', 1000000.0, 'admin', 'system'))
+                       ('admin', 'admin123', 0.0, 'admin', 'system'))
 
     conn.commit()
     conn.close()
@@ -121,11 +133,76 @@ def game_two_page():
     conn.close()
     return render_template_string(GAME_TWO_PAGE, username=session['username'], balance=balance)
 
-@app.route('/admin_panel')
+# لوحة الأدمن مع خزنة المليون دولار ونظام الشحن/السحب المباشر منها
+@app.route('/admin_panel', methods=['GET', 'POST'])
 def admin_panel():
     if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
-    return render_template_string(ADMIN_PAGE, username=session['username'])
+    
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        target_user = request.form.get('target_user', '').strip()
+        amount = float(request.form.get('amount', 0))
+
+        cursor.execute("SELECT vault_balance FROM system_vault WHERE id=1")
+        vault_bal = cursor.fetchone()[0]
+
+        cursor.execute("SELECT balance FROM users WHERE username=?", (target_user,))
+        user_row = cursor.fetchone()
+
+        if user_row and amount > 0:
+            if action == 'sell' and vault_bal >= amount:
+                # بيع وشحن للمشترك: الخصم من المليون وإضافتها للمشترك
+                cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - ? WHERE id=1", (amount,))
+                cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (amount, target_user))
+                cursor.execute("INSERT INTO financial_logs (action_type, target_user, amount, log_time) VALUES ('شحن (من الخزنة)', ?, ?, ?)", 
+                               (target_user, amount, time.strftime('%Y-%m-%d %H:%M')))
+                conn.commit()
+            elif action == 'buy_back' and user_row[0] >= amount:
+                # سحب واسترجاع من المشترك: الخصم من المشترك وإضافتها لخزنة المليون
+                cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (amount, target_user))
+                cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (amount,))
+                cursor.execute("INSERT INTO financial_logs (action_type, target_user, amount, log_time) VALUES ('سحب (إلى الخزنة)', ?, ?, ?)", 
+                               (target_user, amount, time.strftime('%Y-%m-%d %H:%M')))
+                conn.commit()
+
+        return redirect(url_for('admin_panel'))
+
+    cursor.execute("SELECT vault_balance FROM system_vault WHERE id=1")
+    vault_balance = cursor.fetchone()[0]
+
+    cursor.execute("SELECT username, balance FROM users WHERE role != 'admin'")
+    users_list = cursor.fetchall()
+
+    cursor.execute("SELECT action_type, target_user, amount, log_time FROM financial_logs ORDER BY id DESC LIMIT 15")
+    logs = cursor.fetchall()
+
+    conn.close()
+    return render_template_string(ADMIN_PAGE, username=session['username'], vault_balance=vault_balance, users_list=users_list, logs=logs)
+
+# صفحة إنشاء حساب جديد للمشتركين لربطهم بنظام الخزنة
+@app.route('/create_user_page', methods=['GET', 'POST'])
+def create_user_page():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    msg = None
+    if request.method == 'POST':
+        new_user = request.form.get('new_user', '').strip()
+        new_pass = request.form.get('new_pass', '').strip()
+        conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, 0, 'player', 'admin')", 
+                           (new_user, new_pass))
+            conn.commit()
+            msg = f"تم إنشاء الحساب '{new_user}' بنجاح!"
+        except sqlite3.IntegrityError:
+            msg = "خطأ: اسم المستخدم موجود مسبقاً!"
+        conn.close()
+    return render_template_string(CREATE_USER_PAGE, msg=msg)
 
 DASHBOARD_PAGE = """
 <!DOCTYPE html>
@@ -133,14 +210,14 @@ DASHBOARD_PAGE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lira ليرة - لوحة التحكم والتشغيل</title>
+    <title>Lira ليرة - لوحة التحكم</title>
     <link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); flex-wrap: wrap; gap: 10px; border-bottom: 2px solid #ffd700; }
         .logo-area { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .logo-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 0 15px rgba(255,215,0,0.6); }
-        .logo-area h1 { margin: 0; color: #ffd700; font-size: 26px; font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .logo-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+        .logo-area h1 { margin: 0; color: #ffd700; font-size: 26px; font-weight: bold; }
         .user-creds { background: #1f1f1f; padding: 6px 12px; border-radius: 6px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
@@ -163,16 +240,15 @@ DASHBOARD_PAGE = """
             <div class="logo-badge">👑</div>
             <h1>Lira | ليرة</h1>
             <div class="user-creds">👤 <b>{{ username }}</b> {% if role == 'admin' %} | 🔑 <b>{{ role }}</b>{% endif %}</div>
-            <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
+            <div class="balance-badge">الرصيد الشخصي: <span>${{ balance }}</span></div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=الرجاء%20شحن%20رصيد%20حسابي%20بمنصة%20Lira%20باسم%20المستخدم:%20{{ username }}" target="_blank">💬 شراء رصيد (واتساب)</a>
-            {% if role == 'admin' %}<a href="/admin_panel" class="admin-link-btn">👑 لوحة الأدمن</a>{% endif %}
+            {% if role == 'admin' %}<a href="/admin_panel" class="admin-link-btn">👑 لوحة الأدمن والخزنة</a>{% endif %}
             <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
     </div>
 
-    <!-- الـ 8 أيقونات المربعة الفاخرة -->
     <div class="icons-grid">
         <a href="/game_one_page" class="icon-card">
             <div class="icon-logo">👑</div>
@@ -211,25 +287,133 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-GAME_ONE_PAGE = """
+ADMIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>اللعبة الأولى - Lira ليرة</title>
+    <title>لوحة الأدمن وخزنة النظام - Lira</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
-        .back-btn { background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-bottom: 20px; }
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
+        .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; box-shadow: 0 0 30px rgba(52,211,153,0.3); }
+        .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
+        button { padding: 10px 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-sell { background: #22c55e; color: black; }
+        .btn-buy { background: #ef4444; color: white; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; font-size: 14px; }
+        th { background: #252525; color: #ffd700; }
     </style>
 </head>
 <body>
-    <div style="max-width: 850px; margin: 20px auto; text-align: right;">
-        <a href="/dashboard" class="back-btn">⬅ العودة للرئيسية</a>
+    <div class="admin-header">
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة الأدمن وإدارة الخزنة المركزية</h2>
+        <div>
+            <a href="/create_user_page" class="back-btn" style="background: #10b981; margin-left: 10px;">➕ إنشاء حساب مشترك جديد</a>
+            <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        </div>
     </div>
-    <div style="background: #181818; border: 3px solid #ffd700; padding: 40px; border-radius: 20px; max-width: 800px; margin: 0 auto;">
-        <h1 style="color: #ffd700;">👑 اللعبة الأولى جاهزة للبرمجة الجديدة</h1>
-        <p style="color: #cbd5e1;">أخبرني بالخطوة التالية لنبدأ برمجتها!</p>
+
+    <!-- خزنة المليون دولار الخاصة بالبرنامج -->
+    <div class="vault-box">
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 رصيد خزنة النظام المركزية (خاص بالبرنامج)</h3>
+        <div style="font-size: 42px; font-weight: bold; color: #fff; margin: 10px 0; text-shadow: 0 0 15px #34d399;">${{ vault_balance }}</div>
+        <p style="margin: 0; font-size: 13px; color: #e2e8f0;">هذا الرصيد مستقل تماماً عن حساب الأدمن، ويتم الخصم منه عند البيع والإضافة إليه عند السحب.</p>
     </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- نافذة الشحن والبيع -->
+        <div class="panel-box">
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع/شحن رصيد للمشترك (من الخزنة)</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="sell">
+                <label>اختر المشترك:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[1] }})</option>{% endfor %}
+                </select>
+                <label>المبلغ ($):</label>
+                <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
+                <button type="submit" class="btn-sell">إتمام عملية البيع والشحن</button>
+            </form>
+        </div>
+
+        <!-- نافذة السحب والاسترجاع للخزنة -->
+        <div class="panel-box">
+            <h3 style="color: #ef4444; margin-top: 0;">💸 سحب/استرجاع رصيد من المشترك (إلى الخزنة)</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="buy_back">
+                <label>اختر المشترك:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[1] }})</option>{% endfor %}
+                </select>
+                <label>المبلغ ($):</label>
+                <input type="number" name="amount" placeholder="أدخل المبلغ" min="1" required>
+                <button type="submit" class="btn-buy">استرجاع الرصيد إلى الخزنة</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- سجل الحركات المالية الأخيرة -->
+    <div class="panel-box" style="margin-top: 20px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">📋 سجل العمليات المالية الأخيرة للخزنة</h3>
+        <table>
+            <tr><th>نوع العملية</th><th>المشترك</th><th>المبلغ</th><th>التوقيت</th></tr>
+            {% for log in logs %}
+            <tr>
+                <td><b>{{ log[0] }}</b></td>
+                <td>{{ log[1] }}</td>
+                <td style="color: #34d399;">${{ log[2] }}</td>
+                <td>{{ log[3] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+CREATE_USER_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إنشاء حساب مشترك جديد - Lira</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 350px; text-align: center; border: 1px solid #444; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #555; background: #252525; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #10b981; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 15px; }
+        .msg { color: #34d399; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2 style="color: #ffd700; margin-top: 0;">➕ إنشاء حساب مشترك</h2>
+        {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="text" name="new_user" placeholder="اسم المستخدم (مثال: player1)" required>
+            <input type="password" name="new_pass" placeholder="كلمة المرور" required>
+            <button type="submit">إنشاء الحساب</button>
+        </form>
+        <a href="/admin_panel" class="back-btn">⬅️ العودة للوحة الأدمن</a>
+    </div>
+</body>
+</html>
+"""
+
+GAME_ONE_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head><meta charset="UTF-8"><title>اللعبة الأولى</title></head>
+<body style="background:#0b0f19; color:#fff; text-align:center; padding:50px;">
+    <h1>👑 اللعبة الأولى قيد البرمجة</h1>
+    <a href="/dashboard" style="color:#3b82f6;">⬅ العودة للرئيسية</a>
 </body>
 </html>
 """
@@ -237,40 +421,10 @@ GAME_ONE_PAGE = """
 GAME_TWO_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>اللعبة الثانية - Lira ليرة</title>
-    <style>
-        body { font-family: Tahoma, sans-serif; background-color: #071f14; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
-        .back-btn { background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <div style="max-width: 850px; margin: 20px auto; text-align: right;">
-        <a href="/dashboard" class="back-btn">⬅ العودة للرئيسية</a>
-    </div>
-    <div style="background: #0b2e1f; border: 3px solid #ffd700; padding: 40px; border-radius: 20px; max-width: 800px; margin: 0 auto;">
-        <h1 style="color: #ffd700;">🎰 اللعبة الثانية جاهزة للبرمجة الجديدة</h1>
-        <p style="color: #cbd5e1;">أخبرني بالخطوة التالية لنبدأ برمجتها!</p>
-    </div>
-</body>
-</html>
-"""
-
-ADMIN_PAGE = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>لوحة الأدمن - Lira ليرة</title>
-    <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
-        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <h2>👑 لوحة تحكم الأدمن (نظيفة)</h2>
-    <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+<head><meta charset="UTF-8"><title>اللعبة الثانية</title></head>
+<body style="background:#0b0f19; color:#fff; text-align:center; padding:50px;">
+    <h1>🎰 اللعبة الثانية قيد البرمجة</h1>
+    <a href="/dashboard" style="color:#3b82f6;">⬅ العودة للرئيسية</a>
 </body>
 </html>
 """
@@ -280,7 +434,7 @@ LOGIN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الدخول - Lira ليرة</title>
+    <title>تسجيل الدخول - Lira</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: #1f1f1f; padding: 40px; border-radius: 12px; width: 320px; text-align: center; border: 1px solid #333; }
