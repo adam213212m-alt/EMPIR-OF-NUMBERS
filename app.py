@@ -25,6 +25,7 @@ def init_db():
         )
     ''')
     
+    # لوحة أرقام الحظ
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_board (
             number INTEGER PRIMARY KEY,
@@ -32,7 +33,6 @@ def init_db():
             owner TEXT DEFAULT NULL
         )
     ''')
-    
     cursor.execute('SELECT COUNT(*) FROM game_board')
     if cursor.fetchone()[0] == 0:
         for i in range(1, 51):
@@ -55,6 +55,7 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO game_board_state (id, last_winner_msg, banner_end_time, forced_admin_number) VALUES (1, "بانتظار السحب اليومي الساعة 9:00 مساءً...", 0, "")')
             
+    # لعبة اكشف واربح
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS scratch_global (
             id INTEGER PRIMARY KEY,
@@ -75,6 +76,7 @@ def init_db():
         )
     ''')
 
+    # اللعبة الفاخرة (5 خانات)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_three (
             slot_id INTEGER PRIMARY KEY,
@@ -82,7 +84,6 @@ def init_db():
             owner TEXT DEFAULT NULL
         )
     ''')
-    
     cursor.execute('SELECT COUNT(*) FROM game_three')
     if cursor.fetchone()[0] == 0:
         for i in range(1, 6):
@@ -107,6 +108,31 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO game_three_state (id, is_full, timer_end, last_winner_msg, banner_end_time, forced_admin_slot) VALUES (1, 0, 0, "بانتظار اكتمال الأرقام الفاخرة...", 0, "")')
 
+    # لعبة الروليت الجديدة (Roulette State & Bets)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS roulette_state (
+            id INTEGER PRIMARY KEY,
+            phase TEXT DEFAULT 'betting', -- betting, spinning, results
+            phase_end_time REAL DEFAULT 0,
+            winning_number INTEGER DEFAULT -1,
+            last_msg TEXT DEFAULT 'ابدأ الرهان الآن (جولة جديدة)'
+        )
+    ''')
+    cursor.execute('SELECT COUNT(*) FROM roulette_state')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('INSERT INTO roulette_state (id, phase, phase_end_time, winning_number, last_msg) VALUES (1, "betting", ?, -1, "مرحباً بكم في روليت الإمبراطورية - ضع رهانك!")', (time.time() + 30,))
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS roulette_bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            bet_type TEXT,
+            bet_target TEXT,
+            amount REAL
+        )
+    ''')
+
+    # سجل الفائزين والإحصاءات المالية
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS winners_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,11 +150,11 @@ def init_db():
         )
     ''')
     
-    games_list = ["لوحة أرقام الحظ (80$)", "اللعبة الملكية الفاخرة (200$)", "لعبة اكشف واربح (15$)"]
+    games_list = ["لوحة أرقام الحظ (80$)", "اللعبة الملكية الفاخرة (200$)", "لعبة اكشف واربح (15$)", "روليت الإمبراطورية"]
     for g in games_list:
         cursor.execute("INSERT OR IGNORE INTO financial_stats (game_name, total_collected, total_payouts) VALUES (?, 0, 0)", (g,))
     
-    # حساب الأدمن الأساسي (لا يتم مسحه أو تغييره)
+    # الأدمن الأساسي والحسابات
     cursor.execute("SELECT * FROM users WHERE username='admin'")
     if not cursor.fetchone():
         cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
@@ -140,7 +166,6 @@ def init_db():
             cursor.execute("INSERT INTO users (username, password, balance, role, created_by) VALUES (?, ?, ?, ?, ?)", 
                            (adam_name, 'asdcxzasd', 500000.0, 'admin', 'system'))
 
-    # إنشاء الحسابات الـ 100 مرة واحدة فقط نهائياً ولن يتم تغييرها أبداً إلا يدوياً عبر الأدمن
     for i in range(1, 101):
         uname = f"user{i}"
         cursor.execute("SELECT * FROM users WHERE username=?", (uname,))
@@ -155,6 +180,7 @@ def init_db():
 
 init_db()
 
+# دوال السحب التلقائي (لوحة الحظ واللعبة الفاخرة والروليت)
 def check_auto_draw_board():
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -231,6 +257,76 @@ def check_and_auto_draw_game_three():
                 conn.commit()
     conn.close()
 
+# معالجة جولات الروليت التلقائية (30 ثانية رهان، 5 ثواني دوران)
+def process_roulette_rounds():
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT phase, phase_end_time FROM roulette_state WHERE id=1")
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return
+    
+    phase, phase_end = row[0], row[1]
+    now = time.time()
+    
+    if now >= phase_end:
+        if phase == 'betting':
+            # الانتقال لمرحلة الدوران (Spinning) لمدة 5 ثواني
+            winning_num = random.randint(0, 36)
+            spin_end = now + 6
+            cursor.execute("UPDATE roulette_state SET phase='spinning', phase_end_time=?, winning_number=?, last_msg=? WHERE id=1", 
+                           (spin_end, winning_num, f"🎡 توقفت الرهانات! جاري سحب رقم الروليت..."))
+            conn.commit()
+            
+        elif phase == 'spinning':
+            # احتساب نتائج الأرباح للرهانات الفائزة
+            cursor.execute("SELECT winning_number FROM roulette_state WHERE id=1")
+            w_res = cursor.fetchone()
+            win_num = w_res[0] if w_res else 0
+            
+            red_numbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
+            is_red = win_num in red_numbers
+            win_color = 'red' if is_red else ('black' if win_num != 0 else 'green')
+            
+            cursor.execute("SELECT username, bet_type, bet_target, amount FROM roulette_bets")
+            bets = cursor.fetchall()
+            
+            winners_summary = []
+            for uname, b_type, b_target, amt in bets:
+                won = False
+                payout = 0
+                if b_type == 'number' and int(b_target) == win_num:
+                    won = True
+                    payout = amt * 35
+                elif b_type == 'color' and b_target == win_color:
+                    won = True
+                    payout = amt * 2
+                elif b_type == 'even_odd':
+                    if b_target == 'even' and win_num != 0 and win_num % 2 == 0:
+                        won = True
+                        payout = amt * 2
+                    elif b_target == 'odd' and win_num % 2 != 0:
+                        won = True
+                        payout = amt * 2
+                        
+                if won:
+                    cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (payout, uname))
+                    cursor.execute("UPDATE financial_stats SET total_payouts = total_payouts + ? WHERE game_name=?", (payout, "روليت الإمبراطورية"))
+                    winners_summary.append(f"{uname} ربح ${payout}")
+            
+            msg = f"🏆 رقم الروليت الفائز: {win_num} ({win_color.upper()})! " + (" | الفائزون: " + ", ".join(winners_summary) if winners_summary else "لا توجد رهانات رابحة هذه الجولة.")
+            cursor.execute("INSERT INTO winners_log (game_name, winner_info, win_time) VALUES (?, ?, ?)", 
+                           ("روليت الإمبراطورية", f"الرقم {win_num} - {win_color}", time.strftime('%Y-%m-%d %H:%M')))
+            
+            # مسح الرهانات القديمة والبدء بجولة جديدة لمدة 30 ثانية
+            cursor.execute("DELETE FROM roulette_bets")
+            next_bet_end = now + 30
+            cursor.execute("UPDATE roulette_state SET phase='betting', phase_end_time=?, last_msg=? WHERE id=1", (next_bet_end, msg))
+            conn.commit()
+            
+    conn.close()
+
 def get_or_create_scratch_game(username):
     conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
     cursor = conn.cursor()
@@ -274,6 +370,7 @@ def api_sync():
         return jsonify({'error': 'unauthorized'})
     
     check_and_auto_draw_game_three()
+    process_roulette_rounds()
     now_beirut = get_beirut_time()
     if now_beirut.hour == 21 and now_beirut.minute == 0:
         check_auto_draw_board()
@@ -300,11 +397,12 @@ def api_sync():
     g3_state = cursor.fetchone()
     g3_is_full = g3_state[0]
     g3_timer_end = g3_state[1]
-    g3_msg = g3_state[2]
     g3_rem = max(0, int(g3_timer_end - time.time())) if g3_is_full else 0
 
-    cursor.execute("SELECT last_winner_msg FROM game_board_state WHERE id=1")
-    board_msg = cursor.fetchone()[0]
+    cursor.execute("SELECT phase, phase_end_time, winning_number, last_msg FROM roulette_state WHERE id=1")
+    r_state = cursor.fetchone()
+    r_phase, r_end, r_win, r_msg = r_state[0], r_state[1], r_state[2], r_state[3]
+    r_rem = max(0, int(r_end - time.time()))
 
     cursor.execute("SELECT game_name, winner_info, win_time FROM winners_log ORDER BY id DESC LIMIT 10")
     winners = cursor.fetchall()
@@ -318,8 +416,10 @@ def api_sync():
         'g3_slots': g3_slots,
         'g3_is_full': g3_is_full,
         'g3_rem': g3_rem,
-        'g3_msg': g3_msg,
-        'board_msg': board_msg,
+        'r_phase': r_phase,
+        'r_rem': r_rem,
+        'r_win': r_win,
+        'r_msg': r_msg,
         'winners': winners
     })
 
@@ -491,6 +591,44 @@ def pick_game_three(slot_id):
             conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+# مسار وضع الرهان في الروليت
+@app.route('/place_roulette_bet', methods=['POST'])
+def place_roulette_bet():
+    if 'username' not in session:
+        return jsonify({'success': False, 'msg': 'غير مسجل الدخول'})
+    
+    username = session['username']
+    bet_type = request.form.get('bet_type') # 'number', 'color', 'even_odd'
+    bet_target = request.form.get('bet_target') # e.g. '17', 'red', 'even'
+    try:
+        amount = float(request.form.get('amount', 1))
+    except ValueError:
+        return jsonify({'success': False, 'msg': 'مبلغ الرهان غير صالح'})
+        
+    conn = sqlite3.connect('empire_stable.db', check_same_thread=False)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT phase FROM roulette_state WHERE id=1")
+    phase = cursor.fetchone()[0]
+    if phase != 'betting':
+        conn.close()
+        return jsonify({'success': False, 'msg': 'انتهى وقت الرهان لهذه الجولة، انتظر الجولة القادمة!'})
+        
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    balance = cursor.fetchone()[0]
+    if balance < amount:
+        conn.close()
+        return jsonify({'success': False, 'msg': 'رصيدك لا يكفي لتغطية هذا الرهان!'})
+        
+    # خصم المبلغ وتسجيل الرهان
+    cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (amount, username))
+    cursor.execute("INSERT INTO roulette_bets (username, bet_type, bet_target, amount) VALUES (?, ?, ?, ?)", 
+                   (username, bet_type, bet_target, amount))
+    cursor.execute("UPDATE financial_stats SET total_collected = total_collected + ? WHERE game_name=?", (amount, "روليت الإمبراطورية"))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'msg': f'تم وضع رهانك بنجاح بمبلغ ${amount}'})
 
 @app.route('/play_scratch/<int:box_index>', methods=['POST'])
 def play_scratch(box_index):
@@ -687,19 +825,26 @@ DASHBOARD_PAGE = """
         .main-container { margin-top: 20px; display: grid; grid-template-columns: 3fr 1fr; gap: 20px; }
         @media (max-width: 1100px) { .main-container { grid-template-columns: 1fr; } }
         
-        .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; position: relative; overflow: hidden; }
+        .luxury-game-section { background: linear-gradient(135deg, #1e1b4b, #31103d, #0f172a); border: 3px solid #fbbf24; padding: 25px; border-radius: 16px; margin-bottom: 20px; }
         .luxury-game-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-        .luxury-game-section h2 { color: #fbbf24; margin: 0; font-size: 24px; }
+        .luxury-game-section h2 { color: #fbbf24; margin: 0; font-size: 22px; }
         
-        .luxury-right-panel { display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 12px; border: 1px solid #38bdf8; }
+        /* طاولة الروليت وتصميمها */
+        .roulette-container { background: #0f172a; border: 2px solid #38bdf8; border-radius: 14px; padding: 15px; margin-top: 15px; }
+        .roulette-table-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 4px; margin: 15px 0; }
+        .roulette-btn { background: #1e293b; border: 1px solid #475569; color: white; padding: 10px 4px; text-align: center; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .roulette-btn.red { background: #dc2626; border-color: #ef4444; }
+        .roulette-btn.black { background: #111827; border-color: #374151; }
+        .roulette-btn.green { background: #059669; border-color: #10b981; grid-column: span 13; }
         
+        .roulette-side-bets { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+        .roulette-side-btn { background: #334155; border: 1px solid #fbbf24; color: #fbbf24; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
         .big-wheel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
         .big-wheel-container { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 8px solid #fbbf24; background: radial-gradient(circle, #31103d, #0f172a); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(251,191,36,0.8); animation: spinWheel 1.5s infinite linear; }
         .wheel-arrow-top { position: absolute; top: -20px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #22c55e; z-index: 10; filter: drop-shadow(0 0 5px #22c55e); }
         .wheel-number-slot { position: absolute; font-size: 22px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #fbbf24; }
         @keyframes spinWheel { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .winner-win-banner { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); color: #000; padding: 20px; font-weight: bold; font-size: 22px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 0 30px rgba(251,191,36,0.9); text-align: center; border: 2px solid #fff; }
 
         .luxury-slots-container { display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
         .luxury-slot-btn { background: linear-gradient(145deg, #111827, #1f2937); border: 2px solid #fbbf24; width: 110px; height: 110px; border-radius: 14px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -728,8 +873,6 @@ DASHBOARD_PAGE = """
         .winners-sidebar { background: #1e293b; border: 2px solid #fbbf24; padding: 15px; border-radius: 12px; height: fit-content; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .winners-sidebar h3 { color: #fbbf24; margin-top: 0; text-align: center; font-size: 18px; border-bottom: 1px solid #475569; padding-bottom: 10px; }
         .winner-record-item { background: #0f172a; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-right: 4px solid #10b981; font-size: 13px; }
-        
-        .alert-box { background: #ef4444; color: white; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 15px; }
     </style>
     <script>
         let deferredPrompt;
@@ -769,7 +912,25 @@ DASHBOARD_PAGE = """
                 });
         }
 
-        // التحديث التلقائي السريع كل ثانيتين (2000ms) بسلاسة تامة دون تحريك الشاشة
+        // رهان الروليت
+        function placeRouletteBet(type, target) {
+            let amount = prompt("أدخل مبلغ الرهان ($):", "1");
+            if(!amount || isNaN(amount)) return;
+            
+            let formData = new URLSearchParams();
+            formData.append('bet_type', type);
+            formData.append('bet_target', target);
+            formData.append('amount', amount);
+            
+            fetch('/place_roulette_bet', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.msg);
+                    syncData();
+                });
+        }
+
+        // التحديث التلقائي السريع كل ثانيتين
         function syncData() {
             fetch('/api/sync')
                 .then(response => response.json())
@@ -802,23 +963,18 @@ DASHBOARD_PAGE = """
                     const mySpentEl = document.getElementById('myTotalSpent');
                     if(mySpentEl) mySpentEl.innerText = '$' + data.user_spent;
 
-                    const g3Container = document.getElementById('g3SlotsContainer');
-                    if(g3Container && data.g3_slots) {
-                        let g3Html = '';
-                        data.g3_slots.forEach(slot => {
-                            let sId = slot[0];
-                            let sStatus = slot[1];
-                            let sOwner = slot[2];
-                            let lockedCls = sStatus === 'locked' ? 'locked' : '';
-                            let ownerTag = sOwner ? `<span class="luxury-owner">${sOwner}</span>` : '';
-                            g3Html += `<button type="button" onclick="pickSlot(${sId})" class="luxury-slot-btn ${lockedCls}">
-                                          <span style="font-size: 22px;">رقم ${sId}</span>
-                                          <span style="font-size: 11px; color: #38bdf8; margin-top: 4px;">50$</span>
-                                          ${ownerTag}
-                                       </button>`;
-                        });
-                        g3Container.innerHTML = g3Html;
+                    // تحديث واجهة الروليت والمؤقت
+                    const rStatusText = document.getElementById('rouletteStatusText');
+                    const rTimer = document.getElementById('rouletteTimer');
+                    const rMsg = document.getElementById('rouletteMsg');
+                    if(rStatusText) {
+                        if(data.r_phase === 'betting') {
+                            rStatusText.innerHTML = `🟢 فتح باب الرهان (متبقي: <span style="color:#fbbf24">${data.r_rem}</span> ثانية)`;
+                        } else {
+                            rStatusText.innerHTML = `🎡 جاري الدوران وإعلان النتيجة...`;
+                        }
                     }
+                    if(rMsg) rMsg.innerText = data.r_msg;
 
                     const wheelOverlay = document.getElementById('bigWheelOverlay');
                     if(data.g3_is_full) {
@@ -873,24 +1029,37 @@ DASHBOARD_PAGE = """
 
     <div class="main-container">
         <div>
-            <!-- اللعبة الملكية الفاخرة -->
-            <div class="luxury-game-section">
+            <!-- لعبة روليت الإمبراطورية الجديدة كلياً -->
+            <div class="luxury-game-section" style="border-color: #38bdf8;">
                 <div class="luxury-game-top">
                     <div>
-                        <h2>💎 اللعبة الملكية الفاخرة (5 أرقام كبرى - جائزة 200$)</h2>
-                        <p style="color: #cbd5e1; font-size: 13px; margin: 5px 0 0 0;">قيمة الرقم الواحد: 50$</p>
+                        <h2 style="color: #38bdf8;">🎰 روليت الإمبراطورية (جولات حية كل 30 ثانية)</h2>
+                        <p style="color: #cbd5e1; font-size: 13px; margin: 5px 0 0 0;" id="rouletteStatusText">🟢 فتح باب الرهان (30 ثانية)</p>
                     </div>
-                    <div class="luxury-right-panel">
-                        <div style="text-align: center;">
-                            <div style="font-size: 22px; font-weight: bold; color: #fbbf24;" id="g3TimerVal">60</div>
-                            <div style="font-size: 11px; color: #38bdf8;">السحب بعد انتهاء الدقيقة</div>
-                        </div>
-                        <div class="roulette-circle">🎰</div>
+                    <div style="background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 8px; border: 1px solid #38bdf8; font-size: 14px; color: #fbbf24;" id="rouletteMsg">
+                        مرحباً بكم في روليت الإمبراطورية
                     </div>
                 </div>
 
-                <div id="g3SlotsContainer" class="luxury-slots-container">
-                    <!-- يتم تحديثها تلقائياً بالخلفية -->
+                <div class="roulette-container">
+                    <div style="text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 8px;">اختر رقماً للرهان (الربح ×35)</div>
+                    <div class="roulette-table-grid">
+                        <button class="roulette-btn green" onclick="placeRouletteBet('number', '0')">0 (أخضر)</button>
+                        {% set red_nums = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
+                        {% for i in range(1, 37) %}
+                            {% if i in red_nums %}
+                                <button class="roulette-btn red" onclick="placeRouletteBet('number', '{{ i }}')">{{ i }}</button>
+                            {% else %}
+                                <button class="roulette-btn black" onclick="placeRouletteBet('number', '{{ i }}')">{{ i }}</button>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="roulette-side-bets">
+                        <button class="roulette-side-btn" style="background:#dc2626; color:white;" onclick="placeRouletteBet('color', 'red')">رهان أحمر (×2)</button>
+                        <button class="roulette-side-btn" style="background:#111827; color:white;" onclick="placeRouletteBet('color', 'black')">رهان أسود (×2)</button>
+                        <button class="roulette-side-btn" onclick="placeRouletteBet('even_odd', 'even')">زوجي Even (×2)</button>
+                        <button class="roulette-side-btn" onclick="placeRouletteBet('even_odd', 'odd')">فردي Odd (×2)</button>
+                    </div>
                 </div>
             </div>
 
@@ -906,12 +1075,10 @@ DASHBOARD_PAGE = """
                         <div class="summary-item">🎯 أرقامك: <span id="myLockedNumbers" style="color: #fbbf24;">لا توجد</span></div>
                         <div class="summary-item">💵 المدفوع: <span id="myTotalSpent" style="color: #ef4444;">$0</span></div>
                     </div>
-                    <div id="boardContainer" class="board">
-                        <!-- يتم تحديث الأرقام فورياً -->
-                    </div>
+                    <div id="boardContainer" class="board"></div>
                 </div>
 
-                <!-- لعبة اكشف واربح الفاخرة (مستعادة بالكامل) -->
+                <!-- لعبة اكشف واربح الفاخرة -->
                 <div class="scratch-section">
                     <div>
                         <h2>✨ لعبة اكشف واربح الفاخرة</h2>
@@ -938,8 +1105,8 @@ DASHBOARD_PAGE = """
 
         <div class="winners-sidebar">
             <h3>🏆 لوحة شرف الفائزين</h3>
-            {% if winners_records %}
-                {% for game, info, time_str in winners_records %}
+            {% if winners %}
+                {% for game, info, time_str in winners %}
                 <div class="winner-record-item">
                     <div style="color: #fbbf24; font-weight: bold;">{{ game }}</div>
                     <div style="color: #e2e8f0; margin-top: 3px;">{{ info }}</div>
