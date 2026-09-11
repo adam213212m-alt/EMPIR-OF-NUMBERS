@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, send_from_directory
 import sqlite3
 import random
 import time
@@ -132,7 +132,12 @@ def service_worker():
 
 @app.route('/download')
 def download_app():
-    return "جاري تحميل تطبيق ليرة الرسمي... يرجى التواصل عبر الواتساب للحصول على أحدث نسخة APK مباشرة.", 200
+    # محاولة تحميل ملف الـ APK المباشر إذا تم وضعه في مجلد static باسم lira.apk
+    try:
+        return send_from_directory('static', 'lira.apk', as_attachment=True)
+    except Exception:
+        # إذا لم يكن الملف مرفوعاً بعد، يوجه المستخدم لرابط الدعم أو واتساب بشكل مباشر لطلب النسخة
+        return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20ليرة%20الرسمي")
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -400,19 +405,17 @@ def game_balloon_pop():
         if action == 'play_balloon':
             cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
             bal = cursor.fetchone()[0]
-            cost = 1.0 # تكلفة المحاولة 1$
+            cost = 1.0 
             
             if bal >= cost:
                 cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (cost,))
                 
-                # جلب عداد التسلسل للبالون (محاولات منذ آخر فوز ورقم الخطوة في التسلسل)
                 cursor.execute("SELECT attempts_since_last_win, sequence_index FROM balloon_state WHERE id=1")
                 row = cursor.fetchone()
                 attempts_since = row[0] + 1
                 seq_index = row[1]
                 
-                # تسلسل النجاحات المطلوب: 6 ثم 4 ثم 7 ثم 3 ثم 4 ثم 5
                 sequence = [6, 4, 7, 3, 4, 5]
                 current_target = sequence[seq_index]
                 
@@ -695,7 +698,7 @@ DASHBOARD_PAGE = """
         .user-creds { background: #1f1f1f; padding: 8px 14px; border-radius: 8px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .nav-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
+        .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; box-shadow: 0 0 10px rgba(59,130,246,0.5); cursor: pointer; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
@@ -716,7 +719,7 @@ DASHBOARD_PAGE = """
             <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
         </div>
         <div class="nav-buttons">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شحن%20رصيد" target="_blank">💬 شحن رصيد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
@@ -737,6 +740,26 @@ DASHBOARD_PAGE = """
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
         <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
     </div>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('تم قبول تثبيت التطبيق');
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -750,7 +773,7 @@ GAME_BALLOON_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 450px; margin: 30px auto; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
         .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.3s; }
         .balloon.popped { background: transparent !important; box-shadow: none !important; transform: scale(1.6); animation: popAnim 0.4s forwards; }
@@ -770,7 +793,7 @@ GAME_BALLOON_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎈 التحدي السريع (البالون)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -795,6 +818,26 @@ GAME_BALLOON_PAGE = """
         </div>
         {% endif %}
     </div>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('تم قبول تثبيت التطبيق');
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -808,7 +851,7 @@ GAME_ROULETTE_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 20px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-layout { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; align-items: center; }
         .wheel-screen { background: #18181b; border: 4px solid #ffd700; padding: 20px; border-radius: 18px; text-align: center; width: 100%; max-width: 450px; box-shadow: 0 0 30px rgba(255,215,0,0.3); }
         .roulette-ball-box { font-size: 50px; font-weight: bold; background: radial-gradient(circle, #2d2300 0%, #000 100%); border: 3px solid #ffd700; border-radius: 50%; width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; margin: 10px auto; color: #ffd700; box-shadow: inset 0 0 15px rgba(255,215,0,0.5); }
@@ -832,7 +875,7 @@ GAME_ROULETTE_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: $<span id="userBalance">{{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -925,6 +968,21 @@ GAME_ROULETTE_PAGE = """
             for (let k in activeBets) { betsArray.push(activeBets[k]); }
             document.getElementById('betsDataInput').value = JSON.stringify(betsArray);
         }
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
     </script>
 </body>
 </html>
@@ -939,7 +997,7 @@ GAME_GOLDEN_BOXES_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .boxes-container { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 5px solid #ffd700; padding: 30px; border-radius: 20px; margin-top: 25px; box-shadow: 0 0 40px rgba(255,215,0,0.3); text-align: center; }
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
         @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -956,7 +1014,7 @@ GAME_GOLDEN_BOXES_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎁 الصناديق الذهبية (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1027,6 +1085,21 @@ GAME_GOLDEN_BOXES_PAGE = """
                 }
             }
         }
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
     </script>
 </body>
 </html>
@@ -1041,7 +1114,7 @@ GAME_GOLDEN_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; box-shadow: 0 0 35px rgba(184,134,11,0.4); text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
@@ -1061,7 +1134,7 @@ GAME_GOLDEN_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1137,6 +1210,21 @@ GAME_GOLDEN_PAGE = """
                 });
         }
         setInterval(checkGameRealtime, 1000);
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
     </script>
 </body>
 </html>
@@ -1151,7 +1239,7 @@ ADMIN_CUSTOMERS_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; }
         .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         @media(max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
@@ -1171,7 +1259,7 @@ ADMIN_CUSTOMERS_PAGE = """
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - ليرة</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
         </div>
     </div>
@@ -1229,6 +1317,23 @@ ADMIN_CUSTOMERS_PAGE = """
             {% endfor %}
         </table>
     </div>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -1242,7 +1347,7 @@ ADMIN_GAMES_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         .games-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px; }
         @media(max-width:900px){ .games-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1256,7 +1361,7 @@ ADMIN_GAMES_PAGE = """
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم الألعاب</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
         </div>
     </div>
@@ -1275,6 +1380,23 @@ ADMIN_GAMES_PAGE = """
             <a href="/game_golden_boxes" class="ctrl-btn" style="background: #ffd700; color: black; margin-top: 10px;">إدارة الصناديق</a>
         </div>
     </div>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -1288,7 +1410,7 @@ ADMIN_ACCOUNTING_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width:900px){ .stats-grid { grid-template-columns: 1fr; } }
         .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 12px; text-align: center; }
@@ -1304,7 +1426,7 @@ ADMIN_ACCOUNTING_PAGE = """
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
         </div>
     </div>
@@ -1338,6 +1460,23 @@ ADMIN_ACCOUNTING_PAGE = """
             {% endfor %}
         </table>
     </div>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
+            } else {
+                window.location.href = '/download';
+            }
+        }
+    </script>
 </body>
 </html>
 """
