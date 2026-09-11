@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, json, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import random
+import string
 import time
 import os
 
@@ -91,7 +92,7 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة دون المساس بالأرصدة الحالية ---
+# --- إنشاء الجداول وتوليد الحسابات الـ 100 بكلمات مرور فريدة وعشوائية لمرة واحدة فقط ---
 with app.app_context():
     db.create_all()
     
@@ -123,20 +124,18 @@ with app.app_context():
         admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
         db.session.add(admin)
 
-    # إنشاء الـ 100 حساب ثابت بلاير مع أرقامهم السرية وأسماؤهم الحقيقية
+    # إنشاء الـ 100 حساب ثابت مع كلمات مرور عشوائية ومختلفة تماماً (تُنشأ مرة واحدة ولا يتم تغييرها تلقائياً لاحقاً حتى تحافظ على تعديلاتك)
+    alphabet = string.ascii_letters + string.digits
     for i in range(1, 101):
         uname = f"player{i}"
-        pwd = f"pass{i:04d}" # pass0001, pass0002 ... pass0100
         oname = f"لاعب رقم {i}"
         
         acc = User.query.filter_by(username=uname).first()
         if not acc:
-            new_acc = User(username=uname, password=pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
+            # توليد باسورد عشوائي فريد ومختلف تماماً لكل حساب
+            random_pwd = ''.join(random.choices(alphabet, k=10))
+            new_acc = User(username=uname, password=random_pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
             db.session.add(new_acc)
-        else:
-            # تحديث الباسورد والاسم فقط إذا لزم الأمر دون تصفير الرصيد لضمان الحفاظ عليه
-            acc.password = pwd
-            acc.owner_name = oname
 
     db.session.commit()
 
@@ -204,6 +203,30 @@ def dashboard():
     if not user:
         return redirect(url_for('logout'))
     return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance, password=user.password)
+
+# --- مسار تغيير كلمة المرور الشخصية لأي مستخدم ---
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['username']).first()
+    msg = None
+    if request.method == 'POST':
+        old_p = request.form.get('old_password', '')
+        new_p = request.form.get('new_password', '').strip()
+        confirm_p = request.form.get('confirm_password', '').strip()
+        
+        if user.role != 'admin' and user.password != old_p:
+            msg = "كلمة المرور القديمة غير صحيحة!"
+        elif not new_p:
+            msg = "كلمة المرور الجديدة فارغة!"
+        elif new_p != confirm_p:
+            msg = "كلمة المرور الجديدة غير متطابقة مع التأكيد!"
+        else:
+            user.password = new_p
+            db.session.commit()
+            msg = "تم تغيير كلمة المرور بنجاح!"
+    return render_template_string(CHANGE_PASSWORD_PAGE, username=user.username, balance=user.balance, password=user.password, msg=msg)
 
 @app.route('/api/golden_status')
 def api_golden_status():
@@ -880,6 +903,7 @@ DASHBOARD_PAGE = """
         .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; cursor: pointer; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .withdraw-btn { background: #f59e0b; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
+        .pass-btn { background: #8b5cf6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
@@ -927,7 +951,7 @@ DASHBOARD_PAGE = """
         .icon-card:hover { 
             border-color: #ffd700; 
             transform: perspective(1000px) rotateX(0deg) translateY(-8px) scale(1.03); 
-            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,215,0,0.2); 
+            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,255,255,0.2); 
         }
         .icon-logo { 
             font-size: 70px; 
@@ -958,6 +982,7 @@ DASHBOARD_PAGE = """
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20تعبئة%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💬 شحن رصيد</a>
             <a class="withdraw-btn" href="https://wa.me/96176030208?text=اريد%20سحب%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💸 سحب رصيد</a>
+            <a href="/change_password" class="pass-btn">🔑 تغيير الباسورد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
                 <a href="/admin_games" class="admin-link">🎮 لوحة الألعاب</a>
@@ -1004,6 +1029,37 @@ DASHBOARD_PAGE = """
             }
         }
     </script>
+</body>
+</html>
+"""
+
+CHANGE_PASSWORD_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تغيير كلمة المرور - امبراطورية الأرقام</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: linear-gradient(145deg, #1f1f1f, #121212); padding: 40px; border-radius: 20px; width: 380px; text-align: center; border: 3px solid #8b5cf6; box-shadow: 0 0 35px rgba(139,92,246,0.3); }
+        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 14px; background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; }
+        .back-link { display: inline-block; margin-top: 15px; color: #3b82f6; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2 style="color: #ffd700; margin-top: 0;">🔑 تغيير كلمة المرور</h2>
+        <p style="color: #94a3b8; font-size: 13px;">الحساب: {{ username }}</p>
+        {% if msg %}<div style="background: {% if 'بنجاح' in msg %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold;">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="password" name="old_password" placeholder="كلمة المرور القديمة" required>
+            <input type="password" name="new_password" placeholder="كلمة المرور الجديدة" required>
+            <input type="password" name="confirm_password" placeholder="تأكيد كلمة المرور الجديدة" required>
+            <button type="submit">تحديث الباسورد</button>
+        </form>
+        <a href="/dashboard" class="back-link">⬅️ العودة للرئيسية</a>
+    </div>
 </body>
 </html>
 """
@@ -1556,10 +1612,23 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         let isRefreshing = false;
         function checkGameRealtime() {
             if (isRefreshing) return;
-            fetch('/api/luxury_luxury_status') // fallback check
+            fetch('/api/luxury_golden_status')
                 .then(res => res.json())
-                .catch(err => {});
+                .then(data => {
+                    if (data.status !== lastStatus && !isRefreshing) {
+                        isRefreshing = true;
+                        setTimeout(() => { location.reload(); }, 200);
+                        return;
+                    }
+                    let slotEl = document.getElementById('slotDisplay');
+                    let statusText = document.getElementById('statusText');
+                    if (slotEl && data.status === 'finished') {
+                        slotEl.innerText = data.winning_number;
+                        if (statusText) statusText.innerText = "🎉 تم إعلان الصندوق الفائز!";
+                    }
+                });
         }
+        setInterval(checkGameRealtime, 1000);
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
