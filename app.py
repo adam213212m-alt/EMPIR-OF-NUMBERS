@@ -64,6 +64,22 @@ class UserLastBet(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     bets_json = db.Column(db.Text, nullable=False)
 
+# نماذج خاصة بلعبة الرقم الذهبي الفاخر الجديدة
+class LuxuryGoldenBooking(db.Model):
+    __tablename__ = 'luxury_golden_bookings'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(80))
+    box_number = db.Column(db.Integer)
+    booking_date = db.Column(db.String(50))
+
+class LuxuryGoldenState(db.Model):
+    __tablename__ = 'luxury_golden_state'
+    id = db.Column(db.Integer, primary_key=True)
+    winning_number = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='idle')
+    draw_end_time = db.Column(db.Float, default=0)
+    forced_winning_number = db.Column(db.Integer, default=0)
+
 
 # إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
 with app.app_context():
@@ -80,6 +96,10 @@ with app.app_context():
     if not BalloonState.query.get(1):
         balloon_state = BalloonState(id=1, attempts_since_last_win=0, sequence_index=0)
         db.session.add(balloon_state)
+
+    if not LuxuryGoldenState.query.get(1):
+        l_state = LuxuryGoldenState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0)
+        db.session.add(l_state)
         
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
@@ -183,6 +203,27 @@ def api_golden_status():
         "remaining_seconds": remaining,
         "bookings": bookings
     })
+
+# API حالة الرقم الذهبي الفاخر المحدث
+@app.route('/api/luxury_golden_status')
+def api_luxury_golden_status():
+    current_time = time.time()
+    l_state = LuxuryGoldenState.query.get(1)
+    status = 'idle'
+    winning_number = 0
+    if l_state:
+        status = l_state.status
+        winning_number = l_state.winning_number
+        if status == 'finished' and current_time >= l_state.draw_end_time:
+            LuxuryGoldenBooking.query.delete()
+            l_state.winning_number = 0
+            l_state.status = 'idle'
+            l_state.draw_end_time = 0
+            db.session.commit()
+            status = 'idle'
+            winning_number = 0
+    bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
+    return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
 
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
@@ -425,7 +466,6 @@ def game_roulette():
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
-# --- لعبة عجلة الأرقام (مع ألوان دائرية وخلفية مخصصة للفوز والخسارة) ---
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session:
@@ -467,8 +507,10 @@ def game_number_wheel():
                         vault.vault_balance -= payout
                         log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
+                        msg = f"🎉 مبروك! استقرت العجلة على الرقم الفائز ({winning_num}) وهو ضمن أرقامك المختارة! فزت بـ ${payout}!"
                     else:
                         is_win = False
+                        msg = f"💥 حظ أوفر، استقرت العجلة على الرقم ({winning_num}) ولم يكن ضمن أرقامك."
 
                     db.session.commit()
                 else:
@@ -478,7 +520,7 @@ def game_number_wheel():
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
 
-# --- لعبة الرقم الذهبي الفاخر الجديدة (المدمجة كأيقونة سادسة) ---
+# --- لعبة الرقم الذهبي الفاخر الجديدة (الحجز الجماعي والتحكم الحصري للآدمن) ---
 @app.route('/game_golden_boxes_new', methods=['GET', 'POST'])
 def game_golden_boxes_new():
     if 'username' not in session:
@@ -487,44 +529,80 @@ def game_golden_boxes_new():
     username = session['username']
     user = User.query.filter_by(username=username).first()
     vault = SystemVault.query.get(1)
-    
+    l_state = LuxuryGoldenState.query.get(1)
     msg = None
-    target_number = None
-    is_win = False
 
     if request.method == 'POST':
-        chosen_box = int(request.form.get('chosen_box', 1))
-        cost = 50.0 # تكلفة الحجز 50$
-        
-        if user.balance >= cost:
-            user.balance -= cost
-            vault.vault_balance += cost
+        if 'book_box' in request.form:
+            if l_state.status == 'idle':
+                box_num = int(request.form.get('box_number'))
+                cost = 50.0
+                if user.balance >= cost:
+                    existing = LuxuryGoldenBooking.query.filter_by(box_number=box_num).first()
+                    if not existing:
+                        user.balance -= cost
+                        vault.vault_balance += cost
+                        log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                        db.session.add(log_sale)
 
-            log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
-            db.session.add(log_sale)
-
-            # النظام المالي للرقم الذهبي الفاخر (ربح الشركة 25% على المدى الطويل)
-            # 75% من قيمة المدخلات توزع كجوائز (جائزة 200$ لكل حجز 50$ تعني فوزاً بوزن مناسب)
-            winning_chance = random.random()
-            if winning_chance <= 0.1875: # نسبة تضمن الربح المستهدف بدقة
-                target_number = chosen_box
-                is_win = True
-                prize = 200.0
-                user.balance += prize
-                vault.vault_balance -= prize
-                log = FinancialLog(action_type='جائزة الرقم الذهبي الفاخر', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                db.session.add(log)
+                        new_b = LuxuryGoldenBooking(username=username, box_number=box_num, booking_date=time.strftime('%Y-%m-%d'))
+                        db.session.add(new_b)
+                        db.session.commit()
+                        msg = f"تم حجز الصندوق رقم {box_num} بنجاح مقابل 50$!"
+                    else:
+                        msg = f"عذراً، الصندوق رقم {box_num} محجوز مسبقاً!"
+                else:
+                    msg = "رصيدك غير كافٍ (التكلفة 50$)!"
             else:
-                # اختيار رقم مختلف ليكون هو الخاسر
-                other_nums = [n for n in range(1, 6) if n != chosen_box]
-                target_number = random.choice(other_nums)
-                is_win = False
+                msg = "عذراً، جاري السحب حالياً!"
 
-            db.session.commit()
-        else:
-            msg = "رصيدك غير كافٍ للحجز (تكلفة الصندوق 50$)!"
+        elif 'cancel_box' in request.form:
+            if l_state.status == 'idle':
+                box_num = int(request.form.get('box_number'))
+                booking = LuxuryGoldenBooking.query.filter_by(box_number=box_num).first()
+                if booking and booking.username == username:
+                    db.session.delete(booking)
+                    user.balance += 50.0
+                    vault.vault_balance -= 50.0
+                    db.session.commit()
+                    msg = f"تم التراجع عن حجز الصندوق {box_num} واسترداد 50$!"
+                else:
+                    msg = "عذراً، لا يمكنك التراجع إلا عن الصناديق التي حجزتها بنفسك!"
+            else:
+                msg = "لا يمكن التراجع أثناء عملية السحب!"
 
-    return render_template_string(GAME_GOLDEN_BOXES_NEW_PAGE, username=username, balance=user.balance, msg=msg, target_number=target_number, is_win=is_win)
+        elif 'admin_execute_luxury_draw' in request.form and username == 'admin1':
+            bookings_list = LuxuryGoldenBooking.query.all()
+            booked_boxes = [b.box_number for b in bookings_list]
+            if booked_boxes:
+                forced = l_state.forced_winning_number
+                winning_box = forced if (forced in booked_boxes) else random.choice(booked_boxes)
+                
+                winner_booking = LuxuryGoldenBooking.query.filter_by(box_number=winning_box).first()
+                winner_user = User.query.filter_by(username=winner_booking.username).first()
+                
+                winner_user.balance += 200.0
+                vault.vault_balance -= 200.0
+                log = FinancialLog(action_type='جائزة الرقم الذهبي الفاخر', admin_name='admin1', target_user=winner_user.username, amount=200.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+                
+                l_state.winning_number = winning_box
+                l_state.status = 'finished'
+                l_state.draw_end_time = time.time() + 15.0
+                db.session.commit()
+                msg = f"تم السحب بنجاح! الصندوق الفائز هو رقم {winning_box} للفائز {winner_user.username}"
+            else:
+                msg = "لا توجد صناديق محجوزة لإجراء السحب عليها حالياً!"
+
+    bookings_records = LuxuryGoldenBooking.query.all()
+    bookings = {b.box_number: b.username for b in bookings_records}
+    my_bookings = LuxuryGoldenBooking.query.filter_by(username=username).all()
+    my_booked_boxes = [b.box_number for b in my_bookings]
+    my_total_spent = len(my_booked_boxes) * 50.0
+
+    return render_template_string(GAME_GOLDEN_BOXES_NEW_PAGE, username=username, role=user.role, balance=user.balance,
+                                  bookings=bookings, winning_number=l_state.winning_number, draw_status=l_state.status,
+                                  my_booked_boxes=my_booked_boxes, my_total_spent=my_total_spent, msg=msg)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -588,16 +666,24 @@ def admin_games():
         return redirect(url_for('dashboard'))
     
     draw_state = GameDrawState.query.get(1)
+    l_state = LuxuryGoldenState.query.get(1)
     msg = None
 
     if request.method == 'POST':
-        forced_num = request.form.get('forced_winning_number', '').strip()
-        f_val = int(forced_num) if forced_num.isdigit() else 0
-        draw_state.forced_winning_number = f_val
-        db.session.commit()
-        msg = f"تم تحديث الرقم المسبق للسحب إلى: {f_val if f_val > 0 else 'عشوائي'}"
+        if 'forced_winning_number' in request.form:
+            forced_num = request.form.get('forced_winning_number', '').strip()
+            f_val = int(forced_num) if forced_num.isdigit() else 0
+            draw_state.forced_winning_number = f_val
+            db.session.commit()
+            msg = f"تم تحديث الرقم المسبق للرقم الذهبي إلى: {f_val if f_val > 0 else 'عشوائي'}"
+        elif 'forced_luxury_number' in request.form:
+            forced_lux = request.form.get('forced_luxury_number', '').strip()
+            l_val = int(forced_lux) if forced_lux.isdigit() else 0
+            l_state.forced_winning_number = l_val
+            db.session.commit()
+            msg = f"تم تحديث الصندوق المسبق للرقم الذهبي الفاخر إلى: {l_val if l_val > 0 else 'عشوائي'}"
 
-    return render_template_string(ADMIN_GAMES_PAGE, forced_val=draw_state.forced_winning_number, msg=msg)
+    return render_template_string(ADMIN_GAMES_PAGE, forced_val=draw_state.forced_winning_number, forced_lux=l_state.forced_winning_number, msg=msg)
 
 @app.route('/admin_accounting')
 def admin_accounting():
@@ -706,7 +792,6 @@ DASHBOARD_PAGE = """
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
         <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></div>
-        <!-- الأيقونة السادسة: لعبة الرقم الذهبي الفاخر الجديدة -->
         <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الذهبي الفاخر</div></a>
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
@@ -935,7 +1020,6 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- عجلة الأرقام (مع ألوان الخسارة والفوز المطلوبة ودائرة الدوران) ---
 GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -947,34 +1031,10 @@ GAME_NUMBER_WHEEL_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 600px; margin: 20px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
-        
-        /* تصميم دائرة العجلة وحالات الفوز والخسارة */
-        .wheel-circle { 
-            width: 150px; height: 150px; 
-            background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); 
-            border: 6px solid #ffd700; border-radius: 50%; 
-            margin: 15px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            font-size: 42px; font-weight: bold; color: #ffd700; 
-            box-shadow: 0 0 25px rgba(255,215,0,0.5); 
-            transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); 
-        }
-        .wheel-circle.lose {
-            background: #dc2626 !important;
-            border-color: #991b1b !important;
-            color: #000000 !important;
-        }
-        .wheel-circle.win {
-            background: radial-gradient(circle, #ffd700 0%, #b8860b 100%) !important;
-            border-color: #fff !important;
-            color: #000 !important;
-        }
-        .win-label {
-            font-size: 14px;
-            color: #ffffff !important;
-            font-weight: bold;
-            margin-top: -2px;
-        }
-
+        .wheel-circle { width: 150px; height: 150px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 6px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
+        .wheel-circle.lose { background: #dc2626 !important; border-color: #991b1b !important; color: #000000 !important; }
+        .wheel-circle.win { background: radial-gradient(circle, #ffd700 0%, #b8860b 100%) !important; border-color: #fff !important; color: #000 !important; }
+        .win-label { font-size: 14px; color: #ffffff !important; font-weight: bold; margin-top: -2px; }
         .numbers-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
         .num-cell { background: #252525; border: 2px solid #555; border-radius: 10px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #fff; cursor: pointer; transition: 0.2s; }
         .num-cell.selected { background: #22c55e; border-color: #ffd700; color: #000; transform: scale(1.05); }
@@ -995,19 +1055,14 @@ GAME_NUMBER_WHEEL_PAGE = """
     {% if msg %}<div style="background: {% if is_win %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold; max-width: 600px; margin-left: auto; margin-right: auto;">{{ msg }}</div>{% endif %}
     <div class="game-box">
         <h3 style="color: #ffd700; margin-top: 0;">اختر أرقامك (بحد أقصى 15 رقماً | 1$ لكل رقم) ثم أدر العجلة!</h3>
-        
-        <!-- دائرة العجلة مع تطبيق الفئات اللونية للفوز والخسارة -->
         <div class="wheel-circle {% if winning_num is not none %}{% if is_win %}win{% else %}lose{% endif %}{% endif %}" id="wheelDisplay">
             {% if winning_num is not none %}
                 <span>{{ winning_num }}</span>
-                {% if is_win %}
-                    <span class="win-label">مبروك</span>
-                {% endif %}
+                {% if is_win %}<span class="win-label">مبروك</span>{% endif %}
             {% else %}
                 🎡
             {% endif %}
         </div>
-
         <p style="color: #38bdf8; font-size: 14px; margin: 5px 0;">الأرقام المختارة: <b id="selectedCountText">0</b> / 15</p>
         
         <div class="numbers-board">
@@ -1024,14 +1079,12 @@ GAME_NUMBER_WHEEL_PAGE = """
     </div>
     <script>
         let selectedNumbers = [];
-        
         function toggleNumber(num, element) {
             let wheel = document.getElementById('wheelDisplay');
             if (wheel.innerText.trim() !== '🎡') {
                 wheel.className = "wheel-circle";
                 wheel.innerText = '🎡';
             }
-
             if (selectedNumbers.includes(num)) {
                 selectedNumbers = selectedNumbers.filter(n => n !== num);
                 element.classList.remove('selected');
@@ -1055,11 +1108,9 @@ GAME_NUMBER_WHEEL_PAGE = """
             let btn = document.getElementById('spinBtn');
             btn.disabled = true;
             btn.innerText = "⏳ جاري تدوير العجلة...";
-            
             wheel.className = "wheel-circle";
             wheel.innerText = "🎡";
             wheel.style.transform = "rotate(1800deg)";
-            
             setTimeout(function() {
                 document.getElementById('wheelForm').submit();
             }, 2000); 
@@ -1071,8 +1122,7 @@ GAME_NUMBER_WHEEL_PAGE = """
 </html>
 """
 
-# --- قالب واجهة لعبة الرقم الذهبي الفاخر الجديدة (الأيقونة السادسة) ---
-# --- الرقم الذهبي الفاخر (الأيقونة السادسة) ---
+# --- واجهة لعبة الرقم الذهبي الفاخر المحدثة (حجز جماعي وتحكم حصري للآدمن) ---
 GAME_GOLDEN_BOXES_NEW_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1084,29 +1134,23 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         body { background-color: #0d0d0d; color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 25px; border-radius: 12px; border: 2px solid #d4af37; width: 100%; max-width: 900px; box-sizing: border-box; margin-bottom: 20px; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
-        h1 { background: linear-gradient(to left, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); -webkit-background-clip: text; color: transparent; font-size: 2.5rem; margin: 10px 0; text-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); }
-        .game-container { display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 20px; flex-wrap: wrap; width: 100%; max-width: 900px; }
-        .boxes-wrapper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .boxes-wrapper .box:nth-child(4) { grid-column: 1 / 3; justify-self: center; }
-        .boxes-wrapper .box:nth-child(5) { grid-column: 2 / 4; justify-self: center; }
-        .box { background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #d4af37; border-radius: 15px; width: 120px; height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); cursor: pointer; transition: 0.3s; }
-        .box:hover { transform: translateY(-5px); border-color: #fff; }
-        .box .number { font-size: 2.5rem; color: #d4af37; text-shadow: 0 0 10px rgba(212, 175, 55, 0.8); margin-bottom: 5px; }
-        .box .price { background: #d4af37; color: #000; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: 900; }
-        .box .prize { font-size: 0.75rem; color: #aaa; margin-top: 3px; }
-        .wheel-container { position: relative; width: 280px; height: 280px; display: flex; justify-content: center; align-items: center; }
-        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #fff; z-index: 10; }
-        .wheel { width: 260px; height: 260px; border-radius: 50%; border: 6px solid #d4af37; box-shadow: 0 0 30px rgba(212, 175, 55, 0.4); position: relative; overflow: hidden; transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99); background: conic-gradient(#1a1a1a 0deg 72deg, #2a2a2a 72deg 144deg, #1a1a1a 144deg 216deg, #2a2a2a 216deg 288deg, #1a1a1a 288deg 360deg); }
-        .wheel .num { position: absolute; top: 50%; left: 50%; font-size: 1.8rem; color: #d4af37; font-weight: 900; transform-origin: 0 0; }
-        .wheel .num:nth-child(1) { transform: rotate(36deg) translateY(-90px) translateX(-50%); }
-        .wheel .num:nth-child(2) { transform: rotate(108deg) translateY(-90px) translateX(-50%); }
-        .wheel .num:nth-child(3) { transform: rotate(180deg) translateY(-90px) translateX(-50%); }
-        .wheel .num:nth-child(4) { transform: rotate(252deg) translateY(-90px) translateX(-50%); }
-        .wheel .num:nth-child(5) { transform: rotate(324deg) translateY(-90px) translateX(-50%); }
-        .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
-        .popup-box { background: linear-gradient(145deg, #2a220a, #111); border: 3px solid #d4af37; padding: 40px 60px; border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(212, 175, 55, 0.5); transform: scale(0.8); transition: transform 0.5s; }
-        .popup-overlay.active { opacity: 1; pointer-events: all; }
-        .popup-overlay.active .popup-box { transform: scale(1); }
+        h1 { background: linear-gradient(to left, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); -webkit-background-clip: text; color: transparent; font-size: 2.2rem; margin: 10px 0; text-align: center; }
+        .schedule-notice { color: #ffd700; background: #1f1f1f; border: 1px dashed #d4af37; padding: 10px 20px; border-radius: 8px; font-size: 15px; margin-bottom: 20px; text-align: center; }
+        
+        .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 700px; flex-wrap: wrap; gap: 15px; }
+        
+        .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-bottom: 25px; text-align: center; width: 100%; max-width: 700px; box-sizing: border-box; }
+        .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 15px; }
+        
+        .number-box { background: #3d2314; border: 2px solid #8b5a2b; border-radius: 12px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.2s; }
+        .number-box:hover { transform: translateY(-3px); border-color: #ffd700; }
+        .number-box.booked { background: #7f1d1d !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
+        .number-box.my-booked { background: #1e3a8a !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
+        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; }
+
+        .draw-panel { background: #18181b; border: 3px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 20px; text-align: center; width: 100%; max-width: 700px; box-sizing: border-box; }
+        .big-slot-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 60px; font-weight: bold; padding: 10px; width: 180px; margin: 15px auto; border-radius: 16px; }
+        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 15px; border-radius: 12px; margin: 15px auto; width: 90%; max-width: 450px; text-align: center; font-size: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -1116,72 +1160,84 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
     </div>
 
-    <h1>اختر صندوقاً للحجز (التكلفة: 50$)</h1>
-    {% if msg %}<div style="background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold;">{{ msg }}</div>{% endif %}
+    <h1>اختر صندوقاً للحجز (التكلفة: 50$ | الجائزة: 200$)</h1>
+    <div class="schedule-notice">⏰ مواعيد السحب: مرتين يومياً (عند الساعة 12:00 ظهراً وعند الساعة 22:00 مساءً)</div>
+    
+    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; text-align: center; width: 100%; max-width: 700px;">{{ msg }}</div>{% endif %}
 
-    <div class="game-container">
-        <div class="boxes-wrapper">
+    <div class="user-stats-box">
+        <div><b style="color: #ffd700;">👤 حسابك:</b> <span style="color: #cbd5e1;">{{ username }}</span></div>
+        <div><b style="color: #38bdf8;">صناديقك المحجوزة:</b> <span style="color: #fff; font-family: monospace; background: #000; padding: 4px 8px; border-radius: 4px;">{% if my_booked_boxes %}{{ my_booked_boxes | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
+        <div><b style="color: #34d399;">المصروف:</b> <span style="color: #34d399; font-weight: bold;">${{ my_total_spent }}</span></div>
+    </div>
+
+    <div class="board-container">
+        <h3 style="color: #ffd700; margin-top: 0;">📦 صناديق الحجز الجماعي</h3>
+        <div class="board-grid">
             {% for i in range(1, 6) %}
-            <div class="box" onclick="submitBox({{ i }})">
-                <div class="number">{{ i }}</div>
-                <div class="price">حجز 50$</div>
-                <div class="prize">جائزة 200$</div>
-            </div>
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <form method="POST" style="margin: 0;">
+                            <input type="hidden" name="box_number" value="{{ i }}">
+                            <button type="submit" name="cancel_box" class="number-box my-booked" style="width: 100%;" title="إلغاء الحجز واسترداد 50$">
+                                صندوق {{ i }}<br><span style="font-size: 11px;">(أنت) ❌</span>
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="number-box booked" title="محجوز بواسطة {{ bookings[i] }}">
+                            صندوق {{ i }}<br><span style="font-size: 11px; color: #fca5a5;">({{ bookings[i] }})</span>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <form method="POST" style="margin: 0;">
+                        <input type="hidden" name="box_number" value="{{ i }}">
+                        <button type="submit" name="book_box" class="number-box" style="width: 100%;">صندوق {{ i }}<br><span style="font-size: 11px; color: #ffd700;">حجز 50$</span></button>
+                    </form>
+                {% endif %}
             {% endfor %}
         </div>
-
-        <div class="wheel-container">
-            <div class="pointer"></div>
-            <div class="wheel" id="wheel">
-                <div class="num">1</div><div class="num">2</div><div class="num">3</div><div class="num">4</div><div class="num">5</div>
-            </div>
-        </div>
     </div>
 
-    <form method="POST" id="boxForm">
-        <input type="hidden" name="chosen_box" id="chosenBoxInput">
-    </form>
-
-    <div class="popup-overlay" id="popup" onclick="closePopup()">
-        <div class="popup-box">
-            <h2 id="winText" style="color:#fff; margin:0 0 10px 0;">نتيجة السحب</h2>
-            <p class="win-amount" id="winAmountText" style="font-size: 2.5rem; color: #d4af37; margin: 0;"></p>
+    <!-- لوحة السحب والإعلان عن النتائج (مرئية فقط لصاحب البرنامج/الآدمن) -->
+    {% if username == 'admin1' %}
+    <div class="draw-panel">
+        <h3 style="color: #ffd700; margin-top: 0;">👑 لوحة التحكم والتحكم بالسحب (خاص بالآدمن)</h3>
+        <p id="statusText" style="color: #cbd5e1; font-size: 15px;">{% if draw_status == 'finished' %}🎉 تم إعلان الصندوق الفائز!{% else %}في انتظار تنفيذ السحب في مواعيده المحددة{% endif %}</p>
+        <div class="big-slot-screen" id="slotDisplay">{% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
+        <div id="winNotificationContainer">
+            {% if draw_status == 'finished' and winning_number %}
+            <div class="win-badge">الفائز بالصندوق رقم {{ winning_number }} حصل على 200$!</div>
+            {% endif %}
         </div>
+        <form method="POST" style="margin-top: 15px; border-top: 1px dashed #555; padding-top: 15px;">
+            <button type="submit" name="admin_execute_luxury_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">⚡ تنفيذ السحب الآن (للآدمن فقط)</button>
+        </form>
     </div>
+    {% endif %}
 
     <script>
-        function submitBox(boxNum) {
-            document.getElementById('chosenBoxInput').value = boxNum;
-            let targetNumber = {% if target_number is not none %}{{ target_number }}{% else %}boxNum{% endif %};
-            let isWin = {% if is_win %}true{% else %}false{% endif %};
-            
-            let wheel = document.getElementById('wheel');
-            const sliceAngle = 72;
-            const targetAngle = 360 - (targetNumber * sliceAngle - 36);
-            let currentRotation = targetAngle + (360 * 5);
-            wheel.style.transform = `rotate(${currentRotation}deg)`;
-
-            setTimeout(() => {
-                if (isWin) {
-                    document.getElementById('winText').innerText = `مبروك! الصندوق رقم ${targetNumber} هو الرابح`;
-                    document.getElementById('winAmountText').innerText = "ربحت جائزة 200$!";
-                } else {
-                    document.getElementById('winText').innerText = `عذراً، استقرت العجلة على الرقم ${targetNumber}`;
-                    document.getElementById('winAmountText').innerText = "حظ أوفر في المرة القادمة";
-                }
-                document.getElementById('popup').classList.add('active');
-            }, 4000);
-
-            // إرسال البيانات للسيرفر لتحديث الرصيد
-            setTimeout(() => {
-                document.getElementById('boxForm').submit();
-            }, 100);
+        let lastStatus = "{{ draw_status }}";
+        let isRefreshing = false;
+        function checkGameRealtime() {
+            if (isRefreshing) return;
+            fetch('/api/luxury_golden_status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status !== lastStatus && !isRefreshing) {
+                        isRefreshing = true;
+                        setTimeout(() => { location.reload(); }, 200);
+                        return;
+                    }
+                    let slotEl = document.getElementById('slotDisplay');
+                    let statusText = document.getElementById('statusText');
+                    if (slotEl && data.status === 'finished') {
+                        slotEl.innerText = data.winning_number;
+                        if (statusText) statusText.innerText = "🎉 تم إعلان الصندوق الفائز!";
+                    }
+                });
         }
-
-        function closePopup() {
-            document.getElementById('popup').classList.remove('active');
-            location.reload();
-        }
+        setInterval(checkGameRealtime, 1000);
+        function installApp() { window.location.href = '/download'; }
     </script>
 </body>
 </html>
@@ -1423,9 +1479,18 @@ ADMIN_GAMES_PAGE = """
         <div class="game-ctrl-card" style="border: 3px solid #34d399;">
             <div class="game-title">1. الرقم الذهبي 🏆</div>
             <form method="POST">
-                <input type="number" name="forced_winning_number" value="{% if forced_val > 0 %}{{ forced_val }}{% endif %}" placeholder="رقم من 1 إلى 50" min="1" max="50"><button type="submit" class="ctrl-btn" style="background: #34d399; color: black; margin-top: 5px;">حفظ الرقم الفائز</button>
+                <input type="number" name="forced_winning_number" value="{% if forced_val > 0 %}{{ forced_val }}{% endif %}" placeholder="رقم من 1 إلى 50" min="1" max="50">
+                <button type="submit" class="ctrl-btn" style="background: #34d399; color: black; margin-top: 5px;">حفظ الرقم الفائز</button>
             </form>
             <a href="/game_golden_number" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
+        </div>
+        <div class="game-ctrl-card" style="border: 3px solid #ffd700;">
+            <div class="game-title">6. الرقم الذهبي الفاخر 🎁</div>
+            <form method="POST">
+                <input type="number" name="forced_luxury_number" value="{% if forced_lux > 0 %}{{ forced_lux }}{% endif %}" placeholder="صندوق من 1 إلى 5" min="1" max="5">
+                <button type="submit" class="ctrl-btn" style="background: #ffd700; color: black; margin-top: 5px;">حفظ الصندوق الفائز</button>
+            </form>
+            <a href="/game_golden_boxes_new" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
         </div>
     </div>
     <script>
