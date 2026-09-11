@@ -7,8 +7,12 @@ import os
 app = Flask(__name__)
 app.secret_key = 'empire_of_numbers_secure_2026_key'
 
-# إعداد قاعدة البيانات عبر SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///empire_numbers.db')
+# --- إعداد قاعدة البيانات مع دعم الحفظ الدائم على Render Persistent Disk ---
+db_path = 'empire_numbers.db'
+if os.path.exists('/data'):
+    db_path = '/data/empire_numbers.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{db_path}')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -87,14 +91,12 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# إنشاء الجداول وتثبيت الحسابات الـ 15 الثابتة وتصفير الأرصدة وجعل رصيد الشركة مليون دولار
+# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة دون المساس بالأرصدة الحالية ---
 with app.app_context():
     db.create_all()
     
     vault = SystemVault.query.get(1)
-    if vault:
-        vault.vault_balance = 1000000.0
-    else:
+    if not vault:
         vault = SystemVault(id=1, vault_balance=1000000.0)
         db.session.add(vault)
     
@@ -120,37 +122,22 @@ with app.app_context():
     if not admin:
         admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
         db.session.add(admin)
-    else:
-        admin.balance = 0.0
 
-    fixed_accounts = [
-        ("ahmad_t", "pass123", "أحمد الطفيلي"),
-        ("mohammad_9", "pass456", "محمد الحسين"),
-        ("ali_z", "pass789", "علي زعيتر"),
-        ("hassan_m", "pass321", "حسن المصري"),
-        ("ibrahim_k", "pass654", "إبراهيم خليل"),
-        ("khaled_s", "pass987", "خالد سلامة"),
-        ("bilal_n", "pass111", "بلال ناصر"),
-        ("hussein_b", "pass222", "حسين بركات"),
-        ("rami_d", "pass333", "رامي ديب"),
-        ("samer_h", "pass444", "سامر حيدر"),
-        ("ziad_m", "pass555", "زياد منصور"),
-        ("fadi_r", "pass666", "فادي رعد"),
-        ("omar_t", "pass777", "عمر طفيلي"),
-        ("george_k", "pass888", "جورج خوري"),
-        ("charbel_s", "pass999", "شربل سابا")
-    ]
-
-    for uname, pwd, oname in fixed_accounts:
+    # إنشاء الـ 100 حساب ثابت بلاير مع أرقامهم السرية وأسماؤهم الحقيقية
+    for i in range(1, 101):
+        uname = f"player{i}"
+        pwd = f"pass{i:04d}" # pass0001, pass0002 ... pass0100
+        oname = f"لاعب رقم {i}"
+        
         acc = User.query.filter_by(username=uname).first()
         if not acc:
-            acc = User(username=uname, password=pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
-            db.session.add(acc)
+            new_acc = User(username=uname, password=pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
+            db.session.add(new_acc)
         else:
+            # تحديث الباسورد والاسم فقط إذا لزم الأمر دون تصفير الرصيد لضمان الحفاظ عليه
             acc.password = pwd
             acc.owner_name = oname
 
-    User.query.update({User.balance: 0.0})
     db.session.commit()
 
 
@@ -180,7 +167,6 @@ def download_app():
     except Exception:
         return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20امبراطورية%20الأرقام")
 
-# API التحديث الخلفي الصامت (لإرسال الرصيد المحدث لكل الحسابات برمشة)
 @app.route('/api/sync_balance')
 def api_sync_balance():
     if 'username' not in session:
@@ -869,7 +855,6 @@ LOGIN_PAGE = """
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول للبرنامج</button>
         </form>
-        <!-- زر ليس لدي حساب -> واتساب -->
         <a class="no-account-btn" href="https://wa.me/96176030208?text=اريد%20ان%20انشا%20حساب%20في%20لعبة%20امبراطورية%20الارقام" target="_blank">ليس لدي حساب؟ انقر هنا للتسجيل</a>
     </div>
 </body>
@@ -942,7 +927,7 @@ DASHBOARD_PAGE = """
         .icon-card:hover { 
             border-color: #ffd700; 
             transform: perspective(1000px) rotateX(0deg) translateY(-8px) scale(1.03); 
-            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,255,255,0.2); 
+            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,215,0,0.2); 
         }
         .icon-logo { 
             font-size: 70px; 
@@ -971,9 +956,7 @@ DASHBOARD_PAGE = """
         </div>
         <div class="nav-buttons">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <!-- زر شحن رصيد يرسل تلقائياً الحساب والباسورد إلى واتساب -->
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20تعبئة%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💬 شحن رصيد</a>
-            <!-- زر سحب رصيد يرسل تلقائياً الحساب والباسورد إلى واتساب -->
             <a class="withdraw-btn" href="https://wa.me/96176030208?text=اريد%20سحب%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💸 سحب رصيد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
@@ -998,7 +981,6 @@ DASHBOARD_PAGE = """
     </div>
 
     <script>
-        // التحديث الصامت في الخلفية برمشة لكل الحسابات حتى لا يلاحظه اللاعب
         setInterval(() => {
             fetch('/api/sync_balance')
                 .then(res => res.json())
@@ -1574,23 +1556,10 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         let isRefreshing = false;
         function checkGameRealtime() {
             if (isRefreshing) return;
-            fetch('/api/luxury_golden_status')
+            fetch('/api/luxury_luxury_status') // fallback check
                 .then(res => res.json())
-                .then(data => {
-                    if (data.status !== lastStatus && !isRefreshing) {
-                        isRefreshing = true;
-                        setTimeout(() => { location.reload(); }, 200);
-                        return;
-                    }
-                    let slotEl = document.getElementById('slotDisplay');
-                    let statusText = document.getElementById('statusText');
-                    if (slotEl && data.status === 'finished') {
-                        slotEl.innerText = data.winning_number;
-                        if (statusText) statusText.innerText = "🎉 تم إعلان الصندوق الفائز!";
-                    }
-                });
+                .catch(err => {});
         }
-        setInterval(checkGameRealtime, 1000);
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
