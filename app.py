@@ -105,8 +105,8 @@ init_db()
 @app.route('/manifest.json')
 def manifest():
     manifest_data = {
-        "name": "Lira ليرة الألعاب التفاعلية",
-        "short_name": "Lira",
+        "name": "ليرة - المنصة التفاعلية الكبرى",
+        "short_name": "ليرة",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#0b0f19",
@@ -118,6 +118,10 @@ def manifest():
 @app.route('/sw.js')
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
+
+@app.route('/download')
+def download_app():
+    return "جاري تحميل تطبيق ليرة الرسمي... يرجى التواصل عبر الواتساب للحصول على أحدث نسخة APK مباشرة.", 200
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -317,6 +321,7 @@ def game_golden_boxes():
                     
                     cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                     total_att += 1
+                    
                     revealed_nums = [boxes[idx] for idx in selected_indices]
                     
                     if total_att >= 36 or (total_att % 36 == 0):
@@ -325,9 +330,15 @@ def game_golden_boxes():
                         total_att = 0
                         is_win = True
                     else:
-                        is_win = (revealed_nums[0] == revealed_nums[1] == revealed_nums[2])
+                        while revealed_nums[0] == revealed_nums[1] == revealed_nums[2]:
+                            random.shuffle(boxes)
+                            revealed_nums = [boxes[idx] for idx in selected_indices]
+                        is_win = False
 
-                    cursor.execute("UPDATE golden_boxes_state SET total_attempts=? WHERE id=1", (total_att,))
+                    random.shuffle(boxes)
+                    new_boxes_json = json.dumps(boxes)
+
+                    cursor.execute("UPDATE golden_boxes_state SET total_attempts=?, boxes_data=? WHERE id=1", (total_att, new_boxes_json))
                     
                     if is_win:
                         cursor.execute("UPDATE users SET balance = balance + 20.0 WHERE username=?", (username,))
@@ -359,6 +370,51 @@ def game_golden_boxes():
 
     conn.close()
     return render_template_string(GAME_GOLDEN_BOXES_PAGE, username=username, balance=balance, total_att=total_att, boxes=boxes, result_text=result_text, revealed_nums=revealed_nums, msg=msg)
+
+@app.route('/game_balloon_pop', methods=['GET', 'POST'])
+def game_balloon_pop():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    conn = sqlite3.connect('lira_enterprise.db', check_same_thread=False)
+    cursor = conn.cursor()
+    
+    msg = None
+    win_result = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'play_balloon':
+            cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+            bal = cursor.fetchone()[0]
+            cost = 1.0 # تكلفة محاولة ضخ البالون 1$
+            
+            if bal >= cost:
+                cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
+                cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (cost,))
+                
+                outcome = random.choice(['win', 'win', 'lose', 'win', 'lose'])
+                
+                if outcome == 'win':
+                    prize = 10.0
+                    cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (prize, username))
+                    cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - ? WHERE id=1", (prize,))
+                    cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة تحدي البالون', 'system', ?, ?, ?)", 
+                                   (username, prize, time.strftime('%Y-%m-%d %H:%M')))
+                    conn.commit()
+                    win_result = f"🎉 ممتاز! قمت بنفخ البالون بنجاح دون أن ينفجر وفزت بـ ${prize}!"
+                else:
+                    conn.commit()
+                    win_result = "💥 بوووم! نفخت البالون بقوة زائدة فانفجر! حظ أوفر في المرة القادمة."
+            else:
+                msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
+
+    cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
+    balance = cursor.fetchone()[0]
+    conn.close()
+    
+    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=balance, msg=msg, win_result=win_result)
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
@@ -565,7 +621,7 @@ LOGIN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - Lira ليرة</title><link rel="manifest" href="/manifest.json">
+    <title>تسجيل الدخول - ليرة Lira</title><link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: linear-gradient(145deg, #1f1f1f, #121212); padding: 45px; border-radius: 20px; width: 360px; text-align: center; border: 3px solid #ffd700; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
@@ -578,7 +634,7 @@ LOGIN_PAGE = """
 </head>
 <body>
     <div class="login-box">
-        <div class="logo-title">👑 Lira</div><div class="logo-sub">ليرة - المنصة التفاعلية الكبرى</div>
+        <div class="logo-title">👑 ليرة</div><div class="logo-sub">منصة ليرة الألعاب التفاعلية</div>
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="POST">
             <input type="text" name="username" placeholder="اسم المستخدم" required>
@@ -595,7 +651,7 @@ DASHBOARD_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lira ليرة - لوحة التحكم الرئيسية</title><link rel="manifest" href="/manifest.json">
+    <title>ليرة - لوحة التحكم الرئيسية</title><link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); flex-wrap: wrap; gap: 12px; border-bottom: 3px solid #ffd700; }
@@ -605,6 +661,7 @@ DASHBOARD_PAGE = """
         .user-creds { background: #1f1f1f; padding: 8px 14px; border-radius: 8px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .nav-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
@@ -620,24 +677,25 @@ DASHBOARD_PAGE = """
 <body>
     <div class="header">
         <div class="logo-area">
-            <div class="logo-badge">👑</div><h1>Lira | ليرة</h1>
+            <div class="logo-badge">👑</div><h1>ليرة | Lira</h1>
             <div class="user-creds">👤 <b>{{ username }}</b></div>
             <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
         </div>
         <div class="nav-buttons">
-            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شحن%20رصيد" target="_blank">💬 شحن رصيد (واتساب)</a>
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شحن%20رصيد" target="_blank">💬 شحن رصيد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
                 <a href="/admin_games" class="admin-link">🎮 لوحة الألعاب</a>
-                <a href="/admin_accounting" class="admin-link">📊 برنامج المحاسبة</a>
+                <a href="/admin_accounting" class="admin-link">📊 المحاسبة</a>
             {% endif %}
-            <a href="/logout" class="logout-btn">🚪 تسجيل خروج</a>
+            <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
     </div>
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الذهبي</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
-        <div class="icon-card" onclick="alert('اللعبة الثالثة قيد التفعيل')"><div class="icon-logo">⚡</div><div class="icon-title">التحدي السريع</div></div>
+        <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <div class="icon-card" onclick="alert('اللعبة الرابعة قيد التفعيل')"><div class="icon-logo">🏇</div><div class="icon-title">سباق الخيل</div></div>
         <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الثروة</div></div>
         <a href="/game_golden_boxes" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></a>
@@ -649,15 +707,74 @@ DASHBOARD_PAGE = """
 </html>
 """
 
+GAME_BALLOON_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التحدي السريع (البالون) - ليرة</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
+        .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 450px; margin: 30px auto; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
+        .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.2s; cursor: pointer; }
+        .balloon::after { content: ""; position: absolute; bottom: -12px; left: 52px; width: 4px; height: 15px; background: #888; }
+        .pump-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 35px; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 20px rgba(255,215,0,0.4); margin-top: 15px; width: 100%; }
+        .pump-btn:hover { transform: scale(1.03); }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        .result-msg { margin-top: 20px; font-size: 18px; font-weight: bold; padding: 12px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🎈 التحدي السريع (البالون)</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
+        </div>
+    </div>
+
+    {% if msg %}<div style="background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; margin-top: 15px;">{{ msg }}</div>{% endif %}
+
+    <div class="game-box">
+        <h3 style="color: #ffd700; margin-top: 0;">اضغط لضخ الهواء في البالون (التكلفة: 1$)</h3>
+        <div class="balloon" id="myBalloon"></div>
+        
+        <form method="POST">
+            <input type="hidden" name="action" value="play_balloon">
+            <button type="submit" class="pump-btn" onclick="inflateEffect()">💨 اضغط لضخ الهواء</button>
+        </form>
+
+        {% if win_result %}
+        <div class="result-msg" style="background: {% if 'فزت' in win_result %}#065f46{% else %}#7f1d1d{% endif %}; color: white;">
+            {{ win_result }}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function inflateEffect() {
+            let b = document.getElementById('myBalloon');
+            b.style.transform = "scale(1.2)";
+            setTimeout(() => { b.style.transform = "scale(1)"; }, 200);
+        }
+    </script>
+</body>
+</html>
+"""
+
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>روليت الحظ الاحترافية - Lira</title>
+    <title>روليت الحظ - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 20px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .game-layout { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; align-items: center; }
         .wheel-screen { background: #18181b; border: 4px solid #ffd700; padding: 20px; border-radius: 18px; text-align: center; width: 100%; max-width: 450px; box-shadow: 0 0 30px rgba(255,215,0,0.3); }
         .roulette-ball-box { font-size: 50px; font-weight: bold; background: radial-gradient(circle, #2d2300 0%, #000 100%); border: 3px solid #ffd700; border-radius: 50%; width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; margin: 10px auto; color: #ffd700; box-shadow: inset 0 0 15px rgba(255,215,0,0.5); }
@@ -679,8 +796,9 @@ GAME_ROULETTE_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ الاحترافية (Live Style)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
             <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: $<span id="userBalance">{{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -783,10 +901,11 @@ GAME_GOLDEN_BOXES_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة الصناديق الذهبية - Lira</title>
+    <title>الصناديق الذهبية - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .boxes-container { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 5px solid #ffd700; padding: 30px; border-radius: 20px; margin-top: 25px; box-shadow: 0 0 40px rgba(255,215,0,0.3); text-align: center; }
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
         @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -801,15 +920,16 @@ GAME_GOLDEN_BOXES_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎁 لعبة الصناديق الذهبية (15 صندوقاً)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🎁 الصناديق الذهبية (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="boxes-container">
-        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها وطابقها (تكلفة المحاولة: 1$)</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها (تكلفة المحاولة: 1$)</h3>
         <p style="color: #cbd5e1; font-size: 15px;">الصناديق المختارة: <b id="selectionCount" style="color: #38bdf8;">0</b> / 3</p>
         {% if session.get('username') == 'admin1' %}
             <p style="font-size: 14px; color: #38bdf8; background: #000; padding: 8px; border-radius: 6px; display: inline-block;">👑 محاولات النظام التراكمية: <b>{{ total_att }}</b></p>
@@ -844,7 +964,6 @@ GAME_GOLDEN_BOXES_PAGE = """
     <script>
         let selectedBoxes = [];
         function toggleBox(index) {
-            // منع النقر على صندوق تم اختياره مسبقاً (لا يمكن التراجع أو النقر المزدوج)
             if (selectedBoxes.includes(index)) return;
             
             if (selectedBoxes.length < 3) {
@@ -869,7 +988,6 @@ GAME_GOLDEN_BOXES_PAGE = """
                     container.appendChild(input);
                 });
                 
-                // عند اكتمال النقر على 3 صناديق، يتم الإرسال تلقائياً بدون زر وبدون تأكيد
                 if (selectedBoxes.length === 3) {
                     document.getElementById('gameForm').submit();
                 }
@@ -885,10 +1003,11 @@ GAME_GOLDEN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة الرقم الذهبي - Lira</title>
+    <title>الرقم الذهبي - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; box-shadow: 0 0 35px rgba(184,134,11,0.4); text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
@@ -906,8 +1025,9 @@ GAME_GOLDEN_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي (من 1 إلى 50)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي (ليرة)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -993,10 +1113,11 @@ ADMIN_CUSTOMERS_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة الزبائن والخزنة - Lira</title>
+    <title>إدارة الزبائن والخزنة - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; }
         .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         @media(max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
@@ -1014,8 +1135,11 @@ ADMIN_CUSTOMERS_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - إدارة الزبائن والخزنة</h2>
-        <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - ليرة</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        </div>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="vault-box">
@@ -1080,10 +1204,11 @@ ADMIN_GAMES_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم الألعاب - Lira</title>
+    <title>لوحة تحكم الألعاب - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         .games-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px; }
         @media(max-width:900px){ .games-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1096,7 +1221,10 @@ ADMIN_GAMES_PAGE = """
 <body>
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم الألعاب</h2>
-        <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
+        </div>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="games-grid">
@@ -1122,10 +1250,11 @@ ADMIN_ACCOUNTING_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج المحاسبة الشامل - Lira</title>
+    <title>برنامج المحاسبة - ليرة</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width:900px){ .stats-grid { grid-template-columns: 1fr; } }
         .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 12px; text-align: center; }
@@ -1139,8 +1268,11 @@ ADMIN_ACCOUNTING_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية (admin1)</h2>
-        <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
+        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية (ليرة)</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <a class="download-btn" href="/download" target="_blank">📥 تثبيت التطبيق</a>
+            <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
+        </div>
     </div>
     <div class="stats-grid">
         <div class="stat-card">
