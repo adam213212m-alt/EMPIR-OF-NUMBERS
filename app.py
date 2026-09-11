@@ -64,13 +64,6 @@ class UserLastBet(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     bets_json = db.Column(db.Text, nullable=False)
 
-# نموذج حالة لعبة "اكشف واربح" المشتركة بين جميع الحسابات (حوض 46 محاولة)
-class ScratchGameState(db.Model):
-    __tablename__ = 'scratch_game_state'
-    id = db.Column(db.Integer, primary_key=True)
-    current_index = db.Column(db.Integer, default=0)
-    pool_json = db.Column(db.Text, nullable=False)
-
 
 # إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
 with app.app_context():
@@ -87,12 +80,6 @@ with app.app_context():
     if not BalloonState.query.get(1):
         balloon_state = BalloonState(id=1, attempts_since_last_win=0, sequence_index=0)
         db.session.add(balloon_state)
-
-    if not ScratchGameState.query.get(1):
-        initial_pool = [3] + [2]*20 + [0]*25
-        random.shuffle(initial_pool)
-        scratch_state = ScratchGameState(id=1, current_index=0, pool_json=json.dumps(initial_pool))
-        db.session.add(scratch_state)
         
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
@@ -218,7 +205,6 @@ def game_golden_number():
                     if not existing_booking:
                         user.balance -= cost
                         vault.vault_balance += cost
-                        # تسجيل المبيع في المحاسبة
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -306,7 +292,6 @@ def game_balloon_pop():
                 user.balance -= cost
                 vault.vault_balance += cost
                 
-                # تسجيل المبيع في المحاسبة
                 log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log_sale)
                 
@@ -361,7 +346,6 @@ def game_roulette():
                     user.balance -= total_bet_amount
                     vault.vault_balance += total_bet_amount
                     
-                    # تسجيل المبيع في المحاسبة
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet_amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
                     
@@ -441,7 +425,7 @@ def game_roulette():
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
-# --- لعبة عجلة الأرقام (مع لوحة 20 رقماً واختيار حتى 15 رقماً كحد أقصى) ---
+# --- لعبة عجلة الأرقام (مع حركة الدوران قبل كشف الرقم) ---
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session:
@@ -466,21 +450,19 @@ def game_number_wheel():
             elif len(selected_numbers) > 15:
                 msg = "الحد الأقصى المسموح به للرهان هو 15 رقماً!"
             else:
-                total_bet = float(len(selected_numbers)) # 1$ لكل رقم
+                total_bet = float(len(selected_numbers))
                 if user.balance >= total_bet:
                     user.balance -= total_bet
                     vault.vault_balance += total_bet
 
-                    # تسجيل المبيع في المحاسبة
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
 
-                    # السحب عشوائياً من 1 إلى 20
                     winning_num = random.randint(1, 20)
                     
                     if winning_num in selected_numbers:
                         is_win = True
-                        payout = 15.0 # الجائزة الثابتة المطابقة لمعادلة 75% RTP
+                        payout = 15.0
                         user.balance += payout
                         vault.vault_balance -= payout
                         log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
@@ -497,95 +479,6 @@ def game_number_wheel():
             msg = f"حدث خطأ أثناء معالجة الرهان: {str(e)}"
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
-
-# --- لعبة اكشف واربح (15 صندوقاً و3 اختيارات - حوض مشترك مغلق 46 محاولة) ---
-@app.route('/game_scratch', methods=['GET', 'POST'])
-def game_scratch():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    vault = SystemVault.query.get(1)
-    scratch_state = ScratchGameState.query.get(1)
-    
-    msg = None
-    revealed_boxes_data = None
-    cost = 1.0  # تكلفة المحاولة 1 دولار
-
-    if request.method == 'POST':
-        box_indices = request.form.getlist('box_indices')
-        if len(box_indices) != 3:
-            msg = "يرجى اختيار 3 صناديق تماماً قبل الكشف!"
-        else:
-            if user.balance >= cost:
-                user.balance -= cost
-                vault.vault_balance += cost
-
-                # تسجيل المبيع في المحاسبة
-                log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                db.session.add(log_sale)
-
-                # سحب النتيجة من الحوض المشترك المغلق (46 محاولة)
-                pool = json.loads(scratch_state.pool_json)
-                if scratch_state.current_index >= len(pool):
-                    pool = [3] + [2]*20 + [0]*25
-                    random.shuffle(pool)
-                    scratch_state.current_index = 0
-
-                match_type = pool[scratch_state.current_index]
-                scratch_state.current_index += 1
-                db.session.commit()
-
-                # توليد الأرقام للصناديق الـ 15 (بحيث تظهر النتائج في الصناديق الـ 3 المتاحة)
-                boxes_results = {}
-                selected_indices = [int(idx) for idx in box_indices]
-
-                if match_type == 3:
-                    # مطابقة 3 أرقام -> جائزة 20$
-                    win_num = random.randint(1, 9)
-                    boxes_results[selected_indices[0]] = win_num
-                    boxes_results[selected_indices[1]] = win_num
-                    boxes_results[selected_indices[2]] = win_num
-                    payout = 20.0
-                    msg = "🏆 مبروك! طابقت الأرقام الثلاثة في الصناديق المختارة وفزت بالجائزة الكبرى (20$)!"
-                elif match_type == 2:
-                    # مطابقة رقمين -> نصف قيمة الرهان (0.5$)
-                    win_num = random.randint(1, 9)
-                    diff_num = random.choice([x for x in range(1, 10) if x != win_num])
-                    vals = [win_num, win_num, diff_num]
-                    random.shuffle(vals)
-                    boxes_results[selected_indices[0]] = vals[0]
-                    boxes_results[selected_indices[1]] = vals[1]
-                    boxes_results[selected_indices[2]] = vals[2]
-                    payout = 0.5
-                    msg = "✨ ممتاز! طابقت رقمين في الصناديق المختارة وفزت بنصف قيمة الرهان (0.5$)!"
-                else:
-                    # خسارة (أرقام غير متطابقة)
-                    vals = random.sample(range(1, 10), 3)
-                    boxes_results[selected_indices[0]] = vals[0]
-                    boxes_results[selected_indices[1]] = vals[1]
-                    boxes_results[selected_indices[2]] = vals[2]
-                    payout = 0.0
-                    msg = "💥 حظ أوفر في المرة القادمة، لم تتطابق الأرقام في الصناديق المختارة."
-
-                # ملء باقي الصناديق الـ 12 بأرقام عشوائية للتكامل البصري
-                for i in range(15):
-                    if i not in boxes_results:
-                        boxes_results[i] = random.randint(1, 9)
-
-                if payout > 0:
-                    user.balance += payout
-                    vault.vault_balance -= payout
-                    log = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                    db.session.add(log)
-
-                db.session.commit()
-                revealed_boxes_data = boxes_results
-            else:
-                msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
-
-    return render_template_string(GAME_SCRATCH_PAGE, username=username, balance=user.balance, msg=msg, revealed_boxes=revealed_boxes_data)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -669,17 +562,14 @@ def admin_accounting():
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    # حساب إجمالي المبيعات (يشمل بيع العملات للزبائن + كافة رهانات الألعاب باعتبارها مبيعات)
     total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة'])).scalar() or 0.0
     
-    # حساب إجمالي الجوائز المدفوعة
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
     payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
-    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
-    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -768,7 +658,7 @@ DASHBOARD_PAGE = """
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
-        <a href="/game_scratch" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></a>
+        <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></div>
         <div class="icon-card" onclick="alert('قريباً في التعديل القادم')"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></div>
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
@@ -997,7 +887,8 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# قالب واجهة لعبة عجلة الأرقام المحدث (مع لوحة 20 رقماً واختيار حتى 15 رقماً كحد أقصى)
+# --- لعبة عجلة الأرقام (مع حركة الدوران لمدة ثانيتين قبل كشف الرقم الرابح) ---
+# --- عجلة الأرقام (مع حركة الدوران قبل كشف الرقم الرابح) ---
 GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1009,7 +900,7 @@ GAME_NUMBER_WHEEL_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 600px; margin: 20px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
-        .wheel-circle { width: 140px; height: 140px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 5px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); }
+        .wheel-circle { width: 140px; height: 140px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 5px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
         .numbers-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
         .num-cell { background: #252525; border: 2px solid #555; border-radius: 10px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #fff; cursor: pointer; transition: 0.2s; }
         .num-cell.selected { background: #22c55e; border-color: #ffd700; color: #000; transform: scale(1.05); }
@@ -1041,7 +932,7 @@ GAME_NUMBER_WHEEL_PAGE = """
             {% endfor %}
         </div>
 
-        <form method="POST" id="wheelForm">
+        <form method="POST" id="wheelForm" onsubmit="spinWheelAndSubmit(event)">
             <input type="hidden" name="selected_numbers" id="selectedNumbersInput" value="[]">
             <div style="color: #ffd700; font-size: 16px; margin-bottom: 10px;">إجمالي الرهان: <b id="totalBetText">$0</b></div>
             <button type="submit" class="spin-action-btn" id="spinBtn" disabled>🎯 أدر العجلة الآن</button>
@@ -1066,107 +957,23 @@ GAME_NUMBER_WHEEL_PAGE = """
             document.getElementById('selectedNumbersInput').value = JSON.stringify(selectedNumbers);
             document.getElementById('spinBtn').disabled = (selectedNumbers.length === 0);
         }
-        function installApp() { window.location.href = '/download'; }
-    </script>
-</body>
-</html>
-"""
 
-# قالب واجهة لعبة "اكشف واربح" المحدث (15 صندوقاً و3 اختيارات)
-GAME_SCRATCH_PAGE = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اكشف واربح - ليرة</title>
-    <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
-        .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 600px; margin: 20px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
-        .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
-        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 12px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #000; cursor: pointer; transition: 0.2s; }
-        .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; transform: scale(1.05); }
-        .play-action-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-size: 18px; font-weight: bold; padding: 12px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(34,197,94,0.4); }
-        .play-action-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
-        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح (مطابقة الأرقام)</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
-            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
-        </div>
-    </div>
-    {% if msg %}<div style="background: {% if 'مبروك' in msg or 'ممتاز' in msg %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold; max-width: 600px; margin-left: auto; margin-right: auto;">{{ msg }}</div>{% endif %}
-    <div class="game-box">
-        <h3 style="color: #ffd700; margin-top: 0;">اختر 3 صناديق من أصل 15 وكشف مطابقة الأرقام! (تكلفة المحاولة: 1$)</h3>
-        <p style="color: #38bdf8; font-size: 14px; margin: 5px 0;">الصناديق المختارة: <b id="selectionCount">0</b> / 3</p>
-        
-        <form method="POST" id="scratchForm">
-            <div id="hiddenInputsContainer"></div>
-            <div class="boxes-grid">
-                {% for i in range(15) %}
-                    <div class="box-card" id="box-{{ i }}" onclick="toggleBox({{ i }})">
-                        <span id="box-icon-{{ i }}">📦</span>
-                        <span id="box-text-{{ i }}" style="font-size: 11px; margin-top: 2px;">صندوق {{ i+1 }}</span>
-                        <span id="box-val-{{ i }}" style="display:none; font-size: 24px; color: #fff;">
-                            {% if revealed_boxes and i in revealed_boxes %}{{ revealed_boxes[i] }}{% endif %}
-                        </span>
-                    </div>
-                {% endfor %}
-            </div>
-            <button type="submit" class="play-action-btn" id="playBtn" disabled>🎟️ اكشف الصناديق المختارة (1$)</button>
-        </form>
-    </div>
-    <script>
-        let selectedBoxes = [];
-        let revealedData = '{{ revealed_boxes | tojson | safe }}';
-
-        // إذا تم كشف الصناديق في الدورة الحالية، قم بعرضها بصرياً
-        window.onload = function() {
-            if (revealedData && revealedData !== 'None' && revealedData !== '{}') {
-                try {
-                    let boxesMap = JSON.parse(revealedData);
-                    for (let idx in boxesMap) {
-                        let card = document.getElementById('box-' + idx);
-                        document.getElementById('box-icon-' + idx).innerText = "🔓";
-                        document.getElementById('box-text-' + idx).style.display = "none";
-                        let valSpan = document.getElementById('box-val-' + idx);
-                        valSpan.innerText = boxesMap[idx];
-                        valSpan.style.display = "block";
-                        card.style.background = "#1e3a8a";
-                    }
-                } catch(e) { console.error(e); }
-            }
-        };
-
-        function toggleBox(index) {
-            let card = document.getElementById('box-' + index);
-            if (selectedBoxes.includes(index)) {
-                selectedBoxes = selectedBoxes.filter(i => i !== index);
-                card.classList.remove('selected');
-            } else {
-                if (selectedBoxes.length < 3) {
-                    selectedBoxes.push(index);
-                    card.classList.add('selected');
-                } else {
-                    alert('يمكنك اختيار 3 صناديق كحد أقصى في كل محاولة!');
-                }
-            }
-            document.getElementById('selectionCount').innerText = selectedBoxes.length;
-            let container = document.getElementById('hiddenInputsContainer');
-            container.innerHTML = "";
-            selectedBoxes.forEach(boxIdx => {
-                let input = document.createElement('input');
-                input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
-                container.appendChild(input);
-            });
-            document.getElementById('playBtn').disabled = (selectedBoxes.length !== 3);
+        // دالة حركة دوران العجلة قبل اختيار الرقم الرابح وإرسال النموذج
+        function spinWheelAndSubmit(e) {
+            e.preventDefault(); // إيقاف الإرسال الفوري للنموذج لتفعيل الأنيميشن
+            let wheel = document.getElementById('wheelDisplay');
+            let btn = document.getElementById('spinBtn');
+            btn.disabled = true;
+            btn.innerText = "⏳ جاري تدوير العجلة...";
+            
+            // تدوير العجلة بصرياً لفترة قصيرة (ثانيتين)
+            wheel.style.transform = "rotate(1800deg)";
+            
+            setTimeout(function() {
+                document.getElementById('wheelForm').submit();
+            }, 2000); // إرسال النموذج بعد انتهاء الدوران
         }
+
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
