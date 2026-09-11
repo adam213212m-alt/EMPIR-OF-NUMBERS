@@ -22,6 +22,7 @@ class User(db.Model):
     balance = db.Column(db.Float, default=0.0)
     role = db.Column(db.String(20), nullable=False)
     created_by = db.Column(db.String(80), nullable=False)
+    owner_name = db.Column(db.String(100), default='غير محدد')
 
 class SystemVault(db.Model):
     __tablename__ = 'system_vault'
@@ -86,11 +87,15 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
+# إنشاء الجداول وتثبيت الـ 15 حساباً الثابتة وتصفير الأرصدة عند التشغيل الأول
 with app.app_context():
     db.create_all()
     
-    if not SystemVault.query.get(1):
+    # تثبيت رصيد الخزنة على مليون دولار
+    vault = SystemVault.query.get(1)
+    if vault:
+        vault.vault_balance = 1000000.0
+    else:
         vault = SystemVault(id=1, vault_balance=1000000.0)
         db.session.add(vault)
     
@@ -112,14 +117,44 @@ with app.app_context():
         r_state = RevealAndWinState(id=1, global_attempts=0, pool_json=json.dumps(outcomes))
         db.session.add(r_state)
         
+    # حساب الآدمن (رصيده يبدأ بـ 0 مثل أي لاعب آخر)
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
-        admin = User(username='admin1', password='admin123', balance=50000.0, role='admin', created_by='system')
-        vault_record = SystemVault.query.get(1)
-        if vault_record:
-            vault_record.vault_balance -= 50000.0
+        admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
         db.session.add(admin)
-        
+    else:
+        admin.balance = 0.0
+
+    # الحسابات الـ 15 الثابتة الدائمة مع أسرارها وأسماء أصحابها
+    fixed_accounts = [
+        ("ahmad_t", "pass123", "أحمد الطفيلي"),
+        ("mohammad_9", "pass456", "محمد الحسين"),
+        ("ali_z", "pass789", "علي زعيتر"),
+        ("hassan_m", "pass321", "حسن المصري"),
+        ("ibrahim_k", "pass654", "إبراهيم خليل"),
+        ("khaled_s", "pass987", "خالد سلامة"),
+        ("bilal_n", "pass111", "بلال ناصر"),
+        ("hussein_b", "pass222", "حسين بركات"),
+        ("rami_d", "pass333", "رامي ديب"),
+        ("samer_h", "pass444", "سامر حيدر"),
+        ("ziad_m", "pass555", "زياد منصور"),
+        ("fadi_r", "pass666", "فادي رعد"),
+        ("omar_t", "pass777", "عمر طفيلي"),
+        ("george_k", "pass888", "جورج خوري"),
+        ("charbel_s", "pass999", "شربل سابا")
+    ]
+
+    for uname, pwd, oname in fixed_accounts:
+        acc = User.query.filter_by(username=uname).first()
+        if not acc:
+            acc = User(username=uname, password=pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
+            db.session.add(acc)
+        else:
+            acc.password = pwd
+            acc.owner_name = oname
+
+    # تصفير أرصدة كافة الحسابات بناءً على الطلب
+    User.query.update({User.balance: 0.0})
     db.session.commit()
 
 
@@ -300,7 +335,7 @@ def game_golden_number():
                 
                 winner_user.balance += 75.0
                 vault.vault_balance -= 75.0
-                log = FinancialLog(action_type='جائزة الرقم الذهبي', admin_name='admin1', target_user=winner_user.username, amount=75.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=75.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
                 draw_state.winning_number = winning_num
@@ -673,7 +708,7 @@ def game_golden_boxes_new():
                 
                 winner_user.balance += 200.0
                 vault.vault_balance -= 200.0
-                log = FinancialLog(action_type='جائزة الرقم الذهبي الفاخر', admin_name='admin1', target_user=winner_user.username, amount=200.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=200.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
                 l_state.winning_number = winning_box
@@ -707,9 +742,10 @@ def admin_customers():
         if action == 'create_user':
             new_u = request.form.get('new_username', '').strip()
             new_p = request.form.get('new_password', '').strip()
+            new_owner = request.form.get('new_owner', '').strip()
             existing = User.query.filter_by(username=new_u).first()
             if not existing:
-                new_user = User(username=new_u, password=new_p, balance=0.0, role='player', created_by='admin1')
+                new_user = User(username=new_u, password=new_p, balance=0.0, role='player', created_by='admin1', owner_name=new_owner)
                 db.session.add(new_user)
                 db.session.commit()
                 msg = f"تم إنشاء الحساب '{new_u}' بنجاح!"
@@ -746,7 +782,7 @@ def admin_customers():
                 msg = "رصيد الزبون غير كافٍ أو المبلغ غير صالح!"
 
     users_list = User.query.all()
-    users_data = [(u.username, u.password, u.balance, u.role, u.created_by) for u in users_list]
+    users_data = [(u.username, u.password, u.balance, u.role, u.created_by, u.owner_name) for u in users_list]
 
     return render_template_string(ADMIN_CUSTOMERS_PAGE, vault_balance=vault.vault_balance, users_list=users_data, msg=msg)
 
@@ -765,13 +801,13 @@ def admin_games():
             f_val = int(forced_num) if forced_num.isdigit() else 0
             draw_state.forced_winning_number = f_val
             db.session.commit()
-            msg = f"تم تحديث الرقم المسبق للرقم الذهبي إلى: {f_val if f_val > 0 else 'عشوائي'}"
+            msg = f"تم تحديث الرقم المسبق للرقم الحنون إلى: {f_val if f_val > 0 else 'عشوائي'}"
         elif 'forced_luxury_number' in request.form:
             forced_lux = request.form.get('forced_luxury_number', '').strip()
             l_val = int(forced_lux) if forced_lux.isdigit() else 0
             l_state.forced_winning_number = l_val
             db.session.commit()
-            msg = f"تم تحديث الصندوق المسبق للرقم الذهبي الفاخر إلى: {l_val if l_val > 0 else 'عشوائي'}"
+            msg = f"تم تحديث الصندوق المسبق للرقم الحنون الفاخر إلى: {l_val if l_val > 0 else 'عشوائي'}"
 
     return render_template_string(ADMIN_GAMES_PAGE, forced_val=draw_state.forced_winning_number, forced_lux=l_state.forced_winning_number, msg=msg)
 
@@ -786,11 +822,11 @@ def admin_accounting():
     
     total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة'])).scalar() or 0.0
     
-    payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي').scalar() or 0.0
+    payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
     payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
-    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي الفاخر').scalar() or 0.0
+    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون الفاخر').scalar() or 0.0
     payout_res7 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
     total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6 + payout_res7
@@ -852,7 +888,6 @@ DASHBOARD_PAGE = """
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
-        /* لافته الجوائز الكبرى المضيئة والمتحركة */
         @keyframes glowAndColor {
             0% { color: #ffd700; text-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
             33% { color: #ff4500; text-shadow: 0 0 15px #ff4500, 0 0 30px #ff0000; border-color: #ff4500; box-shadow: 0 0 20px rgba(255,69,0,0.5); }
@@ -873,7 +908,6 @@ DASHBOARD_PAGE = """
             letter-spacing: 1px;
         }
 
-        /* شبكة الأيقونات الفاخرة ثلاثية الأبعاد 3D */
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 30px; max-width: 900px; margin-left: auto; margin-right: auto; }
         @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .icons-grid { grid-template-columns: 1fr; } }
@@ -937,19 +971,18 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- اللافته المتحركة والمضيئة فوق الأيقونات -->
     <div class="promo-banner">
         ✨ العب واربح جوائز بقيمة 500,000$ ✨
     </div>
 
-    <!-- شبكة الأيقونات النشطة الفاخرة 3D (تم إزالة الأيقونات الفارغة نهائياً) -->
+    <!-- شبكة الأيقونات النشطة الفاخرة 3D بدون أيقونات فارغة -->
     <div class="icons-grid">
-        <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الذهبي</div></a>
+        <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الحنون</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></a>
-        <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الذهبي الفاخر</div></a>
+        <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الحنون الفاخر</div></a>
     </div>
 
     <script>
@@ -1289,7 +1322,6 @@ GAME_REVEAL_AND_WIN_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; width: 100%; max-width: 800px; box-sizing: border-box; margin-bottom: 20px; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         h1 { background: linear-gradient(to left, #ffd700, #ff8c00); -webkit-background-clip: text; color: transparent; font-size: 2.2rem; margin: 10px 0; text-align: center; }
-        
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 700px; width: 100%; box-sizing: border-box; text-align: center; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
         .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 12px; height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; color: #000; cursor: pointer; transition: 0.2s; }
@@ -1301,7 +1333,7 @@ GAME_REVEAL_AND_WIN_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح (مطابقة الأشكال)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح</h2>
         <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
         <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
     </div>
@@ -1357,7 +1389,6 @@ GAME_REVEAL_AND_WIN_PAGE = """
         };
 
         function toggleBox(index) {
-            // إذا كانت النتائج معروضة بالفعل، امنع التعديل حتى يتم الضغط على محاولة جديدة
             if (resultJson && resultJson !== 'None' && resultJson !== 'null') return;
 
             let card = document.getElementById('box-' + index);
@@ -1383,7 +1414,6 @@ GAME_REVEAL_AND_WIN_PAGE = """
             document.getElementById('playBtn').disabled = (selectedBoxes.length !== 3);
         }
 
-        // دالة إعادة الصناديق لشكلها الأساسي المغلق (📦) للدورة الجديدة
         function resetGameBoxes() {
             window.location.href = '/game_reveal_and_win';
         }
@@ -1397,7 +1427,7 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>الرقم الذهبي الفاخر</title>
+    <title>الرقم الحنون الفاخر</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
     <style>
         body { background-color: #0d0d0d; color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -1420,7 +1450,7 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎁 الرقم الذهبي الفاخر</h2>
+        <h2 style="color: #ffd700; margin: 0;">🎁 الرقم الحنون الفاخر</h2>
         <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
         <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
     </div>
@@ -1512,7 +1542,7 @@ GAME_GOLDEN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الرقم الذهبي - امبراطورية الأرقام</title>
+    <title>الرقم الحنون - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
@@ -1533,7 +1563,7 @@ GAME_GOLDEN_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي</h2>
+        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الحنون</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
@@ -1662,6 +1692,7 @@ ADMIN_CUSTOMERS_PAGE = """
                 <input type="hidden" name="action" value="create_user">
                 <label>اسم المستخدم:</label><input type="text" name="new_username" placeholder="اسم المستخدم" required>
                 <label>الرقم السري:</label><input type="password" name="new_password" placeholder="كلمة المرور" required>
+                <label>صاحب الحساب:</label><input type="text" name="new_owner" placeholder="اسم صاحب الحساب الحقيقي" required>
                 <button type="submit" class="btn-create">إنشاء الحساب</button>
             </form>
         </div>
@@ -1672,7 +1703,7 @@ ADMIN_CUSTOMERS_PAGE = """
                 <label>اختر الزبون:</label>
                 <select name="target_user" required>
                     <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: ${{ u[2] }})</option>{% endfor %}
                 </select>
                 <label>المبلغ ($):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
                 <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
@@ -1685,7 +1716,7 @@ ADMIN_CUSTOMERS_PAGE = """
                 <label>اختر الزبون:</label>
                 <select name="target_user" required>
                     <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (رصيده: ${{ u[2] }})</option>{% endfor %}
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: ${{ u[2] }})</option>{% endfor %}
                 </select>
                 <label>المبلغ ($):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
                 <button type="submit" class="btn-buy">استرجاع للخزنة</button>
@@ -1693,12 +1724,13 @@ ADMIN_CUSTOMERS_PAGE = """
         </div>
     </div>
     <div class="panel-box" style="margin-top: 25px;">
-        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات المسجلة</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات الثابتة والمسجلة</h3>
         <table>
-            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>المُنشئ</th></tr>
+            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>صاحب الحساب</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>المُنشئ</th></tr>
             {% for u in users_list %}
             <tr>
                 <td><b>{{ u[0] }}</b></td><td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
+                <td style="color: #ffd700; font-weight: bold;">{{ u[5] }}</td>
                 <td>{{ u[3] }}</td><td style="color: #34d399; font-weight: bold;">${{ u[2] }}</td><td>{{ u[4] }}</td>
             </tr>
             {% endfor %}
@@ -1741,7 +1773,7 @@ ADMIN_GAMES_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="games-grid">
         <div class="game-ctrl-card" style="border: 3px solid #34d399;">
-            <div class="game-title">1. الرقم الذهبي 🏆</div>
+            <div class="game-title">1. الرقم الحنون 🏆</div>
             <form method="POST">
                 <input type="number" name="forced_winning_number" value="{% if forced_val > 0 %}{{ forced_val }}{% endif %}" placeholder="رقم من 1 إلى 50" min="1" max="50">
                 <button type="submit" class="ctrl-btn" style="background: #34d399; color: black; margin-top: 5px;">حفظ الرقم الفائز</button>
@@ -1749,7 +1781,7 @@ ADMIN_GAMES_PAGE = """
             <a href="/game_golden_number" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
         </div>
         <div class="game-ctrl-card" style="border: 3px solid #ffd700;">
-            <div class="game-title">6. الرقم الذهبي الفاخر 🎁</div>
+            <div class="game-title">6. الرقم الحنون الفاخر 🎁</div>
             <form method="POST">
                 <input type="number" name="forced_luxury_number" value="{% if forced_lux > 0 %}{{ forced_lux }}{% endif %}" placeholder="صندوق من 1 إلى 5" min="1" max="5">
                 <button type="submit" class="ctrl-btn" style="background: #ffd700; color: black; margin-top: 5px;">حفظ الصندوق الفائز</button>
