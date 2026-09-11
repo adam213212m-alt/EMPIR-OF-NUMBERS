@@ -69,7 +69,7 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO game_draw_state (id, winning_number, status, draw_end_time, forced_winning_number) VALUES (1, 0, "idle", 0, 0)')
 
-    # جدول لعبة الصناديق الذهبية الجديد (لتخزين حالة الصناديق والمحاولات الإجمالية لكل الحسابات)
+    # جدول لعبة الصناديق الذهبية الجديد
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS golden_boxes_state (
             id INTEGER PRIMARY KEY,
@@ -80,7 +80,6 @@ def init_db():
     ''')
     cursor.execute('SELECT COUNT(*) FROM golden_boxes_state')
     if cursor.fetchone()[0] == 0:
-        # إعداد 15 صندوقاً بأرقام من 1 إلى 5 متكررة 3 مرات بشكل عشوائي
         initial_nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
         random.shuffle(initial_nums)
         import json
@@ -188,7 +187,7 @@ def api_golden_status():
         "bookings": bookings
     })
 
-# لعبة الرقم الذهبي (الأيقونة الأولى)
+# لعبة الرقم الذهبي
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session:
@@ -282,7 +281,7 @@ def game_golden_number():
                                   forced_num=forced_num, my_booked_nums=my_booked_nums, my_total_spent=my_total_spent, msg=msg)
 
 
-# لعبة الصناديق الذهبية الجديدة (الأيقونة السادسة)
+# لعبة الصناديق الذهبية المعدلة (فتح 3 صناديق في محاولة واحدة بقيمة 1$)
 @app.route('/game_golden_boxes', methods=['GET', 'POST'])
 def game_golden_boxes():
     if 'username' not in session:
@@ -295,83 +294,76 @@ def game_golden_boxes():
     import json
     msg = None
     result_text = None
+    revealed_nums = []
 
     if request.method == 'POST':
         action = request.form.get('action')
         
-        if action == 'open_box':
-            box_idx = int(request.form.get('box_index'))
-            
-            # التحقق من رصيد اللاعب (تكلفة المحاولة 1$)
+        if action == 'open_three_boxes':
+            # التحقق من رصيد اللاعب (المحاولة الواحدة بـ 1$)
             cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
             bal = cursor.fetchone()[0]
             cost = 1.0
             
             if bal >= cost:
-                cursor.execute("SELECT total_attempts, boxes_data, game_status FROM golden_boxes_state WHERE id=1")
+                cursor.execute("SELECT total_attempts, boxes_data FROM golden_boxes_state WHERE id=1")
                 state_row = cursor.fetchone()
-                total_att, boxes_json, g_status = state_row[0], state_row[1], state_row[2]
+                total_att, boxes_json = state_row[0], state_row[1]
                 boxes = json.loads(boxes_json)
                 
                 # خصم 1$ من رصيد اللاعب
                 cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                 
-                # زيادة المحاولات الإجمالية لكل الحسابات بواقع 1
+                # زيادة المحاولات التراكمية لكل الحسابات بـ 1
                 total_att += 1
                 
-                # البرمجة الداخلية: كل 36 محاولة إجمالية تتطابق الأرقام وتفوز تلقائياً
+                # اختيار 3 صناديق عشوائية مختلفة لفتحها في هذه المحاولة
+                selected_indices = random.sample(range(15), 3)
+                revealed_nums = [boxes[idx] for idx in selected_indices]
+                
+                # البرمجة الداخلية: كل 36 محاولة تفوز تلقائياً بتطابق الأرقام الثلاثة
                 if total_att >= 36 or (total_att % 36 == 0):
-                    # تزوير الصناديق الثلاثة الأولى لتكون متطابقة (مثلاً الرقم 3 ثلاث مرات) لجعل الفوز محققاً
-                    target_num = random.randint(1, 5)
-                    boxes[0] = target_num
-                    boxes[1] = target_num
-                    boxes[2] = target_num
-                    total_att = 0 # إعادة ضبط العداد بعد الفوز
+                    winning_val = random.randint(1, 5)
+                    revealed_nums = [winning_val, winning_val, winning_val]
+                    total_att = 0 # تصفير العداد بعد الفوز
                     is_win = True
                 else:
-                    # فحص عشوائي طبيعي هل تطابقت 3 أرقام
-                    # للتبسيط، نفحص إذا فتح اللاعب 3 صناديق وكانوا متشابهين أو حسب منطق اللعبة
-                    is_win = False
+                    # التحقق هل الأرقام الثلاثة متطابقة
+                    is_win = (revealed_nums[0] == revealed_nums[1] == revealed_nums[2])
 
-                # تحديث حالة المحاولات والصناديق في قاعدة البيانات
-                cursor.execute("UPDATE golden_boxes_state SET total_attempts=?, boxes_data=? WHERE id=1", (total_att, json.dumps(boxes)))
+                cursor.execute("UPDATE golden_boxes_state SET total_attempts=? WHERE id=1", (total_att,))
                 
-                opened_val = boxes[box_idx]
-                
-                if total_att == 0 or is_win:
+                if is_win:
                     # الفوز بجائزة 20$
                     cursor.execute("UPDATE users SET balance = balance + 20.0 WHERE username=?", (username,))
                     cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الصناديق الذهبية', 'system', ?, 20.0, ?)", 
                                    (username, time.strftime('%Y-%m-%d %H:%M')))
                     conn.commit()
-                    result_text = f"مبروك لقد فزت ب 20$ (فتحت الصندوق رقم {box_idx+1} وكان يحمل الرقم {opened_val})!"
+                    result_text = f"مبروك لقد فزت ب 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})!"
                 else:
                     conn.commit()
-                    result_text = f"حظ أوفر (فتحت الصندوق رقم {box_idx+1} وكان يحمل الرقم {opened_val})"
+                    result_text = f"حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
             else:
                 msg = "رصيدك غير كافٍ (تكلفة المحاولة 1$)!"
 
         elif action == 'reset_game' and username == 'admin1':
-            # إعادة خلط الصناديق وتصفير اللعبة للآدمن
             new_nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
             random.shuffle(new_nums)
             cursor.execute("UPDATE golden_boxes_state SET total_attempts=0, boxes_data=? WHERE id=1", (json.dumps(new_nums),))
             conn.commit()
-            msg = "تم إعادة تعيين وخلط الصناديق الذهبية بنجاح!"
+            msg = "تم إعادة خلط الصناديق وتصفير عداد النظام بنجاح!"
 
     cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
     balance = cursor.fetchone()[0]
     
-    cursor.execute("SELECT boxes_data, total_attempts FROM golden_boxes_state WHERE id=1")
-    row_state = cursor.fetchone()
-    boxes = json.loads(row_state[0])
-    total_att = row_state[1]
+    cursor.execute("SELECT total_attempts FROM golden_boxes_state WHERE id=1")
+    total_att = cursor.fetchone()[0]
 
     conn.close()
-    return render_template_string(GAME_GOLDEN_BOXES_PAGE, username=username, balance=balance, boxes=boxes, total_att=total_att, result_text=result_text, msg=msg)
+    return render_template_string(GAME_GOLDEN_BOXES_PAGE, username=username, balance=balance, total_att=total_att, result_text=result_text, revealed_nums=revealed_nums, msg=msg)
 
 
-# لوحات الأدمن السابقة (محمية بالكامل)
+# لوحات الأدمن السابقة
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
     if 'username' not in session or session.get('username') != 'admin1':
@@ -467,8 +459,7 @@ def admin_accounting():
     logs = cursor.fetchall()
     
     cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='بيع عملات للزبون'")
-    sales_res = cursor.fetchone()[0]
-    total_sales = sales_res if sales_res else 0.0
+    sales_res = cursor.fetchone()[0] or 0.0
 
     cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='جائزة الرقم الذهبي'")
     payout_res1 = cursor.fetchone()[0] or 0.0
@@ -476,6 +467,7 @@ def admin_accounting():
     cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='جائزة الصناديق الذهبية'")
     payout_res2 = cursor.fetchone()[0] or 0.0
 
+    total_sales = sales_res
     total_payouts = payout_res1 + payout_res2
     net_profits = total_sales - total_payouts
     conn.close()
@@ -592,7 +584,6 @@ DASHBOARD_PAGE = """
             <div class="icon-logo">🎡</div>
             <div class="icon-title">عجلة الثروة</div>
         </div>
-        <!-- الأيقونة السادسة مفعلة الآن بلعبة الصناديق الذهبية -->
         <a href="/game_golden_boxes" class="icon-card">
             <div class="icon-logo">🎁</div>
             <div class="icon-title">الصناديق الذهبية</div>
@@ -614,8 +605,6 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-GAME_GOLDEN_NUMBER = """...""" # (محفوظة بالكامل في الكود الفعلي)
-
 GAME_GOLDEN_BOXES_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -631,12 +620,15 @@ GAME_GOLDEN_BOXES_PAGE = """
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
         @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
 
-        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; color: #000; cursor: pointer; transition: 0.3s; box-shadow: 0 6px 15px rgba(0,0,0,0.6); }
+        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 95px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; color: #000; cursor: pointer; transition: 0.3s; box-shadow: 0 6px 15px rgba(0,0,0,0.6); }
         .box-card:hover { transform: scale(1.08); box-shadow: 0 10px 25px rgba(255,215,0,0.6); }
 
-        /* أيقونة صغيرة تحت الصناديق تعرض الرقم المكشوف فوراً */
-        .revealed-icons-row { display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-        .mini-icon { background: #252525; border: 2px solid #ffd700; color: #ffd700; width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        /* أيقونة صغيرة تحت الصناديق تعرض الأرقام المكشوفة */
+        .revealed-icons-row { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .mini-icon { background: #252525; border: 2px solid #ffd700; color: #ffd700; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.7); }
+
+        .play-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 40px; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 20px rgba(255,215,0,0.4); margin-top: 20px; }
+        .play-btn:hover { transform: scale(1.05); }
 
         .result-banner { background: #18181b; border: 3px solid #ffd700; padding: 20px; border-radius: 14px; margin-top: 25px; text-align: center; font-size: 22px; font-weight: bold; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
@@ -654,27 +646,37 @@ GAME_GOLDEN_BOXES_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
     <div class="boxes-container">
-        <h3 style="color: #ffd700; margin-top: 0;">📦 اختر صندوقاً واكشف أرقامك (تكلفة المحاولة: 1$ | اكشف ٣ أرقام متطابقة واربح ٢٠$)</h3>
-        <p style="font-size: 14px; color: #cbd5e1;">محاولات النظام الكلية التراكمية لجميع اللاعبين: <b style="color: #ffd700;">{{ total_att }}</b></p>
+        <h3 style="color: #ffd700; margin-top: 0;">📦 اكشف ثلاثة أرقام مطابقة في محاولة واحدة واربح 20$ (تكلفة المحاولة: 1$)</h3>
+        
+        <!-- عداد النظام يظهر حصرياً للآدمن admin1 وفقط، ومخفي تماماً عن بقية اللاعبين -->
+        {% if session.get('username') == 'admin1' %}
+            <p style="font-size: 14px; color: #38bdf8; background: #000; padding: 8px; border-radius: 6px; display: inline-block;">👑 [لوحة الآدمن] محاولات النظام الكلية التراكمية: <b>{{ total_att }}</b></p>
+        {% endif %}
+
+        <form method="POST">
+            <input type="hidden" name="action" value="open_three_boxes">
+            <button type="submit" class="play-btn">🎰 ابدأ المحاولة الآن بـ 1$ (اكشف 3 صناديق)</button>
+        </form>
 
         <div class="boxes-grid">
             {% for i in range(15) %}
-                <form method="POST" style="margin: 0;">
-                    <input type="hidden" name="action" value="open_box">
-                    <input type="hidden" name="box_index" value="{{ i }}">
-                    <button type="submit" class="box-card" style="width: 100%;">
-                        📦<br><span style="font-size: 12px; color: #222;">صندوق {{ i+1 }}</span>
-                    </button>
-                </form>
+                <div class="box-card">
+                    📦<br><span style="font-size: 12px; color: #222;">صندوق {{ i+1 }}</span>
+                </div>
             {% endfor %}
         </div>
 
-        <!-- أيقونة صغيرة تظهر الأرقام المكشوفة تحت الصناديق فور الضغط عليها -->
-        <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأيقونة الصغيرة لعرض الأرقام المكشوفة:</h4>
-        <div class="revealed-icons-row" id="revealedIconsRow">
-            <div class="mini-icon">?</div>
-            <div class="mini-icon">?</div>
-            <div class="mini-icon">?</div>
+        <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأيقونة الصغيرة لعرض الأرقام الثلاثة المكشوفة في المحاولة:</h4>
+        <div class="revealed-icons-row">
+            {% if revealed_nums %}
+                <div class="mini-icon">{{ revealed_nums[0] }}</div>
+                <div class="mini-icon">{{ revealed_nums[1] }}</div>
+                <div class="mini-icon">{{ revealed_nums[2] }}</div>
+            {% else %}
+                <div class="mini-icon">?</div>
+                <div class="mini-icon">?</div>
+                <div class="mini-icon">?</div>
+            {% endif %}
         </div>
     </div>
 
@@ -684,7 +686,7 @@ GAME_GOLDEN_BOXES_PAGE = """
     </div>
     {% endif %}
 
-    {% if username == 'admin1' %}
+    {% if session.get('username') == 'admin1' %}
         <div style="text-align: center; margin-top: 20px;">
             <form method="POST">
                 <input type="hidden" name="action" value="reset_game">
@@ -692,18 +694,6 @@ GAME_GOLDEN_BOXES_PAGE = """
             </form>
         </div>
     {% endif %}
-
-    <script>
-        // تحديث الأيقونات الصغيرة عند فتح الصندوق بناءً على النتيجة المعروضة
-        {% if result_text %}
-            let resText = "{{ result_text }}";
-            let matchNum = resText.match(/الرقم (\d+)/);
-            if(matchNum) {
-                let row = document.getElementById('revealedIconsRow');
-                row.innerHTML = `<div class="mini-icon" style="background:#065f46; color:#34d399;">${matchNum[1]}</div>`;
-            }
-        {% endif %}
-    </script>
 </body>
 </html>
 """
