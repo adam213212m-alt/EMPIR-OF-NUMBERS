@@ -336,7 +336,6 @@ def game_roulette():
                     user.balance -= total_bet_amount
                     vault.vault_balance += total_bet_amount
                     
-                    # حفظ آخر رهان تم وضعه من قبل هذا المستخدم
                     last_bet_entry = UserLastBet.query.filter_by(username=username).first()
                     if not last_bet_entry:
                         last_bet_entry = UserLastBet(username=username, bets_json=bets_json)
@@ -346,13 +345,9 @@ def game_roulette():
                     
                     wheel_numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
                     reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
-                    
                     bets = json.loads(bets_json)
                     
-                    # --- خوارزمية ضمان هامش ربح الشركة بنسبة 20% دائمًا ---
-                    # المستهدف: إجمالي العوائد (Payout) يجب أن يساوي تقريباً 80% من إجمالي المراهنة (RTP = 80%) لضمان 20% ربح للشركة
                     target_total_payout = total_bet_amount * 0.80
-                    
                     scored_outcomes = []
                     for num in wheel_numbers:
                         if num == 0: color = 'green'
@@ -380,13 +375,10 @@ def game_roulette():
                             if won:
                                 payout_for_num += (b_amount * multiplier) + b_amount
                         
-                        # حساب المسافة بين عائد هذا الرقم والعائد المستهدف (80% من المدفوعات)
                         diff = abs(payout_for_num - target_total_payout)
                         scored_outcomes.append((num, color, payout_for_num, diff))
                     
-                    # اختيار الرقم الذي يحقق أقرب قيمة مستهدفة لنسبة الـ 80% مع إدخال نسبة عشوائية طفيفة لمنع الشك
                     scored_outcomes.sort(key=lambda x: x[3])
-                    # نختار من أفضل 5 خيارات قريبة لتحقيق دقة الهامش دون نمط متكرر مكشوف
                     best_candidates = scored_outcomes[:min(5, len(scored_outcomes))]
                     chosen = random.choice(best_candidates)
                     
@@ -419,6 +411,56 @@ def game_roulette():
     last_bets_json = user_last_bet_record.bets_json if user_last_bet_record else "[]"
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
+
+# --- لعبة عجلة الأرقام الجديدة (تكلفة اللفة 1$ | ربح الشركة 25% | إضافة الأرباح للحساب) ---
+@app.route('/game_number_wheel', methods=['GET', 'POST'])
+def game_number_wheel():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    
+    msg = None
+    result_data = None
+    cost = 1.0  # تكلفة التجربة دولار واحد فقط لكل لعبة
+
+    if request.method == 'POST':
+        if user.balance >= cost:
+            user.balance -= cost
+            vault.vault_balance += cost
+
+            # توزيع الاحتمالات بدقة لتحقيق ربح 25% للشركة على المدى الطويل (RTP = 75%) بتكلفة 1$
+            outcomes = [
+                {'name': 'خسارة', 'multiplier': '0x', 'payout': 0.0, 'weight': 51, 'color': '#ef4444'},
+                {'name': 'استرجاع نصفي', 'multiplier': '0.5x', 'payout': 0.5, 'weight': 18, 'color': '#f97316'},
+                {'name': 'استرجاع كامل', 'multiplier': '1x', 'payout': 1.0, 'weight': 14, 'color': '#3b82f6'},
+                {'name': 'مضاعف صغير', 'multiplier': '2x', 'payout': 2.0, 'weight': 11, 'color': '#a855f7'},
+                {'name': 'مضاعف مميز', 'multiplier': '4x', 'payout': 4.0, 'weight': 5, 'color': '#22c55e'},
+                {'name': 'الجائزة الكبرى', 'multiplier': '10x', 'payout': 10.0, 'weight': 1, 'color': '#ffd700'}
+            ]
+
+            weights = [o['weight'] for o in outcomes]
+            chosen_outcome = random.choices(outcomes, weights=weights, k=1)[0]
+            
+            payout = chosen_outcome['payout']
+            if payout > 0:
+                user.balance += payout  # إضافة الأرباح إلى رصيد حساب اللاعب
+                vault.vault_balance -= payout
+                log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+
+            db.session.commit()
+            result_data = chosen_outcome
+            if payout > 0:
+                msg = f"🎉 مبروك! استقرت العجلة على ({chosen_outcome['name']} - مضاعف {chosen_outcome['multiplier']}) وتمت إضافة الأرباح بقيمة ${payout} إلى رصيدك!"
+            else:
+                msg = "💥 حظ أوفر في المرة القادمة، استقرت العجلة على منطقة الخسارة."
+        else:
+            msg = "رصيدك غير كافٍ للبدء (تكلفة التجربة 1$)!"
+
+    return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, result_data=result_data)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -506,9 +548,10 @@ def admin_accounting():
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
+    payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
 
     total_sales = sales_res
-    total_payouts = payout_res1 + payout_res3 + payout_res4
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -593,14 +636,23 @@ DASHBOARD_PAGE = """
         </div>
     </div>
     <div class="icons-grid">
+        <!-- الأيقونة الأولى -->
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الذهبي</div></a>
+        <!-- الأيقونة الثانية -->
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
+        <!-- الأيقونة الثالثة -->
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
-        <div class="icon-card" onclick="alert('اللعبة الرابعة قيد التفعيل')"><div class="icon-logo">🏇</div><div class="icon-title">سباق الخيل</div></div>
-        <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الثروة</div></div>
+        <!-- الأيقونة الرابعة: عجلة الأرقام بناءً على طلبك -->
+        <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
+        <!-- الأيقونة الخامسة -->
+        <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🏇</div><div class="icon-title">سباق الخيل</div></div>
+        <!-- الأيقونة السادسة -->
         <div class="icon-card" onclick="alert('قريباً في التعديل القادم')"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></div>
+        <!-- الأيقونة السابعة -->
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
+        <!-- الأيقونة الثامنة -->
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
+        <!-- الأيقونة التاسعة -->
         <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
     </div>
     <script>
@@ -748,14 +800,14 @@ GAME_ROULETTE_PAGE = """
         </form>
     </div>
     <script>
-        let fixedChipValue = 1; // الرهان الثابت حصرياً بقيمة 1$
+        let fixedChipValue = 1;
         let activeBets = {};
         let lastUserBetsJson = '{{ last_bets_json | safe }}';
 
         function placeBet(type, value, element) {
             let key = type + "_" + value;
             if (!activeBets[key]) { activeBets[key] = { type: type, value: value, amount: 0 }; }
-            activeBets[key].amount += fixedChipValue; // زيادة 1$ مع كل نقرة
+            activeBets[key].amount += fixedChipValue;
             let tag = element.querySelector('.bet-tag');
             if(tag) { tag.innerText = "$" + activeBets[key].amount; } 
             else { element.innerHTML += `<span class="bet-tag" style="font-size:10px; color:#ffd700;">$${activeBets[key].amount}</span>`; }
@@ -820,6 +872,60 @@ GAME_ROULETTE_PAGE = """
             document.getElementById('betsDataInput').value = JSON.stringify(betsArray);
         }
 
+        function installApp() { window.location.href = '/download'; }
+    </script>
+</body>
+</html>
+"""
+
+# قالب واجهة لعبة عجلة الأرقام (تكلفة 1$ وتحديث الرصيد التلقائي للرابح)
+GAME_NUMBER_WHEEL_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عجلة الأرقام - ليرة</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
+        .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 35px; border-radius: 24px; max-width: 500px; margin: 30px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
+        .wheel-circle { width: 180px; height: 180px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 6px solid #ffd700; border-radius: 50%; margin: 25px auto; display: flex; align-items: center; justify-content: center; font-size: 45px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); transition: transform 1.5s ease-in-out; }
+        .spin-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 40px; border: none; border-radius: 14px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(255,215,0,0.4); }
+        .spin-action-btn:hover { transform: scale(1.02); }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🎡 عجلة الأرقام الكبرى</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
+        </div>
+    </div>
+    {% if msg %}<div style="background: {% if result_data and result_data.payout > 0 %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold; max-width: 500px; margin-left: auto; margin-right: auto;">{{ msg }}</div>{% endif %}
+    <div class="game-box">
+        <h3 style="color: #ffd700; margin-top: 0;">أدر العجلة واربح مضاعفات كبرى! (تكلفة اللعبة: 1$)</h3>
+        <div class="wheel-circle" id="wheelDisplay">
+            {% if result_data %}{{ result_data.multiplier }}{% else %}🎡{% endif %}
+        </div>
+        <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 20px;">
+            {% if result_data %}النتيجة: <b style="color: {{ result_data.color }};">{{ result_data.name }}</b>{% else %}اضغط زر الدوران أدناه لاختبار حظك بقيمة 1${% endif %}
+        </p>
+        <form method="POST" onsubmit="spinWheelAnimation(event)">
+            <button type="submit" class="spin-action-btn" id="spinBtn">🎯 أدر العجلة الآن (1$)</button>
+        </form>
+    </div>
+    <script>
+        function spinWheelAnimation(e) {
+            let wheel = document.getElementById('wheelDisplay');
+            let btn = document.getElementById('spinBtn');
+            btn.disabled = true;
+            btn.innerText = "⏳ جاري تدوير العجلة...";
+            wheel.style.transform = "rotate(720deg) scale(1.1)";
+        }
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
