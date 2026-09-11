@@ -87,11 +87,10 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# إنشاء الجداول وتثبيت الـ 15 حساباً الثابتة وتصفير الأرصدة عند التشغيل الأول
+# إنشاء الجداول وتثبيت الحسابات الـ 15 الثابتة وتصفير الأرصدة وجعل رصيد الشركة مليون دولار
 with app.app_context():
     db.create_all()
     
-    # تثبيت رصيد الخزنة على مليون دولار
     vault = SystemVault.query.get(1)
     if vault:
         vault.vault_balance = 1000000.0
@@ -117,7 +116,6 @@ with app.app_context():
         r_state = RevealAndWinState(id=1, global_attempts=0, pool_json=json.dumps(outcomes))
         db.session.add(r_state)
         
-    # حساب الآدمن (رصيده يبدأ بـ 0 مثل أي لاعب آخر)
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
         admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
@@ -125,7 +123,6 @@ with app.app_context():
     else:
         admin.balance = 0.0
 
-    # الحسابات الـ 15 الثابتة الدائمة مع أسرارها وأسماء أصحابها
     fixed_accounts = [
         ("ahmad_t", "pass123", "أحمد الطفيلي"),
         ("mohammad_9", "pass456", "محمد الحسين"),
@@ -153,7 +150,6 @@ with app.app_context():
             acc.password = pwd
             acc.owner_name = oname
 
-    # تصفير أرصدة كافة الحسابات بناءً على الطلب
     User.query.update({User.balance: 0.0})
     db.session.commit()
 
@@ -184,6 +180,14 @@ def download_app():
     except Exception:
         return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20امبراطورية%20الأرقام")
 
+# API التحديث الخلفي الصامت (لإرسال الرصيد المحدث لكل الحسابات برمشة)
+@app.route('/api/sync_balance')
+def api_sync_balance():
+    if 'username' not in session:
+        return jsonify({"balance": 0.0})
+    user = User.query.filter_by(username=session['username']).first()
+    return jsonify({"balance": user.balance if user else 0.0})
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     error = None
@@ -213,7 +217,7 @@ def dashboard():
     user = User.query.filter_by(username=session['username']).first()
     if not user:
         return redirect(url_for('logout'))
-    return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance)
+    return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance, password=user.password)
 
 @app.route('/api/golden_status')
 def api_golden_status():
@@ -352,7 +356,7 @@ def game_golden_number():
     my_booked_nums = [b.number for b in my_bookings]
     my_total_spent = len(my_booked_nums) * 2.0
 
-    return render_template_string(GAME_GOLDEN_PAGE, username=username, role=user.role, balance=user.balance, 
+    return render_template_string(GAME_GOLDEN_PAGE, username=username, role=user.role, balance=user.balance, password=user.password,
                                   bookings=bookings, winning_number=draw_state.winning_number, draw_status=draw_state.status, 
                                   forced_num=draw_state.forced_winning_number, my_booked_nums=my_booked_nums, my_total_spent=my_total_spent, msg=msg)
 
@@ -369,6 +373,7 @@ def game_balloon_pop():
     msg = None
     win_result = None
     is_popped = False
+    is_win = False
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -408,7 +413,7 @@ def game_balloon_pop():
             else:
                 msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
 
-    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=user.balance, msg=msg, win_result=win_result, is_popped=is_popped)
+    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=user.balance, password=user.password, msg=msg, win_result=win_result, is_popped=is_popped, is_win=is_win)
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
@@ -509,7 +514,7 @@ def game_roulette():
     user_last_bet_record = UserLastBet.query.filter_by(username=username).first()
     last_bets_json = user_last_bet_record.bets_json if user_last_bet_record else "[]"
 
-    return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
+    return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, password=user.password, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
@@ -563,7 +568,7 @@ def game_number_wheel():
         except Exception as e:
             msg = f"حدث خطأ أثناء معالجة الرهان: {str(e)}"
 
-    return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
+    return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, password=user.password, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
@@ -644,7 +649,7 @@ def game_reveal_and_win():
             else:
                 msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
 
-    return render_template_string(GAME_REVEAL_AND_WIN_PAGE, username=username, balance=user.balance, msg=msg, result_data=result_data)
+    return render_template_string(GAME_REVEAL_AND_WIN_PAGE, username=username, balance=user.balance, password=user.password, msg=msg, result_data=result_data)
 
 @app.route('/game_golden_boxes_new', methods=['GET', 'POST'])
 def game_golden_boxes_new():
@@ -725,7 +730,7 @@ def game_golden_boxes_new():
     my_booked_boxes = [b.box_number for b in my_bookings]
     my_total_spent = len(my_booked_boxes) * 50.0
 
-    return render_template_string(GAME_GOLDEN_BOXES_NEW_PAGE, username=username, role=user.role, balance=user.balance,
+    return render_template_string(GAME_GOLDEN_BOXES_NEW_PAGE, username=username, role=user.role, balance=user.balance, password=user.password,
                                   bookings=bookings, winning_number=l_state.winning_number, draw_status=l_state.status,
                                   my_booked_boxes=my_booked_boxes, my_total_spent=my_total_spent, msg=msg)
 
@@ -851,6 +856,8 @@ LOGIN_PAGE = """
         input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 14px; background: linear-gradient(135deg, #ffd700, #b8860b); color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
         .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; }
+        .no-account-btn { display: inline-block; margin-top: 15px; color: #38bdf8; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .no-account-btn:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -862,6 +869,8 @@ LOGIN_PAGE = """
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول للبرنامج</button>
         </form>
+        <!-- زر ليس لدي حساب -> واتساب -->
+        <a class="no-account-btn" href="https://wa.me/96176030208?text=اريد%20ان%20انشا%20حساب%20في%20لعبة%20امبراطورية%20الارقام" target="_blank">ليس لدي حساب؟ انقر هنا للتسجيل</a>
     </div>
 </body>
 </html>
@@ -885,6 +894,7 @@ DASHBOARD_PAGE = """
         .nav-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; cursor: pointer; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
+        .withdraw-btn { background: #f59e0b; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
@@ -957,11 +967,14 @@ DASHBOARD_PAGE = """
         <div class="logo-area">
             <div class="logo-badge">👑</div><h1>امبراطورية الأرقام</h1>
             <div class="user-creds">👤 <b>{{ username }}</b></div>
-            <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
+            <div class="balance-badge">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
         </div>
         <div class="nav-buttons">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شحن%20رصيد" target="_blank">💬 شحن رصيد</a>
+            <!-- زر شحن رصيد يرسل تلقائياً الحساب والباسورد إلى واتساب -->
+            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20تعبئة%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💬 شحن رصيد</a>
+            <!-- زر سحب رصيد يرسل تلقائياً الحساب والباسورد إلى واتساب -->
+            <a class="withdraw-btn" href="https://wa.me/96176030208?text=اريد%20سحب%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💸 سحب رصيد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
                 <a href="/admin_games" class="admin-link">🎮 لوحة الألعاب</a>
@@ -975,7 +988,6 @@ DASHBOARD_PAGE = """
         ✨ العب واربح جوائز بقيمة 500,000$ ✨
     </div>
 
-    <!-- شبكة الأيقونات النشطة الفاخرة 3D بدون أيقونات فارغة -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الحنون</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
@@ -986,6 +998,19 @@ DASHBOARD_PAGE = """
     </div>
 
     <script>
+        // التحديث الصامت في الخلفية برمشة لكل الحسابات حتى لا يلاحظه اللاعب
+        setInterval(() => {
+            fetch('/api/sync_balance')
+                .then(res => res.json())
+                .then(data => {
+                    let badge = document.getElementById('liveBalance');
+                    if(badge && badge.innerText !== "$" + data.balance) {
+                        badge.innerText = "$" + data.balance;
+                    }
+                })
+                .catch(err => {});
+        }, 2000);
+
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
         function installApp() {
@@ -1014,6 +1039,7 @@ GAME_BALLOON_PAGE = """
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 450px; margin: 30px auto; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
         .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; transition: 0.3s; }
         .balloon.popped { background: transparent !important; box-shadow: none !important; transform: scale(1.6); }
+        .balloon.winning { background: radial-gradient(circle at 30% 30%, #ffd700, #ff8c00) !important; box-shadow: 0 0 30px rgba(255,215,0,0.9); transform: scale(1.1); }
         .pump-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 35px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
     </style>
@@ -1023,14 +1049,14 @@ GAME_BALLOON_PAGE = """
         <h2 style="color: #ffd700; margin: 0;">🎈 التحدي السريع (البالون)</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
     </div>
     {% if msg %}<div style="background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; margin-top: 15px;">{{ msg }}</div>{% endif %}
     <div class="game-box">
         <h3 style="color: #ffd700; margin-top: 0;">اضغط لضخ الهواء في البالون (التكلفة: 1$)</h3>
-        <div class="balloon {% if is_popped %}popped{% endif %}" id="myBalloon">
+        <div class="balloon {% if is_popped %}popped{% elif is_win %}winning{% endif %}" id="myBalloon">
             {% if is_popped %}<div style="font-size: 45px; position: absolute; top: 40px; left: 35px;">💥</div>{% endif %}
         </div>
         <form method="POST">
@@ -1038,12 +1064,18 @@ GAME_BALLOON_PAGE = """
             <button type="submit" class="pump-btn">💨 اضغط لضخ الهواء</button>
         </form>
         {% if win_result %}
-        <div style="margin-top: 20px; font-size: 18px; font-weight: bold; padding: 12px; border-radius: 8px; background: {% if 'فزت' in win_result %}#065f46{% else %}#7f1d1d{% endif %}; color: white;">
+        <div style="margin-top: 20px; font-size: 18px; font-weight: bold; padding: 12px; border-radius: 8px; background: {% if is_win %}#065f46{% else %}#7f1d1d{% endif %}; color: white;">
             {{ win_result }}
         </div>
         {% endif %}
     </div>
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
@@ -1083,7 +1115,7 @@ GAME_ROULETTE_PAGE = """
         <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: ${{ balance }}</div>
+            <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
     </div>
@@ -1130,6 +1162,13 @@ GAME_ROULETTE_PAGE = """
         </form>
     </div>
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
+
         let fixedChipValue = 1;
         let activeBets = {};
         let lastUserBetsJson = '{{ last_bets_json | safe }}';
@@ -1236,7 +1275,7 @@ GAME_NUMBER_WHEEL_PAGE = """
         <h2 style="color: #ffd700; margin: 0;">🎡 عجلة الأرقام الكبرى</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
     </div>
@@ -1266,6 +1305,13 @@ GAME_NUMBER_WHEEL_PAGE = """
         </form>
     </div>
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
+
         let selectedNumbers = [];
         function toggleNumber(num, element) {
             let wheel = document.getElementById('wheelDisplay');
@@ -1334,7 +1380,7 @@ GAME_REVEAL_AND_WIN_PAGE = """
 <body>
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح</h2>
-        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
         <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
     </div>
 
@@ -1366,6 +1412,13 @@ GAME_REVEAL_AND_WIN_PAGE = """
     </div>
 
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
+
         let selectedBoxes = [];
         let resultJson = '{{ result_data | tojson | safe }}';
 
@@ -1451,7 +1504,7 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
 <body>
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎁 الرقم الحنون الفاخر</h2>
-        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
         <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
     </div>
 
@@ -1510,6 +1563,13 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
     {% endif %}
 
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
+
         let lastStatus = "{{ draw_status }}";
         let isRefreshing = false;
         function checkGameRealtime() {
@@ -1566,7 +1626,7 @@ GAME_GOLDEN_PAGE = """
         <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الحنون</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">${{ balance }}</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
     </div>
@@ -1618,6 +1678,13 @@ GAME_GOLDEN_PAGE = """
         {% endif %}
     </div>
     <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
+            }).catch(err => {});
+        }, 2000);
+
         let lastStatus = "{{ draw_status }}";
         let isRefreshing = false;
         function checkGameRealtime() {
