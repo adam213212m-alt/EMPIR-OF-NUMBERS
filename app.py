@@ -82,6 +82,16 @@ def init_db():
         cursor.execute('INSERT INTO golden_boxes_state (id, total_attempts, boxes_data, game_status) VALUES (1, 0, ?, "playing")', (boxes_json,))
 
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS balloon_state (
+            id INTEGER PRIMARY KEY,
+            total_attempts INTEGER DEFAULT 0
+        )
+    ''')
+    cursor.execute('SELECT COUNT(*) FROM balloon_state')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('INSERT INTO balloon_state (id, total_attempts) VALUES (1, 0)')
+
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS roulette_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT,
@@ -382,22 +392,35 @@ def game_balloon_pop():
     
     msg = None
     win_result = None
+    is_popped = False
 
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'play_balloon':
             cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
             bal = cursor.fetchone()[0]
-            cost = 1.0 # تكلفة محاولة ضخ البالون 1$
+            cost = 1.0 # تكلفة المحاولة 1$
             
             if bal >= cost:
                 cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (cost,))
                 
-                outcome = random.choice(['win', 'win', 'lose', 'win', 'lose'])
+                # تتبع المحاولات الإجمالية عالمياً لكل الحسابات
+                cursor.execute("SELECT total_attempts FROM balloon_state WHERE id=1")
+                total_att = cursor.fetchone()[0] + 1
                 
-                if outcome == 'win':
-                    prize = 10.0
+                if total_att >= 5:
+                    total_att = 0
+                    is_win = True
+                    is_popped = False
+                else:
+                    is_win = False
+                    is_popped = True
+
+                cursor.execute("UPDATE balloon_state SET total_attempts=? WHERE id=1", (total_att,))
+                
+                if is_win:
+                    prize = 3.0
                     cursor.execute("UPDATE users SET balance = balance + ? WHERE username=?", (prize, username))
                     cursor.execute("UPDATE system_vault SET vault_balance = vault_balance - ? WHERE id=1", (prize,))
                     cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة تحدي البالون', 'system', ?, ?, ?)", 
@@ -414,7 +437,7 @@ def game_balloon_pop():
     balance = cursor.fetchone()[0]
     conn.close()
     
-    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=balance, msg=msg, win_result=win_result)
+    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=balance, msg=msg, win_result=win_result, is_popped=is_popped)
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
@@ -606,8 +629,11 @@ def admin_accounting():
     cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='جائزة روليت الحظ'")
     payout_res3 = cursor.fetchone()[0] or 0.0
 
+    cursor.execute("SELECT SUM(amount) FROM financial_logs WHERE action_type='جائزة تحدي البالون'")
+    payout_res4 = cursor.fetchone()[0] or 0.0
+
     total_sales = sales_res
-    total_payouts = payout_res1 + payout_res2 + payout_res3
+    total_payouts = payout_res1 + payout_res2 + payout_res3 + payout_res4
     net_profits = total_sales - total_payouts
     conn.close()
 
@@ -718,7 +744,13 @@ GAME_BALLOON_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 450px; margin: 30px auto; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
-        .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.2s; cursor: pointer; }
+        .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.3s; }
+        .balloon.popped { background: transparent !important; box-shadow: none !important; transform: scale(1.6); animation: popAnim 0.4s forwards; }
+        @keyframes popAnim {
+            0% { transform: scale(1.3); opacity: 1; }
+            50% { transform: scale(1.8); opacity: 0.6; }
+            100% { transform: scale(0); opacity: 0; }
+        }
         .balloon::after { content: ""; position: absolute; bottom: -12px; left: 52px; width: 4px; height: 15px; background: #888; }
         .pump-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 35px; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 20px rgba(255,215,0,0.4); margin-top: 15px; width: 100%; }
         .pump-btn:hover { transform: scale(1.03); }
@@ -740,11 +772,13 @@ GAME_BALLOON_PAGE = """
 
     <div class="game-box">
         <h3 style="color: #ffd700; margin-top: 0;">اضغط لضخ الهواء في البالون (التكلفة: 1$)</h3>
-        <div class="balloon" id="myBalloon"></div>
+        <div class="balloon {% if is_popped %}popped{% endif %}" id="myBalloon">
+            {% if is_popped %}<div style="font-size: 45px; position: absolute; top: 40px; left: 35px;">💥</div>{% endif %}
+        </div>
         
         <form method="POST">
             <input type="hidden" name="action" value="play_balloon">
-            <button type="submit" class="pump-btn" onclick="inflateEffect()">💨 اضغط لضخ الهواء</button>
+            <button type="submit" class="pump-btn">💨 اضغط لضخ الهواء</button>
         </form>
 
         {% if win_result %}
@@ -753,14 +787,6 @@ GAME_BALLOON_PAGE = """
         </div>
         {% endif %}
     </div>
-
-    <script>
-        function inflateEffect() {
-            let b = document.getElementById('myBalloon');
-            b.style.transform = "scale(1.2)";
-            setTimeout(() => { b.style.transform = "scale(1)"; }, 200);
-        }
-    </script>
 </body>
 </html>
 """
