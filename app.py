@@ -132,12 +132,10 @@ def service_worker():
 
 @app.route('/download')
 def download_app():
-    # محاولة تحميل ملف الـ APK المباشر إذا تم وضعه في مجلد static باسم lira.apk
     try:
         return send_from_directory('static', 'lira.apk', as_attachment=True)
     except Exception:
-        # إذا لم يكن الملف مرفوعاً بعد، يوجه المستخدم لرابط الدعم أو واتساب بشكل مباشر لطلب النسخة
-        return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20ليرة%20الرسمي")
+        return "جاري تحميل تطبيق ليرة الرسمي... يرجى التواصل عبر الواتساب للحصول على أحدث نسخة APK مباشرة.", 200
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -361,10 +359,10 @@ def game_golden_boxes():
                         cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الصناديق الذهبية', 'system', ?, 20.0, ?)", 
                                        (username, time.strftime('%Y-%m-%d %H:%M')))
                         conn.commit()
-                        result_text = f"مبروك لقد فزت بـ 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
+                        result_text = f"WIN - مبروك لقد فزت بـ 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
                     else:
                         conn.commit()
-                        result_text = f"حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
+                        result_text = f"LOST - حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
                 else:
                     msg = "رصيدك غير كافٍ (تكلفة المحاولة 1$)!"
             else:
@@ -399,6 +397,7 @@ def game_balloon_pop():
     msg = None
     win_result = None
     is_popped = False
+    balloon_color = "#ff5252" # أحمر افتراضي
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -424,9 +423,11 @@ def game_balloon_pop():
                     is_popped = False
                     attempts_since = 0
                     seq_index = (seq_index + 1) % len(sequence)
+                    balloon_color = "#22c55e" # أخضر عند الفوز والبقاء منتفخاً
                 else:
                     is_win = False
                     is_popped = True
+                    balloon_color = random.choice(["#ffeb3b", "#ff9800", "#e91e63"]) # أصفر، زهري، برتقالي قبل الانفجار
 
                 cursor.execute("UPDATE balloon_state SET attempts_since_last_win=?, sequence_index=? WHERE id=1", (attempts_since, seq_index))
                 
@@ -448,7 +449,7 @@ def game_balloon_pop():
     balance = cursor.fetchone()[0]
     conn.close()
     
-    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=balance, msg=msg, win_result=win_result, is_popped=is_popped)
+    return render_template_string(GAME_BALLOON_PAGE, username=username, balance=balance, msg=msg, win_result=win_result, is_popped=is_popped, balloon_color=balloon_color)
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
@@ -476,14 +477,30 @@ def game_roulette():
                     cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (total_bet_amount,))
                     
                     wheel_numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
-                    winning_number = random.choice(wheel_numbers)
                     
+                    # التحقق من امتلاء كامل الجدول أو الرهانات الكبيرة (فوق 5$) بنسبة 15%
+                    bets = json.loads(bets_json)
+                    total_table_bets_count = len(bets)
+                    
+                    if total_bet_amount > 5.0:
+                        # رهانات كبيرة فوق 5$ بنسبة فوز 15%
+                        is_big_win = random.random() < 0.15
+                        if is_big_win and bets:
+                            winning_number = int(bets[0]['value']) if bets[0]['type'] == 'straight' else random.choice(wheel_numbers)
+                        else:
+                            winning_number = 99 # رقم وهمي للخسارة المؤكدة
+                    else:
+                        # شرط امتلاء كامل الجدول للظهور الطبيعي
+                        if total_table_bets_count >= 10:
+                            winning_number = random.choice(wheel_numbers)
+                        else:
+                            winning_number = 99 # لا يتم إظهار الفوز إلا عند اكتمال الرهانات والجدول
+
                     reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
                     if winning_number == 0: winning_color = 'green'
                     elif winning_number in reds: winning_color = 'red'
                     else: winning_color = 'black'
 
-                    bets = json.loads(bets_json)
                     total_payout = 0
                     
                     for bet in bets:
@@ -515,12 +532,15 @@ def game_roulette():
 
                     conn.commit()
                     last_win_data = {
-                        "winning_number": winning_number,
-                        "winning_color": winning_color,
+                        "winning_number": winning_number if winning_number != 99 else "انتظار اكتمال الجدول",
+                        "winning_color": winning_color if winning_number != 99 else "قيد المعالجة",
                         "total_bet": total_bet_amount,
                         "total_payout": total_payout
                     }
-                    msg = f"تم تدوير العجلة! الرقم الفائز هو: {winning_number} ({winning_color}). إجمالي الأرباح: ${total_payout}"
+                    if winning_number == 99:
+                        msg = "لم يكتمل جدول الرهانات بالكامل بعد! يرجى الاستمرار بملء الجدول أو زيادة الرهانات لتحديد الفائز."
+                    else:
+                        msg = f"تم تدوير العجلة! الرقم الفائز هو: {winning_number} ({winning_color}). إجمالي الأرباح: ${total_payout}"
                 else:
                     msg = "رصيدك غير كافٍ لتغطية قيمة الرهانات!"
             else:
@@ -750,9 +770,6 @@ DASHBOARD_PAGE = """
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('تم قبول تثبيت التطبيق');
-                    }
                     deferredPrompt = null;
                 });
             } else {
@@ -775,7 +792,12 @@ GAME_BALLOON_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 20px; max-width: 450px; margin: 30px auto; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
-        .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, #ff5252, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.3s; }
+        .balloon { width: 120px; height: 150px; background: radial-gradient(circle at 30% 30%, {{ balloon_color }}, #c62828); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; margin: 20px auto; position: relative; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), 0 0 25px rgba(255,82,82,0.6); transition: 0.3s; animation: inflateAnim 0.3s ease; }
+        @keyframes inflateAnim {
+            0% { transform: scale(0.9); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
         .balloon.popped { background: transparent !important; box-shadow: none !important; transform: scale(1.6); animation: popAnim 0.4s forwards; }
         @keyframes popAnim {
             0% { transform: scale(1.3); opacity: 1; }
@@ -828,9 +850,6 @@ GAME_BALLOON_PAGE = """
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('تم قبول تثبيت التطبيق');
-                    }
                     deferredPrompt = null;
                 });
             } else {
@@ -1001,9 +1020,11 @@ GAME_GOLDEN_BOXES_PAGE = """
         .boxes-container { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 5px solid #ffd700; padding: 30px; border-radius: 20px; margin-top: 25px; box-shadow: 0 0 40px rgba(255,215,0,0.3); text-align: center; }
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
         @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
-        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 105px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; cursor: pointer; transition: 0.3s; box-shadow: 0 6px 15px rgba(0,0,0,0.6); user-select: none; }
+        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 105px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; cursor: pointer; transition: 0.3s; box-shadow: 0 6px 15px rgba(0,0,0,0.6); user-select: none; position: relative; }
         .box-card:hover { transform: scale(1.05); }
         .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; border-color: #ffd700 !important; box-shadow: 0 0 20px #22c55e; cursor: not-allowed; }
+        .badge-win { position: absolute; top: 5px; right: 5px; background: #22c55e; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .badge-lost { position: absolute; top: 5px; right: 5px; background: #ef4444; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .revealed-icons-row { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
         .mini-icon { background: #252525; border: 2px solid #ffd700; color: #ffd700; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.7); }
         .result-banner { background: #18181b; border: 3px solid #ffd700; padding: 20px; border-radius: 14px; margin-top: 25px; text-align: center; font-size: 22px; font-weight: bold; }
@@ -1021,8 +1042,8 @@ GAME_GOLDEN_BOXES_PAGE = """
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="boxes-container">
-        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها (تكلفة المحاولة: 1$)</h3>
-        <p style="color: #cbd5e1; font-size: 15px;">الصناديق المختارة: <b id="selectionCount" style="color: #38bdf8;">0</b> / 3</p>
+        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على صندوق واحد لكشف النتيجة مباشرة (تكلفة المحاولة: 1$)</h3>
+        <p style="color: #cbd5e1; font-size: 15px;">المحاولة الفورية مفعلة مع أول ضغطة</p>
         {% if session.get('username') == 'admin1' %}
             <p style="font-size: 14px; color: #38bdf8; background: #000; padding: 8px; border-radius: 6px; display: inline-block;">👑 محاولات النظام التراكمية: <b>{{ total_att }}</b></p>
         {% endif %}
@@ -1035,55 +1056,32 @@ GAME_GOLDEN_BOXES_PAGE = """
                         <span id="box-icon-{{ i }}">📦</span>
                         <span id="box-text-{{ i }}" style="font-size: 12px; margin-top: 5px;">صندوق {{ i+1 }}</span>
                         <span id="box-val-{{ i }}" style="display:none; color: #ffd700; font-size: 22px; margin-top: 4px;">{{ boxes[i] }}</span>
+                        {% if result_text %}
+                            {% if 'WIN' in result_text %}
+                                <div class="badge-win">WIN</div>
+                            {% else %}
+                                <div class="badge-lost">LOST</div>
+                            {% endif %}
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
         </form>
-        <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأرقام الثلاثة المكشوفة:</h4>
-        <div class="revealed-icons-row">
-            {% if revealed_nums %}
-                <div class="mini-icon">{{ revealed_nums[0] }}</div><div class="mini-icon">{{ revealed_nums[1] }}</div><div class="mini-icon">{{ revealed_nums[2] }}</div>
-            {% else %}
-                <div class="mini-icon">?</div><div class="mini-icon">?</div><div class="mini-icon">?</div>
-            {% endif %}
-        </div>
     </div>
     {% if result_text %}
-    <div class="result-banner" style="{% if 'فزت' in result_text %}background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; border-color: #fff; box-shadow: 0 0 30px #ffd700;{% else %}color: #fca5a5; border-color: #ef4444;{% endif %}">
+    <div class="result-banner" style="{% if 'WIN' in result_text %}background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; border-color: #fff; box-shadow: 0 0 30px #ffd700;{% else %}color: #fca5a5; border-color: #ef4444;{% endif %}">
         {{ result_text }}
     </div>
     {% endif %}
     <script>
-        let selectedBoxes = [];
         function toggleBox(index) {
-            if (selectedBoxes.includes(index)) return;
-            
-            if (selectedBoxes.length < 3) {
-                selectedBoxes.push(index);
-                let boxEl = document.getElementById('box-' + index);
-                let iconEl = document.getElementById('box-icon-' + index);
-                let textEl = document.getElementById('box-text-' + index);
-                let valEl = document.getElementById('box-val-' + index);
-                
-                boxEl.classList.add('selected');
-                iconEl.innerText = "🔓"; 
-                textEl.style.display = "none"; 
-                valEl.style.display = "block";
-                
-                document.getElementById('selectionCount').innerText = selectedBoxes.length;
-                
-                let container = document.getElementById('hiddenInputsContainer');
-                container.innerHTML = "";
-                selectedBoxes.forEach(boxIdx => {
-                    let input = document.createElement('input');
-                    input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
-                    container.appendChild(input);
-                });
-                
-                if (selectedBoxes.length === 3) {
-                    document.getElementById('gameForm').submit();
-                }
-            }
+            let container = document.getElementById('hiddenInputsContainer');
+            container.innerHTML = "";
+            let input = document.createElement('input');
+            input.type = 'hidden'; input.name = 'box_indices'; input.value = index;
+            container.appendChild(input);
+            // إرسال الطلب تلقائياً مع أول ضغطة
+            document.getElementById('gameForm').submit();
         }
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
