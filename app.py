@@ -64,7 +64,6 @@ class UserLastBet(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     bets_json = db.Column(db.Text, nullable=False)
 
-# نماذج خاصة بلعبة الرقم الذهبي الفاخر الجديدة
 class LuxuryGoldenBooking(db.Model):
     __tablename__ = 'luxury_golden_bookings'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -79,6 +78,13 @@ class LuxuryGoldenState(db.Model):
     status = db.Column(db.String(20), default='idle')
     draw_end_time = db.Column(db.Float, default=0)
     forced_winning_number = db.Column(db.Integer, default=0)
+
+# نموذج حالة لعبة "اكشف واربح" بناءً على الكلاس المطلوب
+class RevealAndWinState(db.Model):
+    __tablename__ = 'reveal_and_win_state'
+    id = db.Column(db.Integer, primary_key=True)
+    global_attempts = db.Column(db.Integer, default=0)
+    pool_json = db.Column(db.Text, nullable=False)
 
 
 # إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
@@ -100,6 +106,12 @@ with app.app_context():
     if not LuxuryGoldenState.query.get(1):
         l_state = LuxuryGoldenState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0)
         db.session.add(l_state)
+
+    if not RevealAndWinState.query.get(1):
+        outcomes = ['WIN_3'] * 1 + ['WIN_2'] * 20 + ['LOSE'] * 25
+        random.shuffle(outcomes)
+        r_state = RevealAndWinState(id=1, global_attempts=0, pool_json=json.dumps(outcomes))
+        db.session.add(r_state)
         
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
@@ -204,7 +216,6 @@ def api_golden_status():
         "bookings": bookings
     })
 
-# API حالة الرقم الذهبي الفاخر المحدث
 @app.route('/api/luxury_golden_status')
 def api_luxury_golden_status():
     current_time = time.time()
@@ -520,6 +531,88 @@ def game_number_wheel():
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
 
+# --- لعبة اكشف واربح المدمجة بالكامل (الأيقونة الخامسة) ---
+@app.route('/game_reveal_and_win', methods=['GET', 'POST'])
+def game_reveal_and_win():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    r_state = RevealAndWinState.query.get(1)
+    
+    msg = None
+    result_data = None
+    cost = 1.0
+
+    if request.method == 'POST':
+        box_indices = request.form.getlist('box_indices')
+        if len(box_indices) != 3:
+            msg = "يجب اختيار 3 صناديق بالضبط!"
+        else:
+            if user.balance >= cost:
+                user.balance -= cost
+                vault.vault_balance += cost
+
+                log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log_sale)
+
+                pool = json.loads(r_state.pool_json)
+                if r_state.global_attempts >= 46:
+                    pool = ['WIN_3'] * 1 + ['WIN_2'] * 20 + ['LOSE'] * 25
+                    random.shuffle(pool)
+                    r_state.global_attempts = 0
+
+                outcome = pool[r_state.global_attempts]
+                r_state.global_attempts += 1
+                db.session.commit()
+
+                items = ['1', '3', '5', '7', '🦁']
+                revealed_items = []
+                prize = 0.0
+
+                if outcome == 'WIN_3':
+                    winning_item = random.choice(items)
+                    revealed_items = [winning_item, winning_item, winning_item]
+                    prize = 20.0
+                    msg = f"🎉 مبروك يا {username}! ربحت الجائزة الكبرى 20$! 💰"
+                elif outcome == 'WIN_2':
+                    match_item = random.choice(items)
+                    other_items = [item for item in items if item != match_item]
+                    different_item = random.choice(other_items)
+                    revealed_items = [match_item, match_item, different_item]
+                    random.shuffle(revealed_items)
+                    prize = 0.5
+                    msg = f"✨ تنبيه بالربح! يا {username} لقد طابقت شكلين وربحت {prize}$"
+                else:
+                    revealed_items = random.sample(items, 3)
+                    prize = 0.0
+                    msg = f"💔 حظ أوفر يا {username}!"
+
+                if prize > 0:
+                    user.balance += prize
+                    vault.vault_balance -= prize
+                    log_prize = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    db.session.add(log_prize)
+
+                db.session.commit()
+                
+                selected_idxs = [int(idx) for idx in box_indices]
+                boxes_map = {}
+                for i, idx in enumerate(selected_idxs):
+                    boxes_map[idx] = revealed_items[i]
+                
+                result_data = {
+                    'boxes': selected_idxs,
+                    'revealed': boxes_map,
+                    'prize': prize
+                }
+            else:
+                msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
+
+    return render_template_string(GAME_REVEAL_AND_WIN_PAGE, username=username, balance=user.balance, msg=msg, result_data=result_data)
+
 # --- لعبة الرقم الذهبي الفاخر الجديدة (الحجز الجماعي والتحكم الحصري للآدمن) ---
 @app.route('/game_golden_boxes_new', methods=['GET', 'POST'])
 def game_golden_boxes_new():
@@ -701,8 +794,9 @@ def admin_accounting():
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
     payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
     payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي الفاخر').scalar() or 0.0
+    payout_res7 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
-    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6 + payout_res7
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -791,7 +885,8 @@ DASHBOARD_PAGE = """
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
-        <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></div>
+        <!-- الأيقونة الخامسة: لعبة اكشف واربح -->
+        <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></a>
         <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الذهبي الفاخر</div></a>
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
@@ -1122,7 +1217,111 @@ GAME_NUMBER_WHEEL_PAGE = """
 </html>
 """
 
-# --- واجهة لعبة الرقم الذهبي الفاخر المحدثة (حجز جماعي وتحكم حصري للآدمن) ---
+# --- قالب واجهة لعبة اكشف واربح المدمجة (الأيقونة الخامسة) ---
+GAME_REVEAL_AND_WIN_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>اكشف واربح - ليرة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0b0f19; color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; width: 100%; max-width: 800px; box-sizing: border-box; margin-bottom: 20px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        h1 { background: linear-gradient(to left, #ffd700, #ff8c00); -webkit-background-clip: text; color: transparent; font-size: 2.2rem; margin: 10px 0; text-align: center; }
+        
+        .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 700px; flex-wrap: wrap; gap: 15px; }
+        
+        .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 700px; width: 100%; box-sizing: border-box; text-align: center; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
+        .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
+        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 12px; height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; color: #000; cursor: pointer; transition: 0.2s; }
+        .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; transform: scale(1.05); }
+        .play-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 14px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(255,215,0,0.4); }
+        .play-action-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح (مطابقة الأشكال)</h2>
+        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+        <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
+    </div>
+
+    <h1>أمامك 15 صندوقاً، اختر 3 صناديق وطابق الأشكال لتربح! (التكلفة: 1$)</h1>
+    {% if msg %}<div style="background: {% if 'مبروك' in msg or 'تنبيه' in msg %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; text-align: center; width: 100%; max-width: 700px;">{{ msg }}</div>{% endif %}
+
+    <div class="game-box">
+        <p style="color: #38bdf8; font-size: 15px; margin: 5px 0 15px 0;">الصناديق المختارة: <b id="selectionCount">0</b> / 3</p>
+        
+        <form method="POST" id="scratchForm">
+            <div id="hiddenInputsContainer"></div>
+            <div class="boxes-grid">
+                {% for i in range(15) %}
+                    <div class="box-card" id="box-{{ i }}" onclick="toggleBox({{ i }})">
+                        <span id="box-icon-{{ i }}">📦</span>
+                        <span id="box-text-{{ i }}" style="font-size: 11px; margin-top: 2px;">صندوق {{ i+1 }}</span>
+                        <span id="box-val-{{ i }}" style="display:none; font-size: 32px;">
+                            {% if result_data and i in result_data.revealed %}{{ result_data.revealed[i] }}{% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="play-action-btn" id="playBtn" disabled>🎟️ اكشف الصناديق المختارة (1$)</button>
+        </form>
+    </div>
+
+    <script>
+        let selectedBoxes = [];
+        let resultJson = '{{ result_data | tojson | safe }}';
+
+        window.onload = function() {
+            if (resultJson && resultJson !== 'None' && resultJson !== 'null') {
+                try {
+                    let res = JSON.parse(resultJson);
+                    let map = res.revealed;
+                    for (let idx in map) {
+                        let card = document.getElementById('box-' + idx);
+                        document.getElementById('box-icon-' + idx).innerText = "🔓";
+                        document.getElementById('box-text-' + idx).style.display = "none";
+                        let valSpan = document.getElementById('box-val-' + idx);
+                        valSpan.innerText = map[idx];
+                        valSpan.style.display = "block";
+                        card.style.background = "linear-gradient(145deg, #1e3a8a, #1d4ed8)";
+                        card.style.color = "#fff";
+                    }
+                } catch(e) { console.error(e); }
+            }
+        };
+
+        function toggleBox(index) {
+            let card = document.getElementById('box-' + index);
+            if (selectedBoxes.includes(index)) {
+                selectedBoxes = selectedBoxes.filter(i => i !== index);
+                card.classList.remove('selected');
+            } else {
+                if (selectedBoxes.length < 3) {
+                    selectedBoxes.push(index);
+                    card.classList.add('selected');
+                } else {
+                    alert('يمكنك اختيار 3 صناديق كحد أقصى في كل محاولة!');
+                }
+            }
+            document.getElementById('selectionCount').innerText = selectedBoxes.length;
+            let container = document.getElementById('hiddenInputsContainer');
+            container.innerHTML = "";
+            selectedBoxes.forEach(boxIdx => {
+                let input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
+                container.appendChild(input);
+            });
+            document.getElementById('playBtn').disabled = (selectedBoxes.length !== 3);
+        }
+    </script>
+</body>
+</html>
+"""
+
 GAME_GOLDEN_BOXES_NEW_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1136,18 +1335,14 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         h1 { background: linear-gradient(to left, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); -webkit-background-clip: text; color: transparent; font-size: 2.2rem; margin: 10px 0; text-align: center; }
         .schedule-notice { color: #ffd700; background: #1f1f1f; border: 1px dashed #d4af37; padding: 10px 20px; border-radius: 8px; font-size: 15px; margin-bottom: 20px; text-align: center; }
-        
         .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 700px; flex-wrap: wrap; gap: 15px; }
-        
         .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-bottom: 25px; text-align: center; width: 100%; max-width: 700px; box-sizing: border-box; }
         .board-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 15px; }
-        
         .number-box { background: #3d2314; border: 2px solid #8b5a2b; border-radius: 12px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #ffffff; cursor: pointer; transition: 0.2s; }
         .number-box:hover { transform: translateY(-3px); border-color: #ffd700; }
         .number-box.booked { background: #7f1d1d !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
         .number-box.my-booked { background: #1e3a8a !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
         .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; }
-
         .draw-panel { background: #18181b; border: 3px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 20px; text-align: center; width: 100%; max-width: 700px; box-sizing: border-box; }
         .big-slot-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 60px; font-weight: bold; padding: 10px; width: 180px; margin: 15px auto; border-radius: 16px; }
         .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 15px; border-radius: 12px; margin: 15px auto; width: 90%; max-width: 450px; text-align: center; font-size: 20px; font-weight: bold; }
@@ -1198,7 +1393,6 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
         </div>
     </div>
 
-    <!-- لوحة السحب والإعلان عن النتائج (مرئية فقط لصاحب البرنامج/الآدمن) -->
     {% if username == 'admin1' %}
     <div class="draw-panel">
         <h3 style="color: #ffd700; margin-top: 0;">👑 لوحة التحكم والتحكم بالسحب (خاص بالآدمن)</h3>
