@@ -334,7 +334,7 @@ def game_golden_boxes():
                         cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الصناديق الذهبية', 'system', ?, 20.0, ?)", 
                                        (username, time.strftime('%Y-%m-%d %H:%M')))
                         conn.commit()
-                        result_text = f"مبروك لقد فزت ب 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
+                        result_text = f"مبروك لقد فزت بـ 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
                     else:
                         conn.commit()
                         result_text = f"حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
@@ -792,10 +792,9 @@ GAME_GOLDEN_BOXES_PAGE = """
         @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
         .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 105px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; cursor: pointer; transition: 0.3s; box-shadow: 0 6px 15px rgba(0,0,0,0.6); user-select: none; }
         .box-card:hover { transform: scale(1.05); }
-        .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; border-color: #ffd700 !important; box-shadow: 0 0 20px #22c55e; }
+        .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; border-color: #ffd700 !important; box-shadow: 0 0 20px #22c55e; cursor: not-allowed; }
         .revealed-icons-row { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
         .mini-icon { background: #252525; border: 2px solid #ffd700; color: #ffd700; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.7); }
-        .play-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 20px; font-weight: bold; padding: 15px 40px; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 5px 20px rgba(255,215,0,0.4); margin-top: 25px; }
         .result-banner { background: #18181b; border: 3px solid #ffd700; padding: 20px; border-radius: 14px; margin-top: 25px; text-align: center; font-size: 22px; font-weight: bold; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
     </style>
@@ -827,7 +826,6 @@ GAME_GOLDEN_BOXES_PAGE = """
                     </div>
                 {% endfor %}
             </div>
-            <button type="submit" class="play-btn" id="submitBtn" style="display:none;">🎰 بدء المحاولة (بـ 1$)</button>
         </form>
         <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأرقام الثلاثة المكشوفة:</h4>
         <div class="revealed-icons-row">
@@ -846,31 +844,36 @@ GAME_GOLDEN_BOXES_PAGE = """
     <script>
         let selectedBoxes = [];
         function toggleBox(index) {
-            let boxEl = document.getElementById('box-' + index);
-            let iconEl = document.getElementById('box-icon-' + index);
-            let textEl = document.getElementById('box-text-' + index);
-            let valEl = document.getElementById('box-val-' + index);
-            let idxInArr = selectedBoxes.indexOf(index);
-            if (idxInArr > -1) {
-                selectedBoxes.splice(idxInArr, 1);
-                boxEl.classList.remove('selected');
-                iconEl.innerText = "📦"; textEl.style.display = "block"; valEl.style.display = "none";
-            } else {
-                if (selectedBoxes.length < 3) {
-                    selectedBoxes.push(index);
-                    boxEl.classList.add('selected');
-                    iconEl.innerText = "🔓"; textEl.style.display = "none"; valEl.style.display = "block";
-                } else { alert("يمكنك اختيار 3 صناديق فقط للمحاولة!"); }
+            // منع النقر على صندوق تم اختياره مسبقاً (لا يمكن التراجع أو النقر المزدوج)
+            if (selectedBoxes.includes(index)) return;
+            
+            if (selectedBoxes.length < 3) {
+                selectedBoxes.push(index);
+                let boxEl = document.getElementById('box-' + index);
+                let iconEl = document.getElementById('box-icon-' + index);
+                let textEl = document.getElementById('box-text-' + index);
+                let valEl = document.getElementById('box-val-' + index);
+                
+                boxEl.classList.add('selected');
+                iconEl.innerText = "🔓"; 
+                textEl.style.display = "none"; 
+                valEl.style.display = "block";
+                
+                document.getElementById('selectionCount').innerText = selectedBoxes.length;
+                
+                let container = document.getElementById('hiddenInputsContainer');
+                container.innerHTML = "";
+                selectedBoxes.forEach(boxIdx => {
+                    let input = document.createElement('input');
+                    input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
+                    container.appendChild(input);
+                });
+                
+                // عند اكتمال النقر على 3 صناديق، يتم الإرسال تلقائياً بدون زر وبدون تأكيد
+                if (selectedBoxes.length === 3) {
+                    document.getElementById('gameForm').submit();
+                }
             }
-            document.getElementById('selectionCount').innerText = selectedBoxes.length;
-            let container = document.getElementById('hiddenInputsContainer');
-            container.innerHTML = "";
-            selectedBoxes.forEach(boxIdx => {
-                let input = document.createElement('input');
-                input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
-                container.appendChild(input);
-            });
-            document.getElementById('submitBtn').style.display = (selectedBoxes.length === 3) ? "inline-block" : "none";
         }
     </script>
 </body>
@@ -1176,4 +1179,3 @@ ADMIN_ACCOUNTING_PAGE = """
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
-                
