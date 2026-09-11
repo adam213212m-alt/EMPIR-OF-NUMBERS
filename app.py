@@ -92,7 +92,7 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة بكلمات مرور فريدة وعشوائية لمرة واحدة فقط ---
+# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة ---
 with app.app_context():
     db.create_all()
     
@@ -124,7 +124,6 @@ with app.app_context():
         admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
         db.session.add(admin)
 
-    # إنشاء الـ 100 حساب ثابت مع كلمات مرور عشوائية ومختلفة تماماً
     alphabet = string.ascii_letters + string.digits
     for i in range(1, 101):
         uname = f"player{i}"
@@ -139,7 +138,7 @@ with app.app_context():
     db.session.commit()
 
 
-# --- المسارات (Routes) والمنطق البرمجي لدعم التثبيت المباشر PWA ---
+# --- المسارات (Routes) والدعم التقني لـ PWA ---
 
 @app.route('/manifest.json')
 def manifest():
@@ -1004,6 +1003,12 @@ DASHBOARD_PAGE = """
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error', err));
+            });
+        }
+
         setInterval(() => {
             fetch('/api/sync_balance')
                 .then(res => res.json())
@@ -1029,11 +1034,11 @@ DASHBOARD_PAGE = """
                     deferredPrompt = null;
                 });
             } else {
-                const isiOS = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-                if (isiOS) {
-                    alert("لتثبيت التطبيق على آيفون:\nاضغط على زر المشاركة (Share) في متصفح سفاري، ثم اختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
+                const ua = navigator.userAgent.toLowerCase();
+                if (/iphone|ipad|ipod/.test(ua)) {
+                    alert("لتثبيت التطبيق على آيفون:\n1. اضغط على زر المشاركة (Share) في متصفح سفاري.\n2. اختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
                 } else {
-                    window.location.href = '/download';
+                    alert("لتثبيت التطبيق على أندرويد:\n1. اضغط على قائمة المتصفح (الثلاث نقاط).\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق' (Install App).");
                 }
             }
         }
@@ -1117,13 +1122,16 @@ GAME_BALLOON_PAGE = """
         {% endif %}
     </div>
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
                 if(badge && badge.innerText !== "$" + data.balance) badge.innerText = "$" + data.balance;
             }).catch(err => {});
         }, 2000);
-        function installApp() { window.location.href = '/download'; }
+        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1209,6 +1217,9 @@ GAME_ROULETTE_PAGE = """
         </form>
     </div>
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1288,7 +1299,7 @@ GAME_ROULETTE_PAGE = """
             document.getElementById('betsDataInput').value = JSON.stringify(betsArray);
         }
 
-        function installApp() { window.location.href = '/download'; }
+        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1352,6 +1363,9 @@ GAME_NUMBER_WHEEL_PAGE = """
         </form>
     </div>
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1397,7 +1411,7 @@ GAME_NUMBER_WHEEL_PAGE = """
             }, 2000); 
         }
 
-        function installApp() { window.location.href = '/download'; }
+        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1459,6 +1473,9 @@ GAME_REVEAL_AND_WIN_PAGE = """
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1610,6 +1627,9 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
     {% endif %}
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1725,6 +1745,9 @@ GAME_GOLDEN_PAGE = """
         {% endif %}
     </div>
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
+        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
