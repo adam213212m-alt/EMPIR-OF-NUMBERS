@@ -425,7 +425,7 @@ def game_roulette():
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
-# --- لعبة عجلة الأرقام (مع حركة الدوران قبل كشف الرقم الرابح) ---
+# --- لعبة عجلة الأرقام (مع ألوان دائرية وخلفية مخصصة للفوز والخسارة) ---
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session:
@@ -467,10 +467,8 @@ def game_number_wheel():
                         vault.vault_balance -= payout
                         log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
-                        msg = f"🎉 مبروك! استقرت العجلة على الرقم الفائز ({winning_num}) وهو ضمن أرقامك المختارة! فزت بـ ${payout}!"
                     else:
                         is_win = False
-                        msg = f"💥 حظ أوفر، استقرت العجلة على الرقم ({winning_num}) ولم يكن ضمن أرقامك."
 
                     db.session.commit()
                 else:
@@ -479,6 +477,54 @@ def game_number_wheel():
             msg = f"حدث خطأ أثناء معالجة الرهان: {str(e)}"
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
+
+# --- لعبة الرقم الذهبي الفاخر الجديدة (المدمجة كأيقونة سادسة) ---
+@app.route('/game_golden_boxes_new', methods=['GET', 'POST'])
+def game_golden_boxes_new():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    
+    msg = None
+    target_number = None
+    is_win = False
+
+    if request.method == 'POST':
+        chosen_box = int(request.form.get('chosen_box', 1))
+        cost = 50.0 # تكلفة الحجز 50$
+        
+        if user.balance >= cost:
+            user.balance -= cost
+            vault.vault_balance += cost
+
+            log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+            db.session.add(log_sale)
+
+            # النظام المالي للرقم الذهبي الفاخر (ربح الشركة 25% على المدى الطويل)
+            # 75% من قيمة المدخلات توزع كجوائز (جائزة 200$ لكل حجز 50$ تعني فوزاً بوزن مناسب)
+            winning_chance = random.random()
+            if winning_chance <= 0.1875: # نسبة تضمن الربح المستهدف بدقة
+                target_number = chosen_box
+                is_win = True
+                prize = 200.0
+                user.balance += prize
+                vault.vault_balance -= prize
+                log = FinancialLog(action_type='جائزة الرقم الذهبي الفاخر', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+            else:
+                # اختيار رقم مختلف ليكون هو الخاسر
+                other_nums = [n for n in range(1, 6) if n != chosen_box]
+                target_number = random.choice(other_nums)
+                is_win = False
+
+            db.session.commit()
+        else:
+            msg = "رصيدك غير كافٍ للحجز (تكلفة الصندوق 50$)!"
+
+    return render_template_string(GAME_GOLDEN_BOXES_NEW_PAGE, username=username, balance=user.balance, msg=msg, target_number=target_number, is_win=is_win)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -568,8 +614,9 @@ def admin_accounting():
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
     payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
+    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي الفاخر').scalar() or 0.0
 
-    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -659,7 +706,8 @@ DASHBOARD_PAGE = """
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
         <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></div>
-        <div class="icon-card" onclick="alert('قريباً في التعديل القادم')"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></div>
+        <!-- الأيقونة السادسة: لعبة الرقم الذهبي الفاخر الجديدة -->
+        <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الذهبي الفاخر</div></a>
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
         <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
@@ -887,7 +935,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- عجلة الأرقام (مع مسح الرقم السابق وتدوير العجلة دون أرقام قبل إظهار النتيجة) ---
+# --- عجلة الأرقام (مع ألوان الخسارة والفوز المطلوبة ودائرة الدوران) ---
 GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -899,7 +947,34 @@ GAME_NUMBER_WHEEL_PAGE = """
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
         .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 600px; margin: 20px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
-        .wheel-circle { width: 140px; height: 140px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 5px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
+        
+        /* تصميم دائرة العجلة وحالات الفوز والخسارة */
+        .wheel-circle { 
+            width: 150px; height: 150px; 
+            background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); 
+            border: 6px solid #ffd700; border-radius: 50%; 
+            margin: 15px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            font-size: 42px; font-weight: bold; color: #ffd700; 
+            box-shadow: 0 0 25px rgba(255,215,0,0.5); 
+            transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); 
+        }
+        .wheel-circle.lose {
+            background: #dc2626 !important;
+            border-color: #991b1b !important;
+            color: #000000 !important;
+        }
+        .wheel-circle.win {
+            background: radial-gradient(circle, #ffd700 0%, #b8860b 100%) !important;
+            border-color: #fff !important;
+            color: #000 !important;
+        }
+        .win-label {
+            font-size: 14px;
+            color: #ffffff !important;
+            font-weight: bold;
+            margin-top: -2px;
+        }
+
         .numbers-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
         .num-cell { background: #252525; border: 2px solid #555; border-radius: 10px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #fff; cursor: pointer; transition: 0.2s; }
         .num-cell.selected { background: #22c55e; border-color: #ffd700; color: #000; transform: scale(1.05); }
@@ -920,9 +995,19 @@ GAME_NUMBER_WHEEL_PAGE = """
     {% if msg %}<div style="background: {% if is_win %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold; max-width: 600px; margin-left: auto; margin-right: auto;">{{ msg }}</div>{% endif %}
     <div class="game-box">
         <h3 style="color: #ffd700; margin-top: 0;">اختر أرقامك (بحد أقصى 15 رقماً | 1$ لكل رقم) ثم أدر العجلة!</h3>
-        <div class="wheel-circle" id="wheelDisplay">
-            {% if winning_num %}{{ winning_num }}{% else %}🎡{% endif %}
+        
+        <!-- دائرة العجلة مع تطبيق الفئات اللونية للفوز والخسارة -->
+        <div class="wheel-circle {% if winning_num is not none %}{% if is_win %}win{% else %}lose{% endif %}{% endif %}" id="wheelDisplay">
+            {% if winning_num is not none %}
+                <span>{{ winning_num }}</span>
+                {% if is_win %}
+                    <span class="win-label">مبروك</span>
+                {% endif %}
+            {% else %}
+                🎡
+            {% endif %}
         </div>
+
         <p style="color: #38bdf8; font-size: 14px; margin: 5px 0;">الأرقام المختارة: <b id="selectedCountText">0</b> / 15</p>
         
         <div class="numbers-board">
@@ -941,9 +1026,9 @@ GAME_NUMBER_WHEEL_PAGE = """
         let selectedNumbers = [];
         
         function toggleNumber(num, element) {
-            // عند بدء اختيار أرقام جديدة، نخفي الرقم السابق فوراً لتبدأ لعبة جديدة نظيفة
             let wheel = document.getElementById('wheelDisplay');
-            if (wheel.innerText !== '🎡') {
+            if (wheel.innerText.trim() !== '🎡') {
+                wheel.className = "wheel-circle";
                 wheel.innerText = '🎡';
             }
 
@@ -964,7 +1049,6 @@ GAME_NUMBER_WHEEL_PAGE = """
             document.getElementById('spinBtn').disabled = (selectedNumbers.length === 0);
         }
 
-        // دالة حركة دوران العجلة ومسح الرقم السابق تماماً قبل إظهار النتيجة الجديدة
         function spinWheelAndSubmit(e) {
             e.preventDefault(); 
             let wheel = document.getElementById('wheelDisplay');
@@ -972,7 +1056,7 @@ GAME_NUMBER_WHEEL_PAGE = """
             btn.disabled = true;
             btn.innerText = "⏳ جاري تدوير العجلة...";
             
-            // إخفاء الرقم السابق وتحويل العجلة لرمز الدوران أثناء حركة الدوران
+            wheel.className = "wheel-circle";
             wheel.innerText = "🎡";
             wheel.style.transform = "rotate(1800deg)";
             
@@ -982,6 +1066,122 @@ GAME_NUMBER_WHEEL_PAGE = """
         }
 
         function installApp() { window.location.href = '/download'; }
+    </script>
+</body>
+</html>
+"""
+
+# --- قالب واجهة لعبة الرقم الذهبي الفاخر الجديدة (الأيقونة السادسة) ---
+# --- الرقم الذهبي الفاخر (الأيقونة السادسة) ---
+GAME_GOLDEN_BOXES_NEW_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الرقم الذهبي الفاخر</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0d0d0d; color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 25px; border-radius: 12px; border: 2px solid #d4af37; width: 100%; max-width: 900px; box-sizing: border-box; margin-bottom: 20px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        h1 { background: linear-gradient(to left, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); -webkit-background-clip: text; color: transparent; font-size: 2.5rem; margin: 10px 0; text-shadow: 0px 4px 15px rgba(212, 175, 55, 0.3); }
+        .game-container { display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 20px; flex-wrap: wrap; width: 100%; max-width: 900px; }
+        .boxes-wrapper { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .boxes-wrapper .box:nth-child(4) { grid-column: 1 / 3; justify-self: center; }
+        .boxes-wrapper .box:nth-child(5) { grid-column: 2 / 4; justify-self: center; }
+        .box { background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #d4af37; border-radius: 15px; width: 120px; height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); cursor: pointer; transition: 0.3s; }
+        .box:hover { transform: translateY(-5px); border-color: #fff; }
+        .box .number { font-size: 2.5rem; color: #d4af37; text-shadow: 0 0 10px rgba(212, 175, 55, 0.8); margin-bottom: 5px; }
+        .box .price { background: #d4af37; color: #000; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: 900; }
+        .box .prize { font-size: 0.75rem; color: #aaa; margin-top: 3px; }
+        .wheel-container { position: relative; width: 280px; height: 280px; display: flex; justify-content: center; align-items: center; }
+        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 25px solid #fff; z-index: 10; }
+        .wheel { width: 260px; height: 260px; border-radius: 50%; border: 6px solid #d4af37; box-shadow: 0 0 30px rgba(212, 175, 55, 0.4); position: relative; overflow: hidden; transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99); background: conic-gradient(#1a1a1a 0deg 72deg, #2a2a2a 72deg 144deg, #1a1a1a 144deg 216deg, #2a2a2a 216deg 288deg, #1a1a1a 288deg 360deg); }
+        .wheel .num { position: absolute; top: 50%; left: 50%; font-size: 1.8rem; color: #d4af37; font-weight: 900; transform-origin: 0 0; }
+        .wheel .num:nth-child(1) { transform: rotate(36deg) translateY(-90px) translateX(-50%); }
+        .wheel .num:nth-child(2) { transform: rotate(108deg) translateY(-90px) translateX(-50%); }
+        .wheel .num:nth-child(3) { transform: rotate(180deg) translateY(-90px) translateX(-50%); }
+        .wheel .num:nth-child(4) { transform: rotate(252deg) translateY(-90px) translateX(-50%); }
+        .wheel .num:nth-child(5) { transform: rotate(324deg) translateY(-90px) translateX(-50%); }
+        .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+        .popup-box { background: linear-gradient(145deg, #2a220a, #111); border: 3px solid #d4af37; padding: 40px 60px; border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(212, 175, 55, 0.5); transform: scale(0.8); transition: transform 0.5s; }
+        .popup-overlay.active { opacity: 1; pointer-events: all; }
+        .popup-overlay.active .popup-box { transform: scale(1); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🎁 الرقم الذهبي الفاخر</h2>
+        <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+        <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
+    </div>
+
+    <h1>اختر صندوقاً للحجز (التكلفة: 50$)</h1>
+    {% if msg %}<div style="background: #7f1d1d; color: #fca5a5; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold;">{{ msg }}</div>{% endif %}
+
+    <div class="game-container">
+        <div class="boxes-wrapper">
+            {% for i in range(1, 6) %}
+            <div class="box" onclick="submitBox({{ i }})">
+                <div class="number">{{ i }}</div>
+                <div class="price">حجز 50$</div>
+                <div class="prize">جائزة 200$</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <div class="wheel" id="wheel">
+                <div class="num">1</div><div class="num">2</div><div class="num">3</div><div class="num">4</div><div class="num">5</div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" id="boxForm">
+        <input type="hidden" name="chosen_box" id="chosenBoxInput">
+    </form>
+
+    <div class="popup-overlay" id="popup" onclick="closePopup()">
+        <div class="popup-box">
+            <h2 id="winText" style="color:#fff; margin:0 0 10px 0;">نتيجة السحب</h2>
+            <p class="win-amount" id="winAmountText" style="font-size: 2.5rem; color: #d4af37; margin: 0;"></p>
+        </div>
+    </div>
+
+    <script>
+        function submitBox(boxNum) {
+            document.getElementById('chosenBoxInput').value = boxNum;
+            let targetNumber = {% if target_number is not none %}{{ target_number }}{% else %}boxNum{% endif %};
+            let isWin = {% if is_win %}true{% else %}false{% endif %};
+            
+            let wheel = document.getElementById('wheel');
+            const sliceAngle = 72;
+            const targetAngle = 360 - (targetNumber * sliceAngle - 36);
+            let currentRotation = targetAngle + (360 * 5);
+            wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                if (isWin) {
+                    document.getElementById('winText').innerText = `مبروك! الصندوق رقم ${targetNumber} هو الرابح`;
+                    document.getElementById('winAmountText').innerText = "ربحت جائزة 200$!";
+                } else {
+                    document.getElementById('winText').innerText = `عذراً، استقرت العجلة على الرقم ${targetNumber}`;
+                    document.getElementById('winAmountText').innerText = "حظ أوفر في المرة القادمة";
+                }
+                document.getElementById('popup').classList.add('active');
+            }, 4000);
+
+            // إرسال البيانات للسيرفر لتحديث الرصيد
+            setTimeout(() => {
+                document.getElementById('boxForm').submit();
+            }, 100);
+        }
+
+        function closePopup() {
+            document.getElementById('popup').classList.remove('active');
+            location.reload();
+        }
     </script>
 </body>
 </html>
