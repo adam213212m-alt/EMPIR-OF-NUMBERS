@@ -58,7 +58,6 @@ class BalloonState(db.Model):
     attempts_since_last_win = db.Column(db.Integer, default=0)
     sequence_index = db.Column(db.Integer, default=0)
 
-# نموذج لحفظ آخر رهان لكل مستخدم لتفعيل ميزة "تكرار الرهان"
 class UserLastBet(db.Model):
     __tablename__ = 'user_last_bets'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -337,7 +336,7 @@ def game_roulette():
                     user.balance -= total_bet_amount
                     vault.vault_balance += total_bet_amount
                     
-                    # حفظ آخر رهان تم وضعه من قبل هذا المستخدم لتمكين زر "تكرار الرهان"
+                    # حفظ آخر رهان تم وضعه من قبل هذا المستخدم
                     last_bet_entry = UserLastBet.query.filter_by(username=username).first()
                     if not last_bet_entry:
                         last_bet_entry = UserLastBet(username=username, bets_json=bets_json)
@@ -346,36 +345,54 @@ def game_roulette():
                         last_bet_entry.bets_json = bets_json
                     
                     wheel_numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
-                    winning_number = random.choice(wheel_numbers)
-                    
                     reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
-                    if winning_number == 0: winning_color = 'green'
-                    elif winning_number in reds: winning_color = 'red'
-                    else: winning_color = 'black'
-
-                    bets = json.loads(bets_json)
-                    total_payout = 0
                     
-                    for bet in bets:
-                        b_type, b_val, b_amount = bet['type'], bet['value'], bet['amount']
-                        won = False
-                        multiplier = 0
+                    bets = json.loads(bets_json)
+                    
+                    # --- خوارزمية ضمان هامش ربح الشركة بنسبة 20% دائمًا ---
+                    # المستهدف: إجمالي العوائد (Payout) يجب أن يساوي تقريباً 80% من إجمالي المراهنة (RTP = 80%) لضمان 20% ربح للشركة
+                    target_total_payout = total_bet_amount * 0.80
+                    
+                    scored_outcomes = []
+                    for num in wheel_numbers:
+                        if num == 0: color = 'green'
+                        elif num in reds: color = 'red'
+                        else: color = 'black'
                         
-                        if b_type == 'straight' and int(b_val) == winning_number:
-                            won = True; multiplier = 35
-                        elif b_type == 'color' and str(b_val) == winning_color:
-                            won = True; multiplier = 1
-                        elif b_type == 'dozen':
-                            if b_val == 1 and 1 <= winning_number <= 12: won = True; multiplier = 2
-                            elif b_val == 2 and 13 <= winning_number <= 24: won = True; multiplier = 2
-                            elif b_val == 3 and 25 <= winning_number <= 36: won = True; multiplier = 2
-                        elif b_type == 'even_odd':
-                            if winning_number != 0:
-                                if b_val == 'even' and winning_number % 2 == 0: won = True; multiplier = 1
-                                if b_val == 'odd' and winning_number % 2 != 0: won = True; multiplier = 1
+                        payout_for_num = 0
+                        for bet in bets:
+                            b_type, b_val, b_amount = bet['type'], bet['value'], bet['amount']
+                            won = False
+                            multiplier = 0
+                            if b_type == 'straight' and int(b_val) == num:
+                                won = True; multiplier = 35
+                            elif b_type == 'color' and str(b_val) == color:
+                                won = True; multiplier = 1
+                            elif b_type == 'dozen':
+                                if b_val == 1 and 1 <= num <= 12: won = True; multiplier = 2
+                                elif b_val == 2 and 13 <= num <= 24: won = True; multiplier = 2
+                                elif b_val == 3 and 25 <= num <= 36: won = True; multiplier = 2
+                            elif b_type == 'even_odd':
+                                if num != 0:
+                                    if b_val == 'even' and num % 2 == 0: won = True; multiplier = 1
+                                    if b_val == 'odd' and num % 2 != 0: won = True; multiplier = 1
 
-                        if won:
-                            total_payout += (b_amount * multiplier) + b_amount
+                            if won:
+                                payout_for_num += (b_amount * multiplier) + b_amount
+                        
+                        # حساب المسافة بين عائد هذا الرقم والعائد المستهدف (80% من المدفوعات)
+                        diff = abs(payout_for_num - target_total_payout)
+                        scored_outcomes.append((num, color, payout_for_num, diff))
+                    
+                    # اختيار الرقم الذي يحقق أقرب قيمة مستهدفة لنسبة الـ 80% مع إدخال نسبة عشوائية طفيفة لمنع الشك
+                    scored_outcomes.sort(key=lambda x: x[3])
+                    # نختار من أفضل 5 خيارات قريبة لتحقيق دقة الهامش دون نمط متكرر مكشوف
+                    best_candidates = scored_outcomes[:min(5, len(scored_outcomes))]
+                    chosen = random.choice(best_candidates)
+                    
+                    winning_number = chosen[0]
+                    winning_color = chosen[1]
+                    total_payout = chosen[2]
 
                     if total_payout > 0:
                         user.balance += total_payout
@@ -670,9 +687,7 @@ GAME_ROULETTE_PAGE = """
         .r-cell.red { background: #dc2626; color: white; }
         .r-cell.black { background: #0f172a; color: white; }
         .r-cell.green { background: #16a34a; color: white; }
-        .chips-bar { display: flex; gap: 10px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
-        .chip { width: 50px; height: 50px; border-radius: 50%; border: 3px dashed #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .chip.selected { border-style: solid; border-color: #ffd700; transform: scale(1.15); }
+        .fixed-bet-notice { background: #1f2937; border: 1px dashed #ffd700; color: #ffd700; padding: 8px 15px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-weight: bold; text-align: center; }
         .quick-bets-bar { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
         .quick-btn { padding: 10px 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; color: white; }
         .spin-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 12px 30px; border: none; border-radius: 10px; cursor: pointer; }
@@ -699,22 +714,15 @@ GAME_ROULETTE_PAGE = """
                 {% if last_win_data %}اللون: <b style="color: {% if last_win_data.winning_color == 'red' %}#ef4444{% elif last_win_data.winning_color == 'green' %}#22c55e{% else %}#94a3b8{% endif %};">{{ last_win_data.winning_color }}</b> | إجمالي الرهان: ${{ last_win_data.total_bet }}{% else %}اختر رهاناتك من الطاولة أدناه ثم اضغط تدوير{% endif %}
             </p>
         </div>
-        <div style="text-align: center;">
-            <p style="color: #ffd700; margin: 0 0 8px 0; font-size: 14px;">اختر قيمة الرقاقة للرهان:</p>
-            <div class="chips-bar">
-                <div class="chip selected" style="background: #3b82f6; color: white;" onclick="selectChip(1, this)">1$</div>
-                <div class="chip" style="background: #22c55e; color: black;" onclick="selectChip(5, this)">5$</div>
-                <div class="chip" style="background: #a855f7; color: white;" onclick="selectChip(10, this)">10$</div>
-                <div class="chip" style="background: #eab308; color: black;" onclick="selectChip(50, this)">50$</div>
-                <div class="chip" style="background: #ef4444; color: white;" onclick="selectChip(100, this)">100$</div>
-            </div>
+        <div style="text-align: center; width: 100%; max-width: 450px;">
+            <div class="fixed-bet-notice">📌 الرهان ثابت حصرياً بقيمة <b>1$</b> لكل نقرة / رقم</div>
             <div class="quick-bets-bar">
                 <button type="button" class="quick-btn" style="background: #dc2626;" onclick="betAllColor('red')">🔴 رهان على كل الأحمر (Red)</button>
                 <button type="button" class="quick-btn" style="background: #0f172a; border: 1px solid #475569;" onclick="betAllColor('black')">⚫ رهان على كل الأسود (Black)</button>
             </div>
         </div>
         <div class="table-container">
-            <div style="text-align: center; color: #ffd700; font-weight: bold; margin-bottom: 8px;">طاولة الرهانات الرقمية</div>
+            <div style="text-align: center; color: #ffd700; font-weight: bold; margin-bottom: 8px;">طاولة الرهانات الرقمية (كل نقرة بـ 1$)</div>
             <div class="grid-board" id="bettingBoard">
                 <div class="r-cell green" style="grid-row: span 3;" onclick="placeBet('straight', 0, this)">0<span class="bet-tag" style="font-size:10px; color:#ffd700;"></span></div>
                 <script>
@@ -740,20 +748,14 @@ GAME_ROULETTE_PAGE = """
         </form>
     </div>
     <script>
-        let currentChipValue = 1;
+        let fixedChipValue = 1; // الرهان الثابت حصرياً بقيمة 1$
         let activeBets = {};
         let lastUserBetsJson = '{{ last_bets_json | safe }}';
-
-        function selectChip(val, element) {
-            currentChipValue = val;
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
-            element.classList.add('selected');
-        }
 
         function placeBet(type, value, element) {
             let key = type + "_" + value;
             if (!activeBets[key]) { activeBets[key] = { type: type, value: value, amount: 0 }; }
-            activeBets[key].amount += currentChipValue;
+            activeBets[key].amount += fixedChipValue; // زيادة 1$ مع كل نقرة
             let tag = element.querySelector('.bet-tag');
             if(tag) { tag.innerText = "$" + activeBets[key].amount; } 
             else { element.innerHTML += `<span class="bet-tag" style="font-size:10px; color:#ffd700;">$${activeBets[key].amount}</span>`; }
