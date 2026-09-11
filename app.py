@@ -1,8 +1,7 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, render_template_string, request, redirect, url_for, session, jsonify, json, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import random
 import time
-import json
 import os
 
 app = Flask(__name__)
@@ -53,47 +52,36 @@ class GameDrawState(db.Model):
     draw_end_time = db.Column(db.Float, default=0)
     forced_winning_number = db.Column(db.Integer, default=0)
 
-class GoldenBoxesState(db.Model):
-    __tablename__ = 'golden_boxes_state'
-    id = db.Column(db.Integer, primary_key=True)
-    total_attempts = db.Column(db.Integer, default=0)
-    boxes_data = db.Column(db.Text)
-    game_status = db.Column(db.String(20), default='playing')
-
 class BalloonState(db.Model):
     __tablename__ = 'balloon_state'
     id = db.Column(db.Integer, primary_key=True)
     attempts_since_last_win = db.Column(db.Integer, default=0)
     sequence_index = db.Column(db.Integer, default=0)
 
+# نموذج لحفظ آخر رهان لكل مستخدم لتفعيل ميزة "تكرار الرهان"
+class UserLastBet(db.Model):
+    __tablename__ = 'user_last_bets'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    bets_json = db.Column(db.Text, nullable=False)
+
 
 # إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
 with app.app_context():
     db.create_all()
     
-    # التحقق من وجود الخزنة
     if not SystemVault.query.get(1):
         vault = SystemVault(id=1, vault_balance=1000000.0)
         db.session.add(vault)
     
-    # التحقق من حالة اللعبة
     if not GameDrawState.query.get(1):
         draw_state = GameDrawState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0)
         db.session.add(draw_state)
         
-    # التحقق من الصناديق الذهبية
-    if not GoldenBoxesState.query.get(1):
-        initial_nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
-        random.shuffle(initial_nums)
-        boxes_state = GoldenBoxesState(id=1, total_attempts=0, boxes_data=json.dumps(initial_nums), game_status='playing')
-        db.session.add(boxes_state)
-        
-    # التحقق من حالة البالون
     if not BalloonState.query.get(1):
         balloon_state = BalloonState(id=1, attempts_since_last_win=0, sequence_index=0)
         db.session.add(balloon_state)
         
-    # إنشاء حساب الآدمن الرئيسي إذا لم يكن موجوداً
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
         admin = User(username='admin1', password='admin123', balance=50000.0, role='admin', created_by='system')
@@ -166,7 +154,6 @@ def dashboard():
 def api_golden_status():
     current_time = time.time()
     draw_state = GameDrawState.query.get(1)
-    
     status = 'idle'
     winning_number = 0
     remaining = 0
@@ -277,72 +264,6 @@ def game_golden_number():
                                   bookings=bookings, winning_number=draw_state.winning_number, draw_status=draw_state.status, 
                                   forced_num=draw_state.forced_winning_number, my_booked_nums=my_booked_nums, my_total_spent=my_total_spent, msg=msg)
 
-@app.route('/game_golden_boxes', methods=['GET', 'POST'])
-def game_golden_boxes():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    boxes_state = GoldenBoxesState.query.get(1)
-    
-    msg = None
-    result_text = None
-    revealed_nums = []
-
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'open_three_boxes':
-            selected_indices = request.form.getlist('box_indices')
-            if len(selected_indices) == 3:
-                selected_indices = [int(idx) for idx in selected_indices]
-                cost = 1.0
-                if user.balance >= cost:
-                    user.balance -= cost
-                    boxes_state.total_attempts += 1
-                    
-                    boxes = json.loads(boxes_state.boxes_data)
-                    revealed_nums = [boxes[idx] for idx in selected_indices]
-                    
-                    if boxes_state.total_attempts >= 36 or (boxes_state.total_attempts % 36 == 0):
-                        winning_val = random.randint(1, 5)
-                        revealed_nums = [winning_val, winning_val, winning_val]
-                        boxes_state.total_attempts = 0
-                        is_win = True
-                    else:
-                        while revealed_nums[0] == revealed_nums[1] == revealed_nums[2]:
-                            random.shuffle(boxes)
-                            revealed_nums = [boxes[idx] for idx in selected_indices]
-                        is_win = False
-
-                    random.shuffle(boxes)
-                    boxes_state.boxes_data = json.dumps(boxes)
-                    
-                    if is_win:
-                        user.balance += 20.0
-                        log = FinancialLog(action_type='جائزة الصناديق الذهبية', admin_name='system', target_user=username, amount=20.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                        db.session.add(log)
-                        result_text = f"مبروك لقد فزت بـ 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
-                    else:
-                        result_text = f"حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
-                    
-                    db.session.commit()
-                else:
-                    msg = "رصيدك غير كافٍ (تكلفة المحاولة 1$)!"
-            else:
-                msg = "يرجى اختيار 3 صناديق تماماً!"
-
-        elif action == 'reset_game' and username == 'admin1':
-            new_nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
-            random.shuffle(new_nums)
-            boxes_state.total_attempts = 0
-            boxes_state.boxes_data = json.dumps(new_nums)
-            db.session.commit()
-            msg = "تم إعادة خلط الصناديق وتصفير عداد النظام بنجاح!"
-
-    boxes = json.loads(boxes_state.boxes_data)
-    return render_template_string(GAME_GOLDEN_BOXES_PAGE, username=username, balance=user.balance, total_att=boxes_state.total_attempts, boxes=boxes, result_text=result_text, revealed_nums=revealed_nums, msg=msg)
-
 @app.route('/game_balloon_pop', methods=['GET', 'POST'])
 def game_balloon_pop():
     if 'username' not in session:
@@ -416,6 +337,14 @@ def game_roulette():
                     user.balance -= total_bet_amount
                     vault.vault_balance += total_bet_amount
                     
+                    # حفظ آخر رهان تم وضعه من قبل هذا المستخدم لتمكين زر "تكرار الرهان"
+                    last_bet_entry = UserLastBet.query.filter_by(username=username).first()
+                    if not last_bet_entry:
+                        last_bet_entry = UserLastBet(username=username, bets_json=bets_json)
+                        db.session.add(last_bet_entry)
+                    else:
+                        last_bet_entry.bets_json = bets_json
+                    
                     wheel_numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
                     winning_number = random.choice(wheel_numbers)
                     
@@ -469,7 +398,10 @@ def game_roulette():
         except Exception as e:
             msg = f"حدث خطأ أثناء معالجة الرهان: {str(e)}"
 
-    return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data)
+    user_last_bet_record = UserLastBet.query.filter_by(username=username).first()
+    last_bets_json = user_last_bet_record.bets_json if user_last_bet_record else "[]"
+
+    return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -555,18 +487,17 @@ def admin_accounting():
     
     sales_res = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='بيع عملات للزبون').scalar() or 0.0
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الذهبي').scalar() or 0.0
-    payout_res2 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الصناديق الذهبية').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
 
     total_sales = sales_res
-    total_payouts = payout_res1 + payout_res2 + payout_res3 + payout_res4
+    total_payouts = payout_res1 + payout_res3 + payout_res4
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
 
 
-# --- قوالب HTML (نفس التصاميم والمظهر الخاص بك) ---
+# --- قوالب HTML ---
 
 LOGIN_PAGE = """
 <!DOCTYPE html>
@@ -650,7 +581,7 @@ DASHBOARD_PAGE = """
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <div class="icon-card" onclick="alert('اللعبة الرابعة قيد التفعيل')"><div class="icon-logo">🏇</div><div class="icon-title">سباق الخيل</div></div>
         <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الثروة</div></div>
-        <a href="/game_golden_boxes" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></a>
+        <div class="icon-card" onclick="alert('قريباً في التعديل القادم')"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></div>
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
         <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
@@ -742,8 +673,11 @@ GAME_ROULETTE_PAGE = """
         .chips-bar { display: flex; gap: 10px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
         .chip { width: 50px; height: 50px; border-radius: 50%; border: 3px dashed #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; cursor: pointer; }
         .chip.selected { border-style: solid; border-color: #ffd700; transform: scale(1.15); }
+        .quick-bets-bar { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .quick-btn { padding: 10px 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; color: white; }
         .spin-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 12px 30px; border: none; border-radius: 10px; cursor: pointer; }
         .clear-btn { background: #ef4444; color: white; font-weight: bold; padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; }
+        .repeat-btn { background: #3b82f6; color: white; font-weight: bold; padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
     </style>
 </head>
@@ -774,6 +708,10 @@ GAME_ROULETTE_PAGE = """
                 <div class="chip" style="background: #eab308; color: black;" onclick="selectChip(50, this)">50$</div>
                 <div class="chip" style="background: #ef4444; color: white;" onclick="selectChip(100, this)">100$</div>
             </div>
+            <div class="quick-bets-bar">
+                <button type="button" class="quick-btn" style="background: #dc2626;" onclick="betAllColor('red')">🔴 رهان على كل الأحمر (Red)</button>
+                <button type="button" class="quick-btn" style="background: #0f172a; border: 1px solid #475569;" onclick="betAllColor('black')">⚫ رهان على كل الأسود (Black)</button>
+            </div>
         </div>
         <div class="table-container">
             <div style="text-align: center; color: #ffd700; font-weight: bold; margin-bottom: 8px;">طاولة الرهانات الرقمية</div>
@@ -783,7 +721,7 @@ GAME_ROULETTE_PAGE = """
                     let redsList = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
                     for(let i=1; i<=36; i++) {
                         let colorClass = redsList.includes(i) ? 'red' : 'black';
-                        document.write(`<div class="r-cell ${colorClass}" onclick="placeBet('straight', ${i}, this)">${i}<span class="bet-tag" style="font-size:10px; color:#ffd700;"></span></div>`);
+                        document.write(`<div class="r-cell ${colorClass}" data-num="${i}" data-color="${colorClass}" onclick="placeBet('straight', ${i}, this)">${i}<span class="bet-tag" style="font-size:10px; color:#ffd700;"></span></div>`);
                     }
                 </script>
             </div>
@@ -794,8 +732,9 @@ GAME_ROULETTE_PAGE = """
             <div style="text-align: center; color: #cbd5e1; font-size: 15px; margin-bottom: 10px;">
                 إجمالي الرهان الحالي: <b style="color: #ffd700;" id="totalBetText">$0</b>
             </div>
-            <div style="display: flex; gap: 10px; justify-content: center;">
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                 <button type="button" class="clear-btn" onclick="clearBets()">🗑️ مسح الرهانات</button>
+                <button type="button" class="repeat-btn" onclick="repeatLastBet()">🔄 تكرار آخر رهان</button>
                 <button type="submit" class="spin-btn" onclick="prepareSubmit()">🎡 تدوير العجلة (Spin)</button>
             </div>
         </form>
@@ -803,11 +742,14 @@ GAME_ROULETTE_PAGE = """
     <script>
         let currentChipValue = 1;
         let activeBets = {};
+        let lastUserBetsJson = '{{ last_bets_json | safe }}';
+
         function selectChip(val, element) {
             currentChipValue = val;
             document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
             element.classList.add('selected');
         }
+
         function placeBet(type, value, element) {
             let key = type + "_" + value;
             if (!activeBets[key]) { activeBets[key] = { type: type, value: value, amount: 0 }; }
@@ -817,112 +759,65 @@ GAME_ROULETTE_PAGE = """
             else { element.innerHTML += `<span class="bet-tag" style="font-size:10px; color:#ffd700;">$${activeBets[key].amount}</span>`; }
             updateTotalSummary();
         }
+
+        function betAllColor(colorName) {
+            let cells = document.querySelectorAll('.r-cell');
+            cells.forEach(cell => {
+                let cellColor = cell.getAttribute('data-color');
+                let numStr = cell.getAttribute('data-num');
+                if (cellColor === colorName && numStr) {
+                    let num = parseInt(numStr);
+                    placeBet('straight', num, cell);
+                }
+            });
+        }
+
+        function repeatLastBet() {
+            if (!lastUserBetsJson || lastUserBetsJson === '[]') {
+                alert('لا يوجد رهان سابق محفوظ لتكراره!');
+                return;
+            }
+            clearBets();
+            try {
+                let parsedBets = JSON.parse(lastUserBetsJson);
+                parsedBets.forEach(bet => {
+                    let key = bet.type + "_" + bet.value;
+                    activeBets[key] = { type: bet.type, value: bet.value, amount: bet.amount };
+                    
+                    if (bet.type === 'straight') {
+                        let cell = document.querySelector(`.r-cell[data-num="${bet.value}"]`);
+                        if (cell) {
+                            let tag = cell.querySelector('.bet-tag');
+                            if(tag) { tag.innerText = "$" + bet.amount; }
+                            else { cell.innerHTML += `<span class="bet-tag" style="font-size:10px; color:#ffd700;">$${bet.amount}</span>`; }
+                        }
+                    }
+                });
+                updateTotalSummary();
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
         function updateTotalSummary() {
             let total = 0;
             for (let k in activeBets) { total += activeBets[k].amount; }
             document.getElementById('totalBetText').innerText = "$" + total;
             document.getElementById('totalBetInput').value = total;
         }
+
         function clearBets() {
             activeBets = {};
             document.querySelectorAll('.bet-tag').forEach(t => t.innerText = "");
             updateTotalSummary();
         }
+
         function prepareSubmit() {
             let betsArray = [];
             for (let k in activeBets) { betsArray.push(activeBets[k]); }
             document.getElementById('betsDataInput').value = JSON.stringify(betsArray);
         }
-        function installApp() { window.location.href = '/download'; }
-    </script>
-</body>
-</html>
-"""
 
-GAME_GOLDEN_BOXES_PAGE = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الصناديق الذهبية - ليرة</title>
-    <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
-        .boxes-container { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 5px solid #ffd700; padding: 30px; border-radius: 20px; margin-top: 25px; text-align: center; }
-        .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 25px; }
-        @media(max-width: 768px) { .boxes-grid { grid-template-columns: repeat(3, 1fr); } }
-        .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 14px; height: 105px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #000; cursor: pointer; }
-        .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; cursor: not-allowed; }
-        .mini-icon { background: #252525; border: 2px solid #ffd700; color: #ffd700; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
-        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎁 الصناديق الذهبية (ليرة)</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
-            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
-        </div>
-    </div>
-    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
-    <div class="boxes-container">
-        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها (تكلفة المحاولة: 1$)</h3>
-        <p style="color: #cbd5e1; font-size: 15px;">الصناديق المختارة: <b id="selectionCount" style="color: #38bdf8;">0</b> / 3</p>
-        <form method="POST" id="gameForm">
-            <input type="hidden" name="action" value="open_three_boxes">
-            <div id="hiddenInputsContainer"></div>
-            <div class="boxes-grid">
-                {% for i in range(15) %}
-                    <div class="box-card" id="box-{{ i }}" onclick="toggleBox({{ i }})">
-                        <span id="box-icon-{{ i }}">📦</span>
-                        <span id="box-text-{{ i }}" style="font-size: 12px; margin-top: 5px;">صندوق {{ i+1 }}</span>
-                        <span id="box-val-{{ i }}" style="display:none; color: #ffd700; font-size: 22px; margin-top: 4px;">{{ boxes[i] }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        </form>
-        <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأرقام الثلاثة المكشوفة:</h4>
-        <div style="display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
-            {% if revealed_nums %}
-                <div class="mini-icon">{{ revealed_nums[0] }}</div><div class="mini-icon">{{ revealed_nums[1] }}</div><div class="mini-icon">{{ revealed_nums[2] }}</div>
-            {% else %}
-                <div class="mini-icon">?</div><div class="mini-icon">?</div><div class="mini-icon">?</div>
-            {% endif %}
-        </div>
-    </div>
-    {% if result_text %}
-    <div style="background: #18181b; border: 3px solid #ffd700; padding: 20px; border-radius: 14px; margin-top: 25px; text-align: center; font-size: 22px; font-weight: bold;">
-        {{ result_text }}
-    </div>
-    {% endif %}
-    <script>
-        let selectedBoxes = [];
-        function toggleBox(index) {
-            if (selectedBoxes.includes(index)) return;
-            if (selectedBoxes.length < 3) {
-                selectedBoxes.push(index);
-                let boxEl = document.getElementById('box-' + index);
-                let iconEl = document.getElementById('box-icon-' + index);
-                let textEl = document.getElementById('box-text-' + index);
-                let valEl = document.getElementById('box-val-' + index);
-                boxEl.classList.add('selected');
-                iconEl.innerText = "🔓"; 
-                textEl.style.display = "none"; 
-                valEl.style.display = "block";
-                document.getElementById('selectionCount').innerText = selectedBoxes.length;
-                let container = document.getElementById('hiddenInputsContainer');
-                container.innerHTML = "";
-                selectedBoxes.forEach(boxIdx => {
-                    let input = document.createElement('input');
-                    input.type = 'hidden'; input.name = 'box_indices'; input.value = boxIdx;
-                    container.appendChild(input);
-                });
-                if (selectedBoxes.length === 3) { document.getElementById('gameForm').submit(); }
-            }
-        }
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
@@ -1168,11 +1063,6 @@ ADMIN_GAMES_PAGE = """
                 <input type="number" name="forced_winning_number" value="{% if forced_val > 0 %}{{ forced_val }}{% endif %}" placeholder="رقم من 1 إلى 50" min="1" max="50"><button type="submit" class="ctrl-btn" style="background: #34d399; color: black; margin-top: 5px;">حفظ الرقم الفائز</button>
             </form>
             <a href="/game_golden_number" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
-        </div>
-        <div class="game-ctrl-card" style="border: 3px solid #ffd700;">
-            <div class="game-title">6. الصناديق الذهبية 🎁</div>
-            <p style="font-size: 12px; color: #cbd5e1;">إدارة وتنظيم لعبة الصناديق:</p>
-            <a href="/game_golden_boxes" class="ctrl-btn" style="background: #ffd700; color: black; margin-top: 10px;">إدارة الصناديق</a>
         </div>
     </div>
     <script>
