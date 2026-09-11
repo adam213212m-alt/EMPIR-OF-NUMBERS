@@ -273,7 +273,7 @@ def game_golden_number():
                                   forced_num=forced_num, my_booked_nums=my_booked_nums, my_total_spent=my_total_spent, msg=msg)
 
 
-# لعبة الصناديق الذهبية المعدلة (النقر على 3 صناديق لكشف الأرقام المخفية وتكلفة المحاولة 1$)
+# لعبة الصناديق الذهبية مع الخصم الفوري عند بدء المحاولة
 @app.route('/game_golden_boxes', methods=['GET', 'POST'])
 def game_golden_boxes():
     if 'username' not in session:
@@ -292,13 +292,12 @@ def game_golden_boxes():
         action = request.form.get('action')
         
         if action == 'open_three_boxes':
-            # استلام مؤشرات الصناديق الثلاثة التي نقر عليها اللاعب
             selected_indices = request.form.getlist('box_indices')
             
             if len(selected_indices) == 3:
                 selected_indices = [int(idx) for idx in selected_indices]
                 
-                # التحقق من رصيد اللاعب (المحاولة بـ 1$)
+                # التحقق من الرصيد والخصم الفوري بقيمة 1$ عند بدء المحاولة
                 cursor.execute("SELECT balance FROM users WHERE username=?", (username,))
                 bal = cursor.fetchone()[0]
                 cost = 1.0
@@ -309,7 +308,7 @@ def game_golden_boxes():
                     total_att, boxes_json = state_row[0], state_row[1]
                     boxes = json.loads(boxes_json)
                     
-                    # خصم 1$
+                    # خصم 1$ فورا عند بداية المحاولة
                     cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                     
                     # زيادة محاولات النظام التراكمية
@@ -317,7 +316,7 @@ def game_golden_boxes():
                     
                     revealed_nums = [boxes[idx] for idx in selected_indices]
                     
-                    # البرمجة الداخلية: كل 36 محاولة تفوز تلقائياً
+                    # البرمجة الداخلية: كل 36 محاولة تفوز تلقائياً بتطابق الأرقام
                     if total_att >= 36 or (total_att % 36 == 0):
                         winning_val = random.randint(1, 5)
                         revealed_nums = [winning_val, winning_val, winning_val]
@@ -333,14 +332,14 @@ def game_golden_boxes():
                         cursor.execute("INSERT INTO financial_logs (action_type, admin_name, target_user, amount, log_time) VALUES ('جائزة الصناديق الذهبية', 'system', ?, 20.0, ?)", 
                                        (username, time.strftime('%Y-%m-%d %H:%M')))
                         conn.commit()
-                        result_text = f"مبروك لقد فزت ب 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})!"
+                        result_text = f"مبروك لقد فزت ب 20$ (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
                     else:
                         conn.commit()
                         result_text = f"حظ أوفر (الأرقام المكشوفة: {revealed_nums[0]} - {revealed_nums[1]} - {revealed_nums[2]})"
                 else:
                     msg = "رصيدك غير كافٍ (تكلفة المحاولة 1$)!"
             else:
-                msg = "يرجى اختيار 3 صناديق تماماً قبل إتمام المحاولة!"
+                msg = "يرجى اختيار 3 صناديق تماماً!"
 
         elif action == 'reset_game' and username == 'admin1':
             new_nums = [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]
@@ -361,7 +360,7 @@ def game_golden_boxes():
     return render_template_string(GAME_GOLDEN_BOXES_PAGE, username=username, balance=balance, total_att=total_att, boxes=boxes, result_text=result_text, revealed_nums=revealed_nums, msg=msg)
 
 
-# لوحات الأدمن السابقة
+# لوحات الأدمن
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
     if 'username' not in session or session.get('username') != 'admin1':
@@ -473,7 +472,7 @@ def admin_accounting():
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
 
 
-# قوالب الـ HTML المحدثة
+# قوالب الـ HTML
 
 LOGIN_PAGE = """
 <!DOCTYPE html>
@@ -644,8 +643,8 @@ GAME_GOLDEN_BOXES_PAGE = """
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
 
     <div class="boxes-container">
-        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها المخفية وطابقها (تكلفة المحاولة: 1$)</h3>
-        <p style="color: #cbd5e1; font-size: 15px;">الخانات المختارة حالياً: <b id="selectionCount" style="color: #38bdf8;">0</b> / 3</p>
+        <h3 style="color: #ffd700; margin-top: 0;">📦 انقر على 3 صناديق لكشف أرقامها وطابقها (تكلفة المحاولة: 1$ تُخصم فور البدء)</h3>
+        <p style="color: #cbd5e1; font-size: 15px;">الصناديق المختارة: <b id="selectionCount" style="color: #38bdf8;">0</b> / 3</p>
 
         {% if session.get('username') == 'admin1' %}
             <p style="font-size: 14px; color: #38bdf8; background: #000; padding: 8px; border-radius: 6px; display: inline-block;">👑 [لوحة الآدمن] محاولات النظام الكلية التراكمية: <b>{{ total_att }}</b></p>
@@ -657,20 +656,20 @@ GAME_GOLDEN_BOXES_PAGE = """
 
             <div class="boxes-grid">
                 {% for i in range(15) %}
-                    <div class="box-card" id="box-{{ i }}" onclick="toggleBox({{ i }}, {{ boxes[i] }})">
+                    <div class="box-card" id="box-{{ i }}" onclick="toggleBox({{ i }})">
                         <span id="box-icon-{{ i }}">📦</span>
                         <span id="box-text-{{ i }}" style="font-size: 12px; margin-top: 5px;">صندوق {{ i+1 }}</span>
-                        <!-- الرقم المخفي تحت كل صندوق -->
                         <span id="box-val-{{ i }}" style="display:none; color: #ffd700; font-size: 22px; margin-top: 4px;">{{ boxes[i] }}</span>
                     </div>
                 {% endfor %}
             </div>
 
-            <button type="submit" class="play-btn" id="submitBtn" style="display:none;">🎰 إتمام المحاولة الآن (بـ 1$)</button>
+            <!-- زر بدء المحاولة المباشر بدون عبارة إتمام -->
+            <button type="submit" class="play-btn" id="submitBtn" style="display:none;">🎰 بدء المحاولة (بـ 1$)</button>
         </form>
 
         <h4 style="color: #ffd700; margin-top: 25px;">🔍 الأيقونة الصغيرة لعرض الأرقام الثلاثة المكشوفة:</h4>
-        <div class="revealed-icons-row" id="revealedIconsRow">
+        <div class="revealed-icons-row">
             {% if revealed_nums %}
                 <div class="mini-icon">{{ revealed_nums[0] }}</div>
                 <div class="mini-icon">{{ revealed_nums[1] }}</div>
@@ -701,7 +700,7 @@ GAME_GOLDEN_BOXES_PAGE = """
     <script>
         let selectedBoxes = [];
 
-        function toggleBox(index, hiddenVal) {
+        function toggleBox(index) {
             let boxEl = document.getElementById('box-' + index);
             let iconEl = document.getElementById('box-icon-' + index);
             let textEl = document.getElementById('box-text-' + index);
@@ -709,7 +708,6 @@ GAME_GOLDEN_BOXES_PAGE = """
 
             let idxInArr = selectedBoxes.indexOf(index);
             if (idxInArr > -1) {
-                // إلغاء التحديد
                 selectedBoxes.splice(idxInArr, 1);
                 boxEl.classList.remove('selected');
                 iconEl.innerText = "📦";
@@ -721,15 +719,14 @@ GAME_GOLDEN_BOXES_PAGE = """
                     boxEl.classList.add('selected');
                     iconEl.innerText = "🔓";
                     textEl.style.display = "none";
-                    valEl.style.display = "block"; // إظهار الرقم المخفي تحت الصندوق عند النقر
+                    valEl.style.display = "block";
                 } else {
-                    alert("يمكنك اختيار 3 صناديق فقط في المحاولة الواحدة!");
+                    alert("يمكنك اختيار 3 صناديق فقط للمحاولة!");
                 }
             }
 
             document.getElementById('selectionCount').innerText = selectedBoxes.length;
 
-            // تحديث الحقول المخفية وزر الإرسال
             let container = document.getElementById('hiddenInputsContainer');
             container.innerHTML = "";
             selectedBoxes.forEach(boxIdx => {
