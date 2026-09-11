@@ -425,7 +425,7 @@ def game_roulette():
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
-# --- لعبة عجلة الأرقام (مع حركة الدوران قبل كشف الرقم) ---
+# --- لعبة عجلة الأرقام (مع حركة الدوران قبل كشف الرقم الرابح) ---
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session:
@@ -887,8 +887,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- لعبة عجلة الأرقام (مع حركة الدوران لمدة ثانيتين قبل كشف الرقم الرابح) ---
-# --- عجلة الأرقام (مع حركة الدوران قبل كشف الرقم الرابح) ---
+# --- عجلة الأرقام (مع مسح الرقم السابق وتدوير العجلة دون أرقام قبل إظهار النتيجة) ---
 GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -940,7 +939,14 @@ GAME_NUMBER_WHEEL_PAGE = """
     </div>
     <script>
         let selectedNumbers = [];
+        
         function toggleNumber(num, element) {
+            // عند بدء اختيار أرقام جديدة، نخفي الرقم السابق فوراً لتبدأ لعبة جديدة نظيفة
+            let wheel = document.getElementById('wheelDisplay');
+            if (wheel.innerText !== '🎡') {
+                wheel.innerText = '🎡';
+            }
+
             if (selectedNumbers.includes(num)) {
                 selectedNumbers = selectedNumbers.filter(n => n !== num);
                 element.classList.remove('selected');
@@ -958,20 +964,21 @@ GAME_NUMBER_WHEEL_PAGE = """
             document.getElementById('spinBtn').disabled = (selectedNumbers.length === 0);
         }
 
-        // دالة حركة دوران العجلة قبل اختيار الرقم الرابح وإرسال النموذج
+        // دالة حركة دوران العجلة ومسح الرقم السابق تماماً قبل إظهار النتيجة الجديدة
         function spinWheelAndSubmit(e) {
-            e.preventDefault(); // إيقاف الإرسال الفوري للنموذج لتفعيل الأنيميشن
+            e.preventDefault(); 
             let wheel = document.getElementById('wheelDisplay');
             let btn = document.getElementById('spinBtn');
             btn.disabled = true;
             btn.innerText = "⏳ جاري تدوير العجلة...";
             
-            // تدوير العجلة بصرياً لفترة قصيرة (ثانيتين)
+            // إخفاء الرقم السابق وتحويل العجلة لرمز الدوران أثناء حركة الدوران
+            wheel.innerText = "🎡";
             wheel.style.transform = "rotate(1800deg)";
             
             setTimeout(function() {
                 document.getElementById('wheelForm').submit();
-            }, 2000); // إرسال النموذج بعد انتهاء الدوران
+            }, 2000); 
         }
 
         function installApp() { window.location.href = '/download'; }
