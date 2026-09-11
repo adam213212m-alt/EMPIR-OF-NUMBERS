@@ -64,6 +64,13 @@ class UserLastBet(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     bets_json = db.Column(db.Text, nullable=False)
 
+# نموذج حالة لعبة "اكشف واربح" المشتركة بين جميع الحسابات
+class ScratchGameState(db.Model):
+    __tablename__ = 'scratch_game_state'
+    id = db.Column(db.Integer, primary_key=True)
+    current_index = db.Column(db.Integer, default=0)
+    pool_json = db.Column(db.Text, nullable=False)
+
 
 # إنشاء الجداول وإدخال حساب الآدمن الافتراضي عند التشغيل الأول
 with app.app_context():
@@ -80,6 +87,13 @@ with app.app_context():
     if not BalloonState.query.get(1):
         balloon_state = BalloonState(id=1, attempts_since_last_win=0, sequence_index=0)
         db.session.add(balloon_state)
+
+    # تهيئة حوض لعبة اكشف واربح (46 محاولة: 1 فائز بـ 20$, 20 فائزين بـ 0.5$, 25 خاسر)
+    if not ScratchGameState.query.get(1):
+        initial_pool = [3] + [2]*20 + [0]*25
+        random.shuffle(initial_pool)
+        scratch_state = ScratchGameState(id=1, current_index=0, pool_json=json.dumps(initial_pool))
+        db.session.add(scratch_state)
         
     admin = User.query.filter_by(username='admin1').first()
     if not admin:
@@ -412,7 +426,7 @@ def game_roulette():
 
     return render_template_string(GAME_ROULETTE_PAGE, username=username, balance=user.balance, msg=msg, last_win_data=last_win_data, last_bets_json=last_bets_json)
 
-# --- لعبة عجلة الأرقام الجديدة (تكلفة اللفة 1$ | ربح الشركة 25% | إضافة الأرباح للحساب) ---
+# --- لعبة عجلة الأرقام (الأيقونة الرابعة) ---
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session:
@@ -424,14 +438,13 @@ def game_number_wheel():
     
     msg = None
     result_data = None
-    cost = 1.0  # تكلفة التجربة دولار واحد فقط لكل لعبة
+    cost = 1.0
 
     if request.method == 'POST':
         if user.balance >= cost:
             user.balance -= cost
             vault.vault_balance += cost
 
-            # توزيع الاحتمالات بدقة لتحقيق ربح 25% للشركة على المدى الطويل (RTP = 75%) بتكلفة 1$
             outcomes = [
                 {'name': 'خسارة', 'multiplier': '0x', 'payout': 0.0, 'weight': 51, 'color': '#ef4444'},
                 {'name': 'استرجاع نصفي', 'multiplier': '0.5x', 'payout': 0.5, 'weight': 18, 'color': '#f97316'},
@@ -446,7 +459,7 @@ def game_number_wheel():
             
             payout = chosen_outcome['payout']
             if payout > 0:
-                user.balance += payout  # إضافة الأرباح إلى رصيد حساب اللاعب
+                user.balance += payout
                 vault.vault_balance -= payout
                 log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
@@ -461,6 +474,70 @@ def game_number_wheel():
             msg = "رصيدك غير كافٍ للبدء (تكلفة التجربة 1$)!"
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, result_data=result_data)
+
+# --- لعبة اكشف واربح الجديدة (نظام الحوض المشترك المغلق لكل الحسابات - 46 محاولة) ---
+@app.route('/game_scratch', methods=['GET', 'POST'])
+def game_scratch():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    scratch_state = ScratchGameState.query.get(1)
+    
+    msg = None
+    revealed_numbers = None
+    cost = 1.0  # تكلفة المحاولة 1 دولار
+
+    if request.method == 'POST':
+        if user.balance >= cost:
+            user.balance -= cost
+            vault.vault_balance += cost
+
+            # سحب النتيجة من الحوض المشترك المغلق (46 محاولة)
+            pool = json.loads(scratch_state.pool_json)
+            if scratch_state.current_index >= len(pool):
+                pool = [3] + [2]*20 + [0]*25
+                random.shuffle(pool)
+                scratch_state.current_index = 0
+
+            match_type = pool[scratch_state.current_index]
+            scratch_state.current_index += 1
+            db.session.commit()
+
+            # توليد الأرقام التي تظهر للمتسابقة بناءً على حالة المطابقة في الحوض
+            if match_type == 3:
+                # مطابقة 3 أرقام -> جائزة 20$
+                num = random.randint(1, 9)
+                revealed_numbers = [num, num, num]
+                payout = 20.0
+                msg = "🏆 مبروك! طابقت الأرقام الثلاثة وفزت بالجائزة الكبرى (20$) وتمت إضافتها إلى رصيدك!"
+            elif match_type == 2:
+                # مطابقة رقمين -> نصف قيمة الرهان (0.5$)
+                num = random.randint(1, 9)
+                other_num = random.choice([x for x in range(1, 10) if x != num])
+                revealed_numbers = [num, num, other_num]
+                random.shuffle(revealed_numbers)
+                payout = 0.5
+                msg = "✨ ممتاز! طابقت رقمين وفزت بنصف قيمة الرهان (0.5$) وتمت إضافتها إلى رصيدك!"
+            else:
+                # خسارة (أرقام غير متطابقة)
+                revealed_numbers = random.sample(range(1, 10), 3)
+                payout = 0.0
+                msg = "💥 حظ أوفر في المرة القادمة، لم تتطابق الأرقام."
+
+            if payout > 0:
+                user.balance += payout
+                vault.vault_balance -= payout
+                log = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+
+            db.session.commit()
+        else:
+            msg = "رصيدك غير كافٍ للبدء (تكلفة المحاولة 1$)!"
+
+    return render_template_string(GAME_SCRATCH_PAGE, username=username, balance=user.balance, msg=msg, revealed_numbers=revealed_numbers)
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -549,9 +626,10 @@ def admin_accounting():
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
     payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
+    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
     total_sales = sales_res
-    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -636,23 +714,15 @@ DASHBOARD_PAGE = """
         </div>
     </div>
     <div class="icons-grid">
-        <!-- الأيقونة الأولى -->
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الذهبي</div></a>
-        <!-- الأيقونة الثانية -->
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
-        <!-- الأيقونة الثالثة -->
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
-        <!-- الأيقونة الرابعة: عجلة الأرقام بناءً على طلبك -->
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
-        <!-- الأيقونة الخامسة -->
-        <div class="icon-card" onclick="alert('اللعبة الخامسة قيد التفعيل')"><div class="icon-logo">🏇</div><div class="icon-title">سباق الخيل</div></div>
-        <!-- الأيقونة السادسة -->
+        <!-- الأيقونة الخامسة: لعبة اكشف واربح -->
+        <a href="/game_scratch" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></a>
         <div class="icon-card" onclick="alert('قريباً في التعديل القادم')"><div class="icon-logo">🎁</div><div class="icon-title">الصناديق الذهبية</div></div>
-        <!-- الأيقونة السابعة -->
         <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
-        <!-- الأيقونة الثامنة -->
         <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
-        <!-- الأيقونة التاسعة -->
         <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
     </div>
     <script>
@@ -878,7 +948,6 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# قالب واجهة لعبة عجلة الأرقام (تكلفة 1$ وتحديث الرصيد التلقائي للرابح)
 GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -926,6 +995,54 @@ GAME_NUMBER_WHEEL_PAGE = """
             btn.innerText = "⏳ جاري تدوير العجلة...";
             wheel.style.transform = "rotate(720deg) scale(1.1)";
         }
+        function installApp() { window.location.href = '/download'; }
+    </script>
+</body>
+</html>
+"""
+
+# قالب واجهة لعبة "اكشف واربح" الجديدة
+GAME_SCRATCH_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اكشف واربح - ليرة</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
+        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
+        .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 35px; border-radius: 24px; max-width: 500px; margin: 30px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
+        .scratch-grid { display: flex; justify-content: center; gap: 15px; margin: 25px 0; }
+        .scratch-cell { width: 85px; height: 95px; background: linear-gradient(145deg, #b8860b, #ffd700); border: 3px solid #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; color: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .play-action-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-size: 20px; font-weight: bold; padding: 15px 40px; border: none; border-radius: 14px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(34,197,94,0.4); }
+        .play-action-btn:hover { transform: scale(1.02); }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🎟️ اكشف واربح (مطابقة الأرقام)</h2>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
+            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
+            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
+        </div>
+    </div>
+    {% if msg %}<div style="background: {% if 'مبروك' in msg or 'ممتاز' in msg %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold; max-width: 500px; margin-left: auto; margin-right: auto;">{{ msg }}</div>{% endif %}
+    <div class="game-box">
+        <h3 style="color: #ffd700; margin-top: 0;">اكشف الأرقام الثلاثة وطابقها لتربح! (تكلفة المحاولة: 1$)</h3>
+        <p style="color: #94a3b8; font-size: 13px; margin-bottom: 20px;">طابق رقمين واربح نصف الرهان (0.5$) | طابق 3 أرقام واربح الكبرى (20$)</p>
+        <div class="scratch-grid">
+            <div class="scratch-cell">{% if revealed_numbers %}{{ revealed_numbers[0] }}{% else %}?{% endif %}</div>
+            <div class="scratch-cell">{% if revealed_numbers %}{{ revealed_numbers[1] }}{% else %}?{% endif %}</div>
+            <div class="scratch-cell">{% if revealed_numbers %}{{ revealed_numbers[2] }}{% else %}?{% endif %}</div>
+        </div>
+        <form method="POST">
+            <button type="submit" class="play-action-btn" id="playBtn">🎟️ اكشف الآن (1$)</button>
+        </form>
+    </div>
+    <script>
         function installApp() { window.location.href = '/download'; }
     </script>
 </body>
