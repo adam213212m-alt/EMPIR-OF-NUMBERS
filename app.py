@@ -92,7 +92,7 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# --- إنشاء الجداول وتوليد الحسابات الـ 100 بكلمات مرور فريدة وعشوائية لمرة واحدة فقط ---
+# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة بكلمات مرور فريدة وعشوائية لمرة واحدة فقط ---
 with app.app_context():
     db.create_all()
     
@@ -124,7 +124,7 @@ with app.app_context():
         admin = User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام')
         db.session.add(admin)
 
-    # إنشاء الـ 100 حساب ثابت مع كلمات مرور عشوائية ومختلفة تماماً (تُنشأ مرة واحدة ولا يتم تغييرها تلقائياً لاحقاً حتى تحافظ على تعديلاتك)
+    # إنشاء الـ 100 حساب ثابت مع كلمات مرور عشوائية ومختلفة تماماً
     alphabet = string.ascii_letters + string.digits
     for i in range(1, 101):
         uname = f"player{i}"
@@ -132,7 +132,6 @@ with app.app_context():
         
         acc = User.query.filter_by(username=uname).first()
         if not acc:
-            # توليد باسورد عشوائي فريد ومختلف تماماً لكل حساب
             random_pwd = ''.join(random.choices(alphabet, k=10))
             new_acc = User(username=uname, password=random_pwd, balance=0.0, role='player', created_by='admin1', owner_name=oname)
             db.session.add(new_acc)
@@ -140,7 +139,7 @@ with app.app_context():
     db.session.commit()
 
 
-# --- المسارات (Routes) والمنطق البرمجي ---
+# --- المسارات (Routes) والمنطق البرمجي لدعم التثبيت المباشر PWA ---
 
 @app.route('/manifest.json')
 def manifest():
@@ -153,18 +152,18 @@ def manifest():
         "theme_color": "#ffd700",
         "icons": [{"src": "https://img.icons8.com/color/512/crown.png", "sizes": "512x512", "type": "image/png"}]
     }
-    return app.response_class(str(manifest_data).replace("'", '"'), status=200, mimetype='application/json')
+    return app.response_class(json.dumps(manifest_data), status=200, mimetype='application/json')
 
 @app.route('/sw.js')
 def service_worker():
-    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
-
-@app.route('/download')
-def download_app():
-    try:
-        return send_from_directory('static', 'empire.apk', as_attachment=True)
-    except Exception:
-        return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20امبراطورية%20الأرقام")
+    sw_code = """
+    self.addEventListener('install', (e) => { self.skipWaiting(); });
+    self.addEventListener('activate', (e) => { return self.clients.claim(); });
+    self.addEventListener('fetch', function(event) {
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    });
+    """
+    return app.response_class(sw_code, mimetype='application/javascript')
 
 @app.route('/api/sync_balance')
 def api_sync_balance():
@@ -204,7 +203,6 @@ def dashboard():
         return redirect(url_for('logout'))
     return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance, password=user.password)
 
-# --- مسار تغيير كلمة المرور الشخصية لأي مستخدم ---
 @app.route('/change_password', methods=['GET', 'POST'])
 def change_password():
     if 'username' not in session:
@@ -1019,13 +1017,24 @@ DASHBOARD_PAGE = """
         }, 2000);
 
         let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
         function installApp() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => { deferredPrompt = null; });
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    deferredPrompt = null;
+                });
             } else {
-                window.location.href = '/download';
+                const isiOS = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+                if (isiOS) {
+                    alert("لتثبيت التطبيق على آيفون:\nاضغط على زر المشاركة (Share) في متصفح سفاري، ثم اختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
+                } else {
+                    window.location.href = '/download';
+                }
             }
         }
     </script>
