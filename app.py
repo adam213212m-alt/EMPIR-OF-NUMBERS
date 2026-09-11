@@ -5,10 +5,10 @@ import time
 import os
 
 app = Flask(__name__)
-app.secret_key = 'lira_empire_secure_2026_key'
+app.secret_key = 'empire_of_numbers_secure_2026_key'
 
 # إعداد قاعدة البيانات عبر SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///lira_enterprise.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///empire_numbers.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -79,7 +79,6 @@ class LuxuryGoldenState(db.Model):
     draw_end_time = db.Column(db.Float, default=0)
     forced_winning_number = db.Column(db.Integer, default=0)
 
-# نموذج حالة لعبة "اكشف واربح" بناءً على الكلاس المطلوب
 class RevealAndWinState(db.Model):
     __tablename__ = 'reveal_and_win_state'
     id = db.Column(db.Integer, primary_key=True)
@@ -129,8 +128,8 @@ with app.app_context():
 @app.route('/manifest.json')
 def manifest():
     manifest_data = {
-        "name": "ليرة - المنصة التفاعلية الكبرى",
-        "short_name": "ليرة",
+        "name": "امبراطورية الأرقام - المنصة التفاعلية الكبرى",
+        "short_name": "امبراطورية الأرقام",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#0b0f19",
@@ -146,9 +145,9 @@ def service_worker():
 @app.route('/download')
 def download_app():
     try:
-        return send_from_directory('static', 'lira.apk', as_attachment=True)
+        return send_from_directory('static', 'empire.apk', as_attachment=True)
     except Exception:
-        return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20ليرة%20الرسمي")
+        return redirect("https://wa.me/96176030208?text=اريد%20تحميل%20تطبيق%20امبراطورية%20الأرقام")
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -531,7 +530,6 @@ def game_number_wheel():
 
     return render_template_string(GAME_NUMBER_WHEEL_PAGE, username=username, balance=user.balance, msg=msg, winning_num=winning_num, is_win=is_win, payout=payout)
 
-# --- لعبة اكشف واربح المدمجة بالكامل (الأيقونة الخامسة) ---
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
     if 'username' not in session:
@@ -613,7 +611,6 @@ def game_reveal_and_win():
 
     return render_template_string(GAME_REVEAL_AND_WIN_PAGE, username=username, balance=user.balance, msg=msg, result_data=result_data)
 
-# --- لعبة الرقم الذهبي الفاخر الجديدة (الحجز الجماعي والتحكم الحصري للآدمن) ---
 @app.route('/game_golden_boxes_new', methods=['GET', 'POST'])
 def game_golden_boxes_new():
     if 'username' not in session:
@@ -809,11 +806,11 @@ LOGIN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - ليرة Lira</title><link rel="manifest" href="/manifest.json">
+    <title>تسجيل الدخول - امبراطورية الأرقام</title><link rel="manifest" href="/manifest.json">
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: linear-gradient(145deg, #1f1f1f, #121212); padding: 45px; border-radius: 20px; width: 360px; text-align: center; border: 3px solid #ffd700; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
-        .logo-title { font-size: 42px; font-weight: bold; color: #ffd700; text-shadow: 0 0 15px rgba(255,215,0,0.6); margin-bottom: 5px; }
+        .logo-title { font-size: 34px; font-weight: bold; color: #ffd700; text-shadow: 0 0 15px rgba(255,215,0,0.6); margin-bottom: 5px; }
         .logo-sub { font-size: 14px; color: #94a3b8; margin-bottom: 25px; }
         input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 14px; background: linear-gradient(135deg, #ffd700, #b8860b); color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
@@ -822,7 +819,7 @@ LOGIN_PAGE = """
 </head>
 <body>
     <div class="login-box">
-        <div class="logo-title">👑 ليرة</div><div class="logo-sub">منصة ليرة الألعاب التفاعلية</div>
+        <div class="logo-title">👑 امبراطورية الأرقام</div><div class="logo-sub">منصة الألعاب التفاعلية الكبرى</div>
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="POST">
             <input type="text" name="username" placeholder="اسم المستخدم" required>
@@ -839,13 +836,14 @@ DASHBOARD_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ليرة - لوحة التحكم الرئيسية</title><link rel="manifest" href="/manifest.json">
+    <title>امبراطورية الأرقام - لوحة التحكم الرئيسية</title><link rel="manifest" href="/manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
+        body { font-family: 'Cairo', Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); flex-wrap: wrap; gap: 12px; border-bottom: 3px solid #ffd700; }
         .logo-area { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
         .logo-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; }
-        .logo-area h1 { margin: 0; color: #ffd700; font-size: 26px; font-weight: bold; }
+        .logo-area h1 { margin: 0; color: #ffd700; font-size: 26px; font-weight: 900; }
         .user-creds { background: #1f1f1f; padding: 8px 14px; border-radius: 8px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .nav-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -853,19 +851,77 @@ DASHBOARD_PAGE = """
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
-        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 35px; }
+
+        /* لافته الجوائز الكبرى المضيئة والمتحركة */
+        @keyframes glowAndColor {
+            0% { color: #ffd700; text-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
+            33% { color: #ff4500; text-shadow: 0 0 15px #ff4500, 0 0 30px #ff0000; border-color: #ff4500; box-shadow: 0 0 20px rgba(255,69,0,0.5); }
+            66% { color: #00ffcc; text-shadow: 0 0 15px #00ffcc, 0 0 30px #00bfff; border-color: #00ffcc; box-shadow: 0 0 20px rgba(0,255,204,0.5); }
+            100% { color: #ffd700; text-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
+        }
+        .promo-banner {
+            background: linear-gradient(145deg, #1a1505, #0a0802);
+            border: 4px solid #ffd700;
+            padding: 20px 40px;
+            border-radius: 25px;
+            font-size: 32px;
+            font-weight: 900;
+            margin: 30px auto 10px auto;
+            max-width: 750px;
+            animation: glowAndColor 3s infinite;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        /* شبكة الأيقونات الفاخرة ثلاثية الأبعاد 3D */
+        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 30px; max-width: 900px; margin-left: auto; margin-right: auto; }
         @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .icons-grid { grid-template-columns: 1fr; } }
-        .icon-card { background: linear-gradient(145deg, #1f1f1f, #121212); border: 2px solid #b8860b; border-radius: 16px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; aspect-ratio: 1; }
-        .icon-card:hover { border-color: #ffd700; transform: translateY(-5px); box-shadow: 0 8px 30px rgba(255,215,0,0.4); }
-        .icon-logo { font-size: 60px; margin-bottom: 15px; }
-        .icon-title { color: #ffd700; font-size: 18px; font-weight: bold; }
+        
+        .icon-card { 
+            background: linear-gradient(145deg, #1f1f1f, #111111); 
+            border: 3px solid #b8860b; 
+            border-radius: 22px; 
+            padding: 30px; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.4s ease; 
+            box-shadow: 0 12px 30px rgba(0,0,0,0.8), inset 0 2px 6px rgba(255,255,255,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            text-decoration: none; 
+            aspect-ratio: 1; 
+            transform: perspective(1000px) rotateX(4deg);
+        }
+        .icon-card:hover { 
+            border-color: #ffd700; 
+            transform: perspective(1000px) rotateX(0deg) translateY(-8px) scale(1.03); 
+            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,255,255,0.2); 
+        }
+        .icon-logo { 
+            font-size: 70px; 
+            margin-bottom: 15px; 
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.7));
+            transition: transform 0.3s ease;
+        }
+        .icon-card:hover .icon-logo {
+            transform: scale(1.12) translateZ(20px);
+        }
+        .icon-title { 
+            color: #ffd700; 
+            font-size: 21px; 
+            font-weight: 900; 
+            text-shadow: 0 2px 5px rgba(0,0,0,0.9);
+            letter-spacing: 0.5px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo-area">
-            <div class="logo-badge">👑</div><h1>ليرة | Lira</h1>
+            <div class="logo-badge">👑</div><h1>امبراطورية الأرقام</h1>
             <div class="user-creds">👤 <b>{{ username }}</b></div>
             <div class="balance-badge">الرصيد: <span>${{ balance }}</span></div>
         </div>
@@ -880,18 +936,22 @@ DASHBOARD_PAGE = """
             <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
     </div>
+
+    <!-- اللافته المتحركة والمضيئة فوق الأيقونات -->
+    <div class="promo-banner">
+        ✨ العب واربح جوائز بقيمة 500,000$ ✨
+    </div>
+
+    <!-- شبكة الأيقونات النشطة الفاخرة 3D (تم إزالة الأيقونات الفارغة نهائياً) -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">الرقم الذهبي</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">روليت الحظ</div></a>
         <a href="/game_balloon_pop" class="icon-card"><div class="icon-logo">🎈</div><div class="icon-title">التحدي السريع (البالون)</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">عجلة الأرقام</div></a>
-        <!-- الأيقونة الخامسة: لعبة اكشف واربح -->
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">اكشف واربح</div></a>
         <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">الرقم الذهبي الفاخر</div></a>
-        <div class="icon-card" onclick="alert('اللعبة السابعة قيد التفعيل')"><div class="icon-logo">🔢</div><div class="icon-title">تحدي الأرقام</div></div>
-        <div class="icon-card" onclick="alert('اللعبة الثامنة قيد التفعيل')"><div class="icon-logo">🃏</div><div class="icon-title">البوكر الملكي</div></div>
-        <div class="icon-card" onclick="alert('اللعبة التاسعة قيد التفعيل')"><div class="icon-logo">💎</div><div class="icon-title">المجوهرات الكبرى</div></div>
     </div>
+
     <script>
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
@@ -913,7 +973,7 @@ GAME_BALLOON_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>التحدي السريع (البالون) - ليرة</title>
+    <title>التحدي السريع (البالون) - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
@@ -962,7 +1022,7 @@ GAME_ROULETTE_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>روليت الحظ - ليرة</title>
+    <title>روليت الحظ - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 20px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
@@ -987,7 +1047,7 @@ GAME_ROULETTE_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ (ليرة)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: ${{ balance }}</div>
@@ -1120,7 +1180,7 @@ GAME_NUMBER_WHEEL_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>عجلة الأرقام - ليرة</title>
+    <title>عجلة الأرقام - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
@@ -1217,13 +1277,12 @@ GAME_NUMBER_WHEEL_PAGE = """
 </html>
 """
 
-# --- قالب واجهة لعبة اكشف واربح المدمجة (الأيقونة الخامسة) ---
 GAME_REVEAL_AND_WIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>اكشف واربح - ليرة</title>
+    <title>اكشف واربح - امبراطورية الأرقام</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
     <style>
         body { background-color: #0b0f19; color: #fff; font-family: 'Cairo', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -1231,14 +1290,13 @@ GAME_REVEAL_AND_WIN_PAGE = """
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         h1 { background: linear-gradient(to left, #ffd700, #ff8c00); -webkit-background-clip: text; color: transparent; font-size: 2.2rem; margin: 10px 0; text-align: center; }
         
-        .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; width: 100%; max-width: 700px; flex-wrap: wrap; gap: 15px; }
-        
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 700px; width: 100%; box-sizing: border-box; text-align: center; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
         .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 12px; height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; color: #000; cursor: pointer; transition: 0.2s; }
         .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; transform: scale(1.05); }
         .play-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 14px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(255,215,0,0.4); }
         .play-action-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+        .reset-btn { background: #3b82f6; color: white; font-size: 16px; font-weight: bold; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -1269,6 +1327,10 @@ GAME_REVEAL_AND_WIN_PAGE = """
             </div>
             <button type="submit" class="play-action-btn" id="playBtn" disabled>🎟️ اكشف الصناديق المختارة (1$)</button>
         </form>
+
+        {% if result_data %}
+        <button type="button" class="reset-btn" onclick="resetGameBoxes()">🔄 محاولة جديدة (إعادة إغلاق الصناديق)</button>
+        {% endif %}
     </div>
 
     <script>
@@ -1295,6 +1357,9 @@ GAME_REVEAL_AND_WIN_PAGE = """
         };
 
         function toggleBox(index) {
+            // إذا كانت النتائج معروضة بالفعل، امنع التعديل حتى يتم الضغط على محاولة جديدة
+            if (resultJson && resultJson !== 'None' && resultJson !== 'null') return;
+
             let card = document.getElementById('box-' + index);
             if (selectedBoxes.includes(index)) {
                 selectedBoxes = selectedBoxes.filter(i => i !== index);
@@ -1316,6 +1381,11 @@ GAME_REVEAL_AND_WIN_PAGE = """
                 container.appendChild(input);
             });
             document.getElementById('playBtn').disabled = (selectedBoxes.length !== 3);
+        }
+
+        // دالة إعادة الصناديق لشكلها الأساسي المغلق (📦) للدورة الجديدة
+        function resetGameBoxes() {
+            window.location.href = '/game_reveal_and_win';
         }
     </script>
 </body>
@@ -1442,7 +1512,7 @@ GAME_GOLDEN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الرقم الذهبي - ليرة</title>
+    <title>الرقم الذهبي - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
@@ -1463,7 +1533,7 @@ GAME_GOLDEN_PAGE = """
 </head>
 <body>
     <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي (ليرة)</h2>
+        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الذهبي</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: ${{ balance }}</div>
@@ -1552,7 +1622,7 @@ ADMIN_CUSTOMERS_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة الزبائن والخزنة - ليرة</title>
+    <title>إدارة الزبائن والخزنة - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
@@ -1574,7 +1644,7 @@ ADMIN_CUSTOMERS_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - ليرة</h2>
+        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - امبراطورية الأرقام</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
@@ -1646,7 +1716,7 @@ ADMIN_GAMES_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم الألعاب - ليرة</title>
+    <title>لوحة تحكم الألعاب - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
@@ -1699,7 +1769,7 @@ ADMIN_ACCOUNTING_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج المحاسبة - ليرة</title>
+    <title>برنامج المحاسبة - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
@@ -1717,7 +1787,7 @@ ADMIN_ACCOUNTING_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية (ليرة)</h2>
+        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
             <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
