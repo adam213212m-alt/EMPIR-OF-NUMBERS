@@ -84,12 +84,13 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS balloon_state (
             id INTEGER PRIMARY KEY,
-            total_attempts INTEGER DEFAULT 0
+            attempts_since_last_win INTEGER DEFAULT 0,
+            sequence_index INTEGER DEFAULT 0
         )
     ''')
     cursor.execute('SELECT COUNT(*) FROM balloon_state')
     if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO balloon_state (id, total_attempts) VALUES (1, 0)')
+        cursor.execute('INSERT INTO balloon_state (id, attempts_since_last_win, sequence_index) VALUES (1, 0, 0)')
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS roulette_history (
@@ -405,19 +406,26 @@ def game_balloon_pop():
                 cursor.execute("UPDATE users SET balance = balance - ? WHERE username=?", (cost, username))
                 cursor.execute("UPDATE system_vault SET vault_balance = vault_balance + ? WHERE id=1", (cost,))
                 
-                # تتبع المحاولات الإجمالية عالمياً لكل الحسابات
-                cursor.execute("SELECT total_attempts FROM balloon_state WHERE id=1")
-                total_att = cursor.fetchone()[0] + 1
+                # جلب عداد التسلسل للبالون (محاولات منذ آخر فوز ورقم الخطوة في التسلسل)
+                cursor.execute("SELECT attempts_since_last_win, sequence_index FROM balloon_state WHERE id=1")
+                row = cursor.fetchone()
+                attempts_since = row[0] + 1
+                seq_index = row[1]
                 
-                if total_att >= 5:
-                    total_att = 0
+                # تسلسل النجاحات المطلوب: 6 ثم 4 ثم 7 ثم 3 ثم 4 ثم 5
+                sequence = [6, 4, 7, 3, 4, 5]
+                current_target = sequence[seq_index]
+                
+                if attempts_since >= current_target:
                     is_win = True
                     is_popped = False
+                    attempts_since = 0
+                    seq_index = (seq_index + 1) % len(sequence)
                 else:
                     is_win = False
                     is_popped = True
 
-                cursor.execute("UPDATE balloon_state SET total_attempts=? WHERE id=1", (total_att,))
+                cursor.execute("UPDATE balloon_state SET attempts_since_last_win=?, sequence_index=? WHERE id=1", (attempts_since, seq_index))
                 
                 if is_win:
                     prize = 3.0
