@@ -180,7 +180,7 @@ TRANSLATIONS = {
     'es': {
         'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma Interactiva 12D',
         'login': 'Iniciar Sesión', 'username': 'Usuario', 'password': 'Contraseña', 'balance': 'Saldo',
-        'recharge': 'Recargar Saldo', 'withdraw': 'Retirar Saldo', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
+        'recharge': 'Recargar Saldo', 'withdraw': 'Retirar Saldo', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrار Sesión',
         'dashboard': 'Panel Principal', 'back_dash': '🏠 Inicio',
         'withdraw_warning': '⚠️ Aviso: Comisión del 10%.',
         'wish_withdraw': 'Retirar Wish Money', 'visa_withdraw': 'Retirar Visa', 'usdt_withdraw': 'Recibir USDT',
@@ -220,7 +220,7 @@ LANG_BAR = """
 </div>
 """
 
-# --- تعريف كافة قوالب HTML في الأعلى أولاً ---
+# --- تعريف جميع قوالب HTML في الأعلى تماماً قبل أي مسارات فلاسك ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -831,7 +831,157 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- جميع مسارات الفلاسك (Routes) تأتي هنا في الأسفل بعد تعريف القوالب بالكامل ---
+GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
+<!DOCTYPE html>
+<html lang="{{ t.dir }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game2 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:15px; text-align: center; }
+        .grand-prize-banner { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; padding: 14px; border-radius: 14px; font-weight: 900; font-size: 20px; max-width: 850px; margin: 0 auto 15px auto; box-shadow: 0 0 25px rgba(255,215,0,0.6); border: 2px solid #fff; }
+        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 25px; border-radius: 25px; max-width: 850px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
+        .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 10px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; }
+        .table-scroll-wrapper { width: 100%; overflow-x: auto; margin: 15px 0; padding-bottom: 10px; }
+        .roulette-vertical-table { display: flex; flex-direction: column; gap: 6px; max-width: 320px; margin: 0 auto; background: #09381b; padding: 15px; border-radius: 16px; border: 3px solid #ffd700; }
+        .table-row { display: flex; gap: 6px; justify-content: center; }
+        .num-btn { width: 65px; height: 60px; background: #111827; border: 2px solid #ffd700; border-radius: 10px; font-size: 20px; font-weight: 900; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .num-btn.selected { background: #d97706 !important; color: #000 !important; }
+        .num-btn.winning-gold-glow { background: #fbbf24 !important; border: 4px solid #fff !important; box-shadow: 0 0 40px #ffd700 !important; color: #000 !important; transform: scale(1.15); }
+        .btn-red { background: #dc2626 !important; }
+        .btn-black { background: #1f2937 !important; }
+        .btn-green { background: #059669 !important; width: 100%; height: 50px; }
+        .action-btn { padding: 14px 22px; font-weight: 900; border-radius: 12px; border: none; cursor: pointer; color: #fff; }
+    </style>
+</head>
+<body>
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:850px; margin:0 auto; background:rgba(20,24,38,0.9); padding:12px 20px; border-radius:15px;">
+        <h2 style="color:#ffd700; margin:0;">🎰 {{ t.game2 }}</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:8px;">الرئيسية</a>
+        <div><b>{{ t.balance }}: <span id="liveRouletteBalance">{{ balance }}</span> USDD</b></div>
+    </div>
+    <div class="roulette-container">
+        <div class="grand-prize-banner">🌟 الجائزة الكبرى 299000 usdd 🌟</div>
+        <div id="rouletteTimer" style="font-size: 22px; font-weight: 900; color: #38bdf8; margin-bottom: 15px;">⏳ وقت اختيار الأرقام: 20 ثانية</div>
+        <div id="rouletteSlot" class="slot-box">--</div>
+        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0;">انقر على الأرقام للخصم الفوري والرهان!</div>
+        <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
+            <button type="button" onclick="selectColor('red')" class="action-btn" style="background: #dc2626;">🟥 حجز كل الأحمر</button>
+            <button type="button" onclick="selectColor('black')" class="action-btn" style="background: #111827; border: 1px solid #ffd700;">⬛ حجز كل الأسود</button>
+        </div>
+        <div class="table-scroll-wrapper">
+            <div class="roulette-vertical-table">
+                <button type="button" id="num_0" onclick="toggleNumber(0)" class="num-btn btn-green">0</button>
+                {% for row in [[1,2,3],[4,5,6],[7,8,9],[10,11,12],[13,14,15],[16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],[31,32,33],[34,35,36]] %}
+                    <div class="table-row">
+                        {% for n in row %}
+                            <button type="button" id="num_{{ n }}" onclick="toggleNumber({{ n }})" class="num-btn {{ 'btn-red' if n in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else 'btn-black' }}">{{ n }}</button>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <button type="button" onclick="undoLastAction()" class="action-btn" style="background: #ef4444;">🗑️ مسح (آخر نقرة)</button>
+            <button type="button" onclick="repeatLastBet()" class="action-btn" style="background: #3b82f6;">🔄 تكرار الرهان</button>
+        </div>
+    </div>
+    <script>
+        let selectedNumbers = [];
+        let actionStack = [];
+        let maxAllowed = 21;
+        let timeLeft = 20;
+        const reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        const blacks = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
+
+        function toggleNumber(num) {
+            let idx = selectedNumbers.indexOf(num);
+            if(idx > -1) {
+                fetch('/api/roulette_action', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'remove'})}).then(res => res.json()).then(d => {
+                    if(d.success) document.getElementById('liveRouletteBalance').innerText = d.balance;
+                });
+                selectedNumbers.splice(idx, 1);
+                actionStack.forEach(arr => { let i = arr.indexOf(num); if(i > -1) arr.splice(i, 1); });
+                document.getElementById('num_' + num).classList.remove('selected');
+            } else {
+                if(selectedNumbers.length >= maxAllowed) { alert("حد أقصى 21 رقماً!"); return; }
+                fetch('/api/roulette_action', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'add'})}).then(res => res.json()).then(d => {
+                    if(d.success) {
+                        document.getElementById('liveRouletteBalance').innerText = d.balance;
+                        selectedNumbers.push(num);
+                        actionStack.push([num]);
+                        document.getElementById('num_' + num).classList.add('selected');
+                    } else { alert("رصيدك لا يكفي!"); }
+                });
+            }
+        }
+        function selectColor(type) {
+            let tNums = (type === 'red') ? reds : blacks;
+            let newly = [];
+            tNums.forEach(n => {
+                if(!selectedNumbers.includes(n) && selectedNumbers.length < maxAllowed) {
+                    selectedNumbers.push(n);
+                    newly.push(n);
+                    document.getElementById('num_' + n).classList.add('selected');
+                }
+            });
+            if(newly.length > 0) {
+                for(let i=0; i<newly.length; i++) {
+                    fetch('/api/roulette_action', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'add'})}).then(res => res.json()).then(d => {
+                        if(d.success) document.getElementById('liveRouletteBalance').innerText = d.balance;
+                    });
+                }
+                actionStack.push(newly);
+            }
+        }
+        function undoLastAction() {
+            if(actionStack.length > 0) {
+                let last = actionStack.pop();
+                fetch('/api/roulette_action', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'clear', count: last.length})}).then(res => res.json()).then(d => {
+                    if(d.success) document.getElementById('liveRouletteBalance').innerText = d.balance;
+                });
+                last.forEach(n => {
+                    selectedNumbers = selectedNumbers.filter(i => i !== n);
+                    document.getElementById('num_' + n).classList.remove('selected');
+                });
+            }
+        }
+        function repeatLastBet() {
+            if(selectedNumbers.length > 0) undoLastAction();
+            let last = localStorage.getItem('lastRouletteSelection');
+            if(last) {
+                let saved = JSON.parse(last);
+                saved.forEach(n => toggleNumber(n));
+            }
+        }
+        let timer = setInterval(() => {
+            timeLeft--;
+            document.getElementById('rouletteTimer').innerText = `⏳ وقت اختيار الأرقام: ${timeLeft} ثانية`;
+            if(timeLeft <= 0) {
+                clearInterval(timer);
+                if(selectedNumbers.length > 0) spin();
+                else { for(let i=0; i<5; i++) selectedNumbers.push(Math.floor(Math.random()*37)); spin(); }
+            }
+        }, 1000);
+
+        function spin() {
+            if(selectedNumbers.length === 0) return;
+            localStorage.setItem('lastRouletteSelection', JSON.stringify(selectedNumbers));
+            fetch('/game_roulette', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({selected_numbers: selectedNumbers})}).then(res => res.json()).then(d => {
+                document.getElementById('rouletteSlot').innerText = d.winning_number;
+                document.getElementById('rouletteMsg').innerText = d.msg;
+                document.getElementById('liveRouletteBalance').innerText = d.balance;
+                let wBtn = document.getElementById('num_' + d.winning_number);
+                if(wBtn) wBtn.classList.add('winning-gold-glow');
+                setTimeout(() => { location.reload(); }, 4000);
+            });
+        }
+    </script>
+</body>
+</html>
+"""
+
+# --- جميع مسارات الفلاسك تأتي في الأسفل حصرياً بعد تعريف كافة القوالب ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
