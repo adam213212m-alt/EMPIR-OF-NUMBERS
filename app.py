@@ -3,10 +3,16 @@ from flask_sqlalchemy import SQLAlchemy
 import random
 import string
 import time
+from datetime import datetime, timezone, timedelta
 import os
 
 app = Flask(__name__)
 app.secret_key = 'empire_of_numbers_secure_2026_key'
+
+# --- توقيت مدينة بيروت (لبنان) ---
+def get_local_time():
+    beirut_tz = timezone(timedelta(hours=3)) # EEST (UTC+3)
+    return datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
 
 # --- إعداد قاعدة البيانات مع دعم الحفظ الدائم على Render Persistent Disk ---
 db_path = 'empire_numbers.db'
@@ -220,7 +226,7 @@ def dashboard():
                 card.is_used = True
                 card.used_by = user.username
                 
-                log = FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=get_local_time())
                 db.session.add(log)
                 db.session.commit()
                 msg = f"🎉 مبروك! تم شحن حسابك بنجاح بقيمة {card.amount} USDD"
@@ -330,10 +336,10 @@ def game_golden_number():
                     if not existing_booking:
                         user.balance -= cost
                         vault.vault_balance += cost
-                        log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                        log_sale = FinancialLog(action_type='مبيع رهان لعبة (الرقم الحنون)', admin_name='system', target_user=username, amount=cost, log_time=get_local_time())
                         db.session.add(log_sale)
 
-                        new_booking = GoldenNumberBooking(username=username, number=number, booking_date=time.strftime('%Y-%m-%d'))
+                        new_booking = GoldenNumberBooking(username=username, number=number, booking_date=get_local_time())
                         db.session.add(new_booking)
                         db.session.commit()
                         msg = f"تم حجز الرقم {number} بنجاح مقابل 2 USDD!"
@@ -376,7 +382,7 @@ def game_golden_number():
                 winner_user.balance += prize
                 vault.vault_balance -= prize
                 
-                log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=get_local_time())
                 db.session.add(log)
                 
                 draw_state.winning_number = winning_num
@@ -416,10 +422,10 @@ def game_numbers_empire():
                 if not existing:
                     user.balance -= cost
                     vault.vault_balance += cost
-                    log_sale = FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    log_sale = FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=cost, log_time=get_local_time())
                     db.session.add(log_sale)
 
-                    new_b = NumbersEmpireBooking(username=username, number=number, booking_date=time.strftime('%Y-%m-%d'))
+                    new_b = NumbersEmpireBooking(username=username, number=number, booking_date=get_local_time())
                     db.session.add(new_b)
                     db.session.commit()
                     msg = f"تم حجز الرقم #{number} بنجاح مقابل 2 USDD!"
@@ -471,7 +477,7 @@ def game_roulette():
                     user.balance -= total_bet_amount
                     vault.vault_balance += total_bet_amount
                     
-                    log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet_amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    log_sale = FinancialLog(action_type='مبيع رهان لعبة (روليت الحظ)', admin_name='system', target_user=username, amount=total_bet_amount, log_time=get_local_time())
                     db.session.add(log_sale)
                     
                     last_bet_entry = UserLastBet.query.filter_by(username=username).first()
@@ -527,7 +533,7 @@ def game_roulette():
                     if total_payout > 0:
                         user.balance += total_payout
                         vault.vault_balance -= total_payout
-                        log = FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=username, amount=total_payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                        log = FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=username, amount=total_payout, log_time=get_local_time())
                         db.session.add(log)
 
                     db.session.commit()
@@ -579,7 +585,7 @@ def game_number_wheel():
                     user.balance -= total_bet
                     vault.vault_balance += total_bet
 
-                    log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    log_sale = FinancialLog(action_type='مبيع رهان لعبة (عجلة الأرقام)', admin_name='system', target_user=username, amount=total_bet, log_time=get_local_time())
                     db.session.add(log_sale)
 
                     winning_num = random.randint(1, 20)
@@ -589,7 +595,7 @@ def game_number_wheel():
                         payout = 15.0
                         user.balance += payout
                         vault.vault_balance -= payout
-                        log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                        log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=get_local_time())
                         db.session.add(log)
                         msg = f"🎉 مبروك! استقرت العجلة على الرقم الفائز ({winning_num}) وهو ضمن أرقامك المختارة! فزت بـ {payout} USDD!"
                     else:
@@ -627,7 +633,7 @@ def game_reveal_and_win():
                 user.balance -= cost
                 vault.vault_balance += cost
 
-                log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log_sale = FinancialLog(action_type='مبيع رهان لعبة (اكشف واربح)', admin_name='system', target_user=username, amount=cost, log_time=get_local_time())
                 db.session.add(log_sale)
 
                 pool = json.loads(r_state.pool_json)
@@ -665,7 +671,7 @@ def game_reveal_and_win():
                 if prize > 0:
                     user.balance += prize
                     vault.vault_balance -= prize
-                    log_prize = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    log_prize = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=prize, log_time=get_local_time())
                     db.session.add(log_prize)
 
                 db.session.commit()
@@ -706,10 +712,10 @@ def game_golden_boxes_new():
                     if not existing:
                         user.balance -= cost
                         vault.vault_balance += cost
-                        log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                        log_sale = FinancialLog(action_type='مبيع رهان لعبة (الرقم الفاخر)', admin_name='system', target_user=username, amount=cost, log_time=get_local_time())
                         db.session.add(log_sale)
 
-                        new_b = LuxuryGoldenBooking(username=username, box_number=box_num, booking_date=time.strftime('%Y-%m-%d'))
+                        new_b = LuxuryGoldenBooking(username=username, box_number=box_num, booking_date=get_local_time())
                         db.session.add(new_b)
                         db.session.commit()
                         msg = f"تم حجز الصندوق رقم {box_num} بنجاح مقابل 50 USDD!"
@@ -749,7 +755,7 @@ def game_golden_boxes_new():
                 winner_user.balance += prize
                 vault.vault_balance -= prize
                 
-                log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=get_local_time())
                 db.session.add(log)
                 
                 l_state.winning_number = winning_box
@@ -796,6 +802,25 @@ def admin_customers():
 
     return render_template_string(ADMIN_CUSTOMERS_PAGE, users_list=users_data, msg=msg)
 
+@app.route('/admin_customer_detail/<username>')
+def admin_customer_detail(username):
+    if 'username' not in session or session.get('username') != 'admin1':
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return "المستخدم غير موجود", 404
+        
+    # جلب سجل عمليات هذا الزبون المحددة (سجل المالي والرهانات)
+    logs = FinancialLog.query.filter_by(target_user=username).order_by(FinancialLog.id.desc()).all()
+    
+    # جلب تفاصيل حجوزات الألعاب الخاصة به (الرقم الحنون، إمبراطورية الأرقام، إلخ)
+    golden_bookings = GoldenNumberBooking.query.filter_by(username=username).all()
+    empire_bookings = NumbersEmpireBooking.query.filter_by(username=username).all()
+    luxury_bookings = LuxuryGoldenBooking.query.filter_by(username=username).all()
+
+    return render_template_string(ADMIN_CUSTOMER_DETAIL_PAGE, user=user, logs=logs, golden_bookings=golden_bookings, empire_bookings=empire_bookings, luxury_bookings=luxury_bookings)
+
 @app.route('/admin_games', methods=['GET', 'POST'])
 def admin_games():
     if 'username' not in session or session.get('username') != 'admin1':
@@ -832,21 +857,21 @@ def admin_accounting():
     if request.method == 'POST':
         action = request.form.get('action')
         
-        # توليد كود بطاقة الشحن من غرفة المحاسبة
+        # 1. توليد كود بطاقة الشحن
         if action == 'generate_card':
             amount = float(request.form.get('card_amount', 0))
             if amount in [10.0, 20.0, 50.0, 100.0]:
                 rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
                 code = f"EMP-{int(amount)}-{rand_str}"
                 
-                new_card = RechargeCard(code=code, amount=amount, is_used=False, created_at=time.strftime('%Y-%m-%d %H:%M'))
+                new_card = RechargeCard(code=code, amount=amount, is_used=False, created_at=get_local_time())
                 db.session.add(new_card)
                 db.session.commit()
                 msg = f"✅ تم خلق كود شحن بقيمة {amount} USDD بنجاح: {code}"
             else:
                 msg = "قيمة البطاقة غير صالحة!"
 
-        # بيع عملات مباشر من غرفة المحاسبة
+        # 2. بيع عملات مباشر للزبون من غرفة المحاسبة
         elif action == 'sell_currency':
             target = request.form.get('target_user')
             amount = float(request.form.get('amount', 0))
@@ -855,14 +880,14 @@ def admin_accounting():
                 target_user = User.query.filter_by(username=target).first()
                 if target_user:
                     target_user.balance += amount
-                    log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time())
                     db.session.add(log)
                     db.session.commit()
                     msg = f"تم بيع رصيد بقيمة {amount} USDD للحساب {target} بنجاح!"
             else:
                 msg = "رصيد الخزنة غير كافٍ أو المبلغ غير صالح!"
 
-        # استرجاع العملات للخزنة
+        # 3. شراء العملات واسترجاعها من الزبون (Buy-back)
         elif action == 'buy_back_currency':
             target = request.form.get('target_user')
             amount = float(request.form.get('amount', 0))
@@ -870,7 +895,7 @@ def admin_accounting():
             if target_user and target_user.balance >= amount and amount > 0:
                 target_user.balance -= amount
                 vault.vault_balance += amount
-                log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time())
                 db.session.add(log)
                 db.session.commit()
                 msg = f"تم استرجاع رصيد بقيمة {amount} USDD من الحساب {target} إلى الخزنة بنجاح!"
@@ -880,13 +905,9 @@ def admin_accounting():
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    # صندوق النقاط المباعة للزبائن (بطاقات الشحن والشحن المباشر)
     total_points_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود'])).scalar() or 0.0
+    total_game_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام', 'مبيع رهان لعبة (الرقم الحنون)', 'مبيع رهان لعبة (روليت الحظ)', 'مبيع رهان لعبة (عجلة الأرقام)', 'مبيع رهان لعبة (اكشف واربح)', 'مبيع رهان لعبة (الرقم الفاخر)'])).scalar() or 0.0
     
-    # صندوق رهانات الألعاب (الأموال التي يخسرها أو يدفعها اللاعبون في الألعاب وتعود للنظام)
-    total_game_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام'])).scalar() or 0.0
-    
-    # صندوق الجوائز المصروفة للزبائن (الواردات / الأرباح التي يفوز بها الزبون)
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
@@ -894,8 +915,6 @@ def admin_accounting():
     payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
     total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
-    
-    # صندوق أرباح أو خسارة الشركة من الألعاب (الرهانات ناقص الجوائز)
     net_game_result = total_game_bets - total_payouts
 
     users_list = User.query.all()
@@ -1025,9 +1044,9 @@ DASHBOARD_PAGE = """
             <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شراء%20بطاقة%20شحن%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20-%20الحساب:%20{{ username }}" target="_blank">💬 شراء بطاقة (واتساب)</a>
             <a href="/change_password" class="pass-btn">🔑 تغيير الباسورد</a>
             {% if username == 'admin1' %}
-                <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
+                <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن</a>
                 <a href="/admin_games" class="admin-link">🎮 لوحة الألعاب</a>
-                <a href="/admin_accounting" class="admin-link">📊 المحاسبة</a>
+                <a href="/admin_accounting" class="admin-link">📊 المحاسبة والخزنة</a>
             {% endif %}
             <a href="/logout" class="logout-btn">🚪 خروج</a>
         </div>
@@ -1094,7 +1113,7 @@ CHANGE_PASSWORD_PAGE = """
             <input type="password" name="confirm_password" placeholder="تأكيد كلمة المرور الجديدة" required>
             <button type="submit">تحديث الباسورد</button>
         </form>
-        <a href="/dashboard" class="back-link">⬅️ العودة للرئيسية</a>
+        <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
     </div>
 </body>
 </html>
@@ -1694,6 +1713,8 @@ ADMIN_CUSTOMERS_PAGE = """
         table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
         th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
         th { background: #252525; color: #ffd700; }
+        a.user-link { color: #38bdf8; text-decoration: none; font-weight: bold; }
+        a.user-link:hover { text-decoration: underline; color: #ffd700; }
     </style>
 </head>
 <body>
@@ -1715,16 +1736,112 @@ ADMIN_CUSTOMERS_PAGE = """
     </div>
 
     <div class="panel-box" style="max-width: 1000px;">
-        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات المسجلة</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات المسجلة (انقر على اسم المستخدم لفتح ذاكرة الزبون)</h3>
         <table>
             <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>صاحب الحساب</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>المُنشئ</th></tr>
             {% for u in users_list %}
             <tr>
-                <td><b>{{ u[0] }}</b></td><td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
+                <td><a href="/admin_customer_detail/{{ u[0] }}" class="user-link">📂 {{ u[0] }}</a></td>
+                <td style="color: #38bdf8; font-family: monospace;">{{ u[1] }}</td>
                 <td style="color: #ffd700; font-weight: bold;">{{ u[5] }}</td>
-                <td>{{ u[3] }}</td><td style="color: #34d399; font-weight: bold;">{{ u[2] }} USDD</td><td>{{ u[4] }}</td>
+                <td>{{ u[3] }}</td>
+                <td style="color: #34d399; font-weight: bold;">{{ u[2] }} USDD</td>
+                <td>{{ u[4] }}</td>
             </tr>
             {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+ADMIN_CUSTOMER_DETAIL_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ذاكرة وسجل الزبون - {{ user.username }}</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
+        .panel-box { background: #1f1f1f; padding: 25px; border-radius: 12px; border: 1px solid #444; margin-bottom: 25px; }
+        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
+        th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
+        th { background: #252525; color: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h2 style="color: #ffd700; margin: 0;">📂 ذاكرة وسجل تفاصيل الزبون: {{ user.username }}</h2>
+        <a href="/admin_customers" class="back-btn">⬅️ العودة لقائمة الزبائن</a>
+    </div>
+
+    <div class="panel-box" style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px; text-align: center;">
+        <div><span style="color: #94a3b8; display: block;">اسم المستخدم</span><b style="color: #38bdf8; font-size: 18px;">{{ user.username }}</b></div>
+        <div><span style="color: #94a3b8; display: block;">صاحب الحساب الحقيقي</span><b style="color: #ffd700; font-size: 18px;">{{ user.owner_name }}</b></div>
+        <div><span style="color: #94a3b8; display: block;">الرصيد الحالي</span><b style="color: #34d399; font-size: 22px;">{{ user.balance }} USDD</b></div>
+        <div><span style="color: #94a3b8; display: block;">كلمة المرور</span><b style="font-family: monospace; font-size: 16px;">{{ user.password }}</b></div>
+    </div>
+
+    <div class="panel-box">
+        <h3 style="color: #38bdf8; margin-top: 0;">🎯 تفاصيل وحجوزات الألعاب والأرقام التي راهن عليها</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div style="background: #111827; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #ffd700; margin-top: 0;">🏆 الرقم الحنون</h4>
+                {% if golden_bookings %}
+                    <ul style="padding-right: 20px; margin: 0;">
+                        {% for b in golden_bookings %}
+                            <li>رقم الحظ: <b>#{{ b.number }}</b> (تاريخ: {{ b.booking_date }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="color: #94a3b8; font-size: 13px;">لا توجد رهانات مسجلة.</p>
+                {% endif %}
+            </div>
+            <div style="background: #111827; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #ffd700; margin-top: 0;">🏛️ إمبراطورية الأرقام</h4>
+                {% if empire_bookings %}
+                    <ul style="padding-right: 20px; margin: 0;">
+                        {% for b in empire_bookings %}
+                            <li>رقم التذكرة: <b>#{{ b.number }}</b> (تاريخ: {{ b.booking_date }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="color: #94a3b8; font-size: 13px;">لا توجد رهانات مسجلة.</p>
+                {% endif %}
+            </div>
+            <div style="background: #111827; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #ffd700; margin-top: 0;">🎁 الرقم الحنون الفاخر</h4>
+                {% if luxury_bookings %}
+                    <ul style="padding-right: 20px; margin: 0;">
+                        {% for b in luxury_bookings %}
+                            <li>الصندوق المحجوز: <b>رقم {{ b.box_number }}</b> (تاريخ: {{ b.booking_date }})</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="color: #94a3b8; font-size: 13px;">لا توجد رهانات مسجلة.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-box">
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية واللعب للزبون (حسب توقيت بيروت المحلي)</h3>
+        <table>
+            <tr><th>نوع العملية</th><th>المسؤول</th><th>المبلغ (USDD)</th><th>التوقيت المحلي (بيروت)</th></tr>
+            {% if logs %}
+                {% for log in logs %}
+                <tr>
+                    <td><b>{{ log.action_type }}</b></td>
+                    <td>{{ log.admin_name }}</td>
+                    <td style="color: #34d399; font-weight: bold;">{{ log.amount }} USDD</td>
+                    <td>{{ log.log_time }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="4" style="color: #94a3b8;">لا توجد عمليات مسجلة لهذا الزبون حتى الآن.</td></tr>
+            {% endif %}
         </table>
     </div>
 </body>
@@ -1791,7 +1908,7 @@ ADMIN_ACCOUNTING_PAGE = """
         @media(max-width:900px){ .stats-grid { grid-template-columns: 1fr; } }
         .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 12px; text-align: center; }
         .stat-val { font-size: 28px; font-weight: bold; color: #34d399; margin-top: 8px; }
-        .panel-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px; }
+        .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width:900px){ .panel-grid { grid-template-columns: 1fr; } }
         .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; }
         input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
@@ -1841,8 +1958,9 @@ ADMIN_ACCOUNTING_PAGE = """
         </div>
     </div>
 
-    <!-- لوحات التحكم وخلق الكودات وبيع العملات داخل المحاسبة -->
+    <!-- لوحات التحكم: خلق الكودات، البيع، والشراء/الاسترجاع -->
     <div class="panel-grid">
+        <!-- 1. خلق كودات الشحن -->
         <div class="panel-box" style="border: 2px dashed #ffd700;">
             <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
             <form method="POST">
@@ -1858,6 +1976,7 @@ ADMIN_ACCOUNTING_PAGE = """
             </form>
         </div>
 
+        <!-- 2. بيع العملات الشحن المباشر -->
         <div class="panel-box">
             <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
             <form method="POST">
@@ -1869,6 +1988,21 @@ ADMIN_ACCOUNTING_PAGE = """
                 </select>
                 <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
                 <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
+            </form>
+        </div>
+
+        <!-- 3. شراء العملات واسترجاعها من الزبون (Buy-back) -->
+        <div class="panel-box" style="border: 2px solid #ef4444;">
+            <h3 style="color: #ef4444; margin-top: 0;">💸 شراء واسترجاع العملات من الزبون</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="buy_back_currency">
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: {{ u[2] }} USDD)</option>{% endfor %}
+                </select>
+                <label>المبلغ المراد استرجاعه (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" class="btn-buy">استرجاع الرصيد للخزنة</button>
             </form>
         </div>
     </div>
@@ -1896,9 +2030,9 @@ ADMIN_ACCOUNTING_PAGE = """
     </div>
 
     <div class="panel-box">
-        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية والواردات والصادرات</h3>
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية والواردات والصادرات (حسب توقيت بيروت المحلي)</h3>
         <table>
-            <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ (USDD)</th><th>التوقيت</th></tr>
+            <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ (USDD)</th><th>التوقيت المحلي</th></tr>
             {% for log in logs %}
             <tr>
                 <td><b>{{ log[0] }}</b></td><td style="color: #ffd700;">{{ log[1] }}</td><td>{{ log[2] }}</td>
