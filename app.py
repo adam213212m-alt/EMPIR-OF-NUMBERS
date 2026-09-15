@@ -450,6 +450,38 @@ def game_numbers_empire():
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
 
+# --- مسار الخصم الفوري عند النقر في الروليت ---
+@app.route('/api/roulette_action', methods=['POST'])
+def api_roulette_action():
+    if 'username' not in session: return jsonify({"success": False})
+    data = request.get_json() or request.form
+    action = data.get('action') # 'add', 'remove', 'clear'
+    user = User.query.filter_by(username=session['username']).first()
+    vault = SystemVault.query.get(1)
+    
+    if action == 'add':
+        if user.balance >= 1.0:
+            user.balance -= 1.0
+            vault.vault_balance += 1.0
+            db.session.commit()
+            return jsonify({"success": True, "balance": user.balance})
+        else:
+            return jsonify({"success": False, "msg": "رصيدك لا يكفي!"})
+    elif action == 'remove':
+        user.balance += 1.0
+        vault.vault_balance -= 1.0
+        db.session.commit()
+        return jsonify({"success": True, "balance": user.balance})
+    elif action == 'clear':
+        count = int(data.get('count', 0))
+        if count > 0:
+            user.balance += count * 1.0
+            vault.vault_balance -= count * 1.0
+            db.session.commit()
+        return jsonify({"success": True, "balance": user.balance})
+    return jsonify({"success": False})
+
+# --- لعبة روليت الحظ مع الخصم الفوري، جائزة 20 USDD، ونقرات 40 و 360 الخاصة ---
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
@@ -467,13 +499,9 @@ def game_roulette():
             if isinstance(selected_numbers, str):
                 selected_numbers = json.loads(selected_numbers)
             selected_numbers = [int(n) for n in selected_numbers]
-            bet_per_number = float(data.get('bet_amount', 1.0))
-            total_bet = bet_per_number * len(selected_numbers)
             
-            if total_bet > 0 and user.balance >= total_bet:
-                user.balance -= total_bet
-                vault.vault_balance += total_bet
-                db.session.add(FinancialLog(action_type='مبيع رهان روليت 12D', admin_name='system', target_user=username, amount=total_bet, log_time=get_local_time()))
+            if selected_numbers:
+                db.session.add(FinancialLog(action_type='مبيع رهان روليت 12D', admin_name='system', target_user=username, amount=float(len(selected_numbers)), log_time=get_local_time()))
                 
                 g_state = RouletteGlobalState.query.get(1)
                 if not g_state:
@@ -485,14 +513,14 @@ def game_roulette():
                 is_40th_win = (g_state.total_global_spins % 40 == 0)
                 
                 if is_360th_win:
-                    winning_num = random.choice(selected_numbers) if selected_numbers else random.choice(all_numbers)
+                    winning_num = random.choice(selected_numbers)
                     payout = 100.0
                     user.balance += payout
                     vault.vault_balance -= payout
                     db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 360 - 100 USDD)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                    msg = f"🌟 مبروك! النقرة رقم #{g_state.total_global_spins} أصابت الحدث الأكبر وفزت بـ 100 USDD!"
+                    msg = f"🌟 مبروك! النقرة رقم #{g_state.total_global_spins} في المنصة أصابت الحدث الأكبر وفزت بـ 100 USDD!"
                 elif is_40th_win:
-                    winning_num = random.choice(selected_numbers) if selected_numbers else random.choice(all_numbers)
+                    winning_num = random.choice(selected_numbers)
                     payout = 20.0
                     user.balance += payout
                     vault.vault_balance -= payout
@@ -507,7 +535,7 @@ def game_roulette():
                     
                     payout = 0
                     if winning_num in selected_numbers:
-                        payout = 20.0
+                        payout = 20.0 # الجائزة للرقم الرابح هي 20 USDD
                         user.balance += payout
                         vault.vault_balance -= payout
                         db.session.add(FinancialLog(action_type='جائزة روليت 20 USDD', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
@@ -677,6 +705,15 @@ def admin_accounting():
                 db.session.add(FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time()))
                 db.session.commit()
                 msg = "Done!"
+        elif action == 'sell_1000':
+            target = request.form.get('target_user')
+            amount = 1000.0
+            if vault.vault_balance >= amount and target:
+                vault.vault_balance -= amount
+                User.query.filter_by(username=target).first().balance += amount
+                db.session.add(FinancialLog(action_type='بيع باقة 1000 USDD', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time()))
+                db.session.commit()
+                msg = f"تم بيع باقة 1000 USDD للزبون {target} بنجاح!"
         elif action == 'buy_back_currency':
             target, amount = request.form.get('target_user'), float(request.form.get('amount', 0))
             u = User.query.filter_by(username=target).first()
@@ -688,13 +725,13 @@ def admin_accounting():
                 msg = "Done!"
 
     logs = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
-    tp_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود'])).scalar() or 0.0
+    tp_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود', 'بيع باقة 1000 USDD'])).scalar() or 0.0
     tg_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%مبيع رهان%')).scalar() or 0.0
     tpayouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%جائزة%')).scalar() or 0.0
     net = tg_bets - tpayouts
     return render_template_string(ADMIN_ACCOUNTING_PAGE, t=t, vault_balance=vault.vault_balance, logs=logs, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), cards_list=RechargeCard.query.order_by(RechargeCard.id.desc()).all(), msg=msg)
 
-# --- قوالب HTML 12D الفائقة (متضمنة جميع قوالب الإدارة دون نقص) ---
+# --- قوالب HTML 12D الفائقة ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -1106,6 +1143,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </html>
 """
 
+# --- قالب لعبة روليت الحظ مع بانر الجائزة الكبرى، الخصم الفوري عند النقر، فحص الرصيد، حجز الألوان وزر مسح تنازلي لآخر نقرة ---
 GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -1114,6 +1152,8 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     <title>{{ t.game2 }} - 12D</title>
     <style>
         body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:15px; text-align: center; }
+
+        .grand-prize-banner { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; padding: 14px; border-radius: 14px; font-weight: 900; font-size: 20px; max-width: 850px; margin: 0 auto 15px auto; box-shadow: 0 0 25px rgba(255,215,0,0.6); border: 2px solid #fff; }
 
         .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 25px; border-radius: 25px; max-width: 850px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
         .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 10px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; box-shadow: inset 0 0 15px rgba(255,215,0,0.6); letter-spacing: 4px; }
@@ -1148,11 +1188,14 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     </div>
 
     <div class="roulette-container">
+        <!-- بانر الجائزة الكبرى -->
+        <div class="grand-prize-banner">🌟 الجائزة الكبرى 299000 usdd 🌟</div>
+
         <div id="rouletteTimer" style="font-size: 22px; font-weight: 900; color: #38bdf8; margin-bottom: 15px;">⏳ وقت اختيار الأرقام: 20 ثانية</div>
 
         <div id="rouletteSlot" class="slot-screen slot-box">--</div>
         
-        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0; min-height: 28px;">اختر حتى 21 رقماً أو الألوان واضغط للحجز!</div>
+        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0; min-height: 28px;">انقر على الأرقام للخصم الفوري والرهان!</div>
 
         <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
             <button type="button" onclick="selectColor('red')" class="action-btn btn-color-pick" style="background: #dc2626; color: #fff;">🟥 حجز كل الأحمر</button>
@@ -1249,6 +1292,17 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         function toggleNumber(num) {
             let idx = selectedNumbers.indexOf(num);
             if(idx > -1) {
+                // إلغاء الاختيار واسترداد المبالغ فوراً
+                fetch('/api/roulette_action', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'remove'})
+                }).then(res => res.json()).then(data => {
+                    if(data.success) {
+                        document.getElementById('liveRouletteBalance').innerText = data.balance;
+                    }
+                });
+
                 selectedNumbers.splice(idx, 1);
                 actionStack.forEach(arr => {
                     let i = arr.indexOf(num);
@@ -1260,26 +1314,62 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                     alert("يمكنك اختيار كحد أقصى 21 رقماً في الجولة الواحدة!");
                     return;
                 }
-                selectedNumbers.push(num);
-                actionStack.push([num]);
-                document.getElementById('num_' + num).classList.add('selected');
+                // خصم فوري بقيمة 1 USDD لكل رقم
+                fetch('/api/roulette_action', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'add'})
+                }).then(res => res.json()).then(data => {
+                    if(data.success) {
+                        document.getElementById('liveRouletteBalance').innerText = data.balance;
+                        selectedNumbers.push(num);
+                        actionStack.push([num]);
+                        document.getElementById('num_' + num).classList.add('selected');
+                    } else {
+                        alert("⚠️ رصيدك لا يكفي لإتمام هذا الرهان!");
+                    }
+                });
             }
         }
 
         function selectColor(colorType) {
             let targetNums = (colorType === 'red') ? reds : blacks;
-            let newlyAdded = [];
+            let countToAdd = 0;
             targetNums.forEach(n => {
-                if(!selectedNumbers.includes(n)) {
-                    if(selectedNumbers.length < maxAllowed) {
-                        selectedNumbers.push(n);
-                        newlyAdded.push(n);
-                        let btn = document.getElementById('num_' + n);
-                        if(btn) btn.classList.add('selected');
-                    }
+                if(!selectedNumbers.includes(n) && selectedNumbers.length + countToAdd < maxAllowed) {
+                    countToAdd++;
                 }
             });
+
+            if(countToAdd === 0) return;
+
+            let currentBal = parseFloat(document.getElementById('liveRouletteBalance').innerText);
+            if(currentBal < countToAdd) {
+                alert("⚠️ رصيدك لا يكفي لحجز هذا اللون بالكامل!");
+                return;
+            }
+
+            let newlyAdded = [];
+            targetNums.forEach(n => {
+                if(!selectedNumbers.includes(n) && selectedNumbers.length < maxAllowed) {
+                    selectedNumbers.push(n);
+                    newlyAdded.push(n);
+                    let btn = document.getElementById('num_' + n);
+                    if(btn) btn.classList.add('selected');
+                }
+            });
+
             if(newlyAdded.length > 0) {
+                // خصم المبالغ دفعة واحدة للون المختار
+                for(let i=0; i<newlyAdded.length; i++) {
+                    fetch('/api/roulette_action', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'add'})
+                    }).then(res => res.json()).then(data => {
+                        if(data.success) document.getElementById('liveRouletteBalance').innerText = data.balance;
+                    });
+                }
                 actionStack.push(newlyAdded);
             }
         }
@@ -1287,6 +1377,15 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         function undoLastAction() {
             if(actionStack.length > 0) {
                 let lastActionNums = actionStack.pop();
+                // استرداد أموال آخر نقرة فقط
+                fetch('/api/roulette_action', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'clear', count: lastActionNums.length})
+                }).then(res => res.json()).then(data => {
+                    if(data.success) document.getElementById('liveRouletteBalance').innerText = data.balance;
+                });
+
                 lastActionNums.forEach(n => {
                     selectedNumbers = selectedNumbers.filter(item => item !== n);
                     let btn = document.getElementById('num_' + n);
@@ -1298,18 +1397,44 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         }
 
         function repeatLastBet() {
+            // إرجاع مبالغ الاختيارات الحالية أولاً
+            if(selectedNumbers.length > 0) {
+                fetch('/api/roulette_action', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'clear', count: selectedNumbers.length})
+                }).then(res => res.json()).then(data => {
+                    if(data.success) document.getElementById('liveRouletteBalance').innerText = data.balance;
+                });
+            }
+
             actionStack = [];
             selectedNumbers.forEach(n => {
                 let b = document.getElementById('num_' + n);
                 if(b) b.classList.remove('selected');
             });
             selectedNumbers = [];
+
             let last = localStorage.getItem('lastRouletteSelection');
             if(last) {
-                selectedNumbers = JSON.parse(last);
-                selectedNumbers.forEach(n => {
+                let savedNums = JSON.parse(last);
+                let currentBal = parseFloat(document.getElementById('liveRouletteBalance').innerText);
+                if(currentBal < savedNums.length) {
+                    alert("⚠️ رصيدك لا يكفي لتكرار الرهان السابق!");
+                    return;
+                }
+                savedNums.forEach(n => {
+                    selectedNumbers.push(n);
                     let btn = document.getElementById('num_' + n);
                     if(btn) btn.classList.add('selected');
+                    
+                    fetch('/api/roulette_action', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'add'})
+                    }).then(res => res.json()).then(data => {
+                        if(data.success) document.getElementById('liveRouletteBalance').innerText = data.balance;
+                    });
                 });
                 actionStack.push([...selectedNumbers]);
             } else {
@@ -1340,13 +1465,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         function spinRoulette() {
             if(selectedNumbers.length === 0) {
                 alert("يرجى اختيار رقم واحد على الأقل للمشاركة في السحب!");
-                return;
-            }
-
-            let totalCost = selectedNumbers.length * 1.0;
-            let currentBal = parseFloat(document.getElementById('liveRouletteBalance').innerText);
-            if(currentBal < totalCost) {
-                alert("⚠️ تنبيه: رصيدك غير كافي لإتمام هذا الرهان! يرجى شحن الرصيد.");
                 return;
             }
 
@@ -1725,6 +1843,19 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
             </form>
         </div>
 
+        <div class="panel-box" style="border: 2px solid #38bdf8;">
+            <h3 style="color: #38bdf8; margin-top: 0;">💎 بيع باقة 1000 USDD</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="sell_1000">
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }} USDD)</option>{% endfor %}
+                </select>
+                <button type="submit" style="background:#38bdf8; color:#000; margin-top: 25px;">بيع 1000 USDD للزبون</button>
+            </form>
+        </div>
+
         <div class="panel-box" style="border: 2px solid #ef4444;">
             <h3 style="color: #ef4444; margin-top: 0;">💸 استرجاع العملات من الزبون</h3>
             <form method="POST">
@@ -1761,7 +1892,10 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
 
     <div class="panel-box">
         <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية</h3>
-        <table>
+        <!-- صندوق فلتر البحث الذكي -->
+        <input type="text" id="logSearch" placeholder="🔍 فلتر البحث: ابحث باسم الزبون أو نوع العملية..." onkeyup="filterLogs()" style="margin: 15px 0; padding: 12px; width: 100%; background: rgba(10,13,22,0.9); color: #fff; border-radius: 10px; border: 1px solid #ffd700; font-size: 15px; box-sizing: border-box;">
+        
+        <table id="logsTable">
             <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ (USDD)</th><th>التوقيت المحلي</th></tr>
             {% for log in logs %}
             <tr>
@@ -1771,6 +1905,26 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
             {% endfor %}
         </table>
     </div>
+
+    <script>
+        function filterLogs() {
+            let input = document.getElementById('logSearch').value.toLowerCase();
+            let trs = document.querySelectorAll('#logsTable tr');
+            for (let i = 1; i < trs.length; i++) {
+                let tdAction = trs[i].getElementsByTagName('td')[0];
+                let tdTarget = trs[i].getElementsByTagName('td')[2];
+                if (tdAction || tdTarget) {
+                    let aText = tdAction ? tdAction.innerText.toLowerCase() : '';
+                    let tText = tdTarget ? tdTarget.innerText.toLowerCase() : '';
+                    if (aText.includes(input) || tText.includes(input)) {
+                        trs[i].style.display = "";
+                    } else {
+                        trs[i].style.display = "none";
+                    }
+                }
+            }
+        }
+    </script>
 </body>
 </html>
 """
