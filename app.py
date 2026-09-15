@@ -220,7 +220,7 @@ LANG_BAR = """
 </div>
 """
 
-# --- تعريف جميع قوالب HTML أولاً وقبل أي مسارات ---
+# --- تعريف كافة قوالب HTML في الأعلى أولاً ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -830,6 +830,98 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
 </body>
 </html>
 """
+
+# --- جميع مسارات الفلاسك (Routes) تأتي هنا في الأسفل بعد تعريف القوالب بالكامل ---
+
+@app.route('/set_lang/<lang>')
+def set_lang(lang):
+    if lang in TRANSLATIONS:
+        session['lang'] = lang
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({"name": "Empire of Numbers 12D", "short_name": "Empire12D", "start_url": "/", "display": "standalone", "background_color": "#0b0f19", "theme_color": "#ffd700"})
+
+@app.route('/sw.js')
+def service_worker():
+    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
+
+@app.route('/api/sync_balance')
+def api_sync_balance():
+    if 'username' not in session: return jsonify({"balance": 0.0})
+    user = User.query.filter_by(username=session['username']).first()
+    return jsonify({"balance": user.balance if user else 0.0})
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    t = get_t()
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        user = User.query.filter_by(username=username, password=password).first()
+        if user:
+            session.clear()
+            session['username'] = user.username
+            session['balance'] = user.balance
+            session['role'] = user.role
+            session['lang'] = session.get('lang', 'ar')
+            return redirect(url_for('dashboard'))
+        else:
+            error = "خطأ في اسم المستخدم أو كلمة المرور!" if t['dir'] == 'rtl' else "Invalid Username or Password!"
+    return render_template_string(LOGIN_PAGE, t=t, error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/dashboard', methods=['GET', 'POST'])
+def dashboard():
+    if 'username' not in session: return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['username']).first()
+    if not user: return redirect(url_for('logout'))
+    
+    t = get_t()
+    msg = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        vault = SystemVault.query.get(1)
+        if action == 'redeem_card':
+            card_code = request.form.get('card_code', '').strip()
+            card = RechargeCard.query.filter_by(code=card_code, is_used=False).first()
+            if card:
+                if vault.vault_balance >= card.amount:
+                    vault.vault_balance -= card.amount
+                    user.balance += card.amount
+                    card.is_used = True
+                    card.used_by = user.username
+                    db.session.add(FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=get_local_time()))
+                    db.session.commit()
+                    msg = f"🎉 {card.amount} USDD"
+                else: msg = "Error Vault"
+            else: msg = "Invalid Code"
+        elif action in ['withdraw_wish', 'withdraw_visa', 'withdraw_usdt']:
+            msg = t['success_msg']
+
+    return render_template_string(DASHBOARD_PAGE, t=t, username=user.username, role=user.role, balance=user.balance, msg=msg)
+
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'username' not in session: return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['username']).first()
+    t = get_t()
+    msg = None
+    if request.method == 'POST':
+        old_p, new_p, confirm_p = request.form.get('old_password', ''), request.form.get('new_password', '').strip(), request.form.get('confirm_password', '').strip()
+        if user.role != 'admin' and user.password != old_p: msg = "Old Password Error!"
+        elif not new_p or new_p != confirm_p: msg = "Password Mismatch!"
+        else:
+            user.password = new_p
+            db.session.commit()
+            msg = "Updated Successfully!"
+    return render_template_string(CHANGE_PASSWORD_PAGE, t=t, username=user.username, balance=user.balance, msg=msg)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
