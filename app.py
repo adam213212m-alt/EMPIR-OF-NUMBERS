@@ -100,7 +100,6 @@ class LuxuryGoldenState(db.Model):
     draw_end_time = db.Column(db.Float, default=0)
     forced_winning_number = db.Column(db.Integer, default=0)
 
-# --- جدول تتبع عدد النقرات والرهانات العالمية للروليت لضمان الفوز عند النقرة 40 ---
 class RouletteGlobalState(db.Model):
     __tablename__ = 'roulette_global_state'
     id = db.Column(db.Integer, primary_key=True)
@@ -360,7 +359,6 @@ def api_luxury_golden_status():
     bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
     return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
 
-# --- لعبة الرقم الحنون مع ضمان السحب من 1 إلى 50 وضبط زر الآدمن ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -452,7 +450,7 @@ def game_numbers_empire():
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
 
-# --- لعبة روليت الحظ الجديدة بالكامل (بالمواصفات والمعايير العالمية وخصائص الـ 40 نقرة للـ 20$) ---
+# --- لعبة روليت الحظ بمعايير الكازينو العالمي وخوارزمية الفوز عند النقرة 40 ---
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
@@ -460,10 +458,8 @@ def game_roulette():
     user = User.query.filter_by(username=username).first()
     vault = SystemVault.query.get(1)
     t = get_t()
-    msg = None
     
     if request.method == 'POST':
-        action = request.form.get('action')
         bet_type = request.form.get('bet_type') # 'red', 'black', or number '0'-'36'
         bet_amount = float(request.form.get('bet_amount', 5.0))
         
@@ -471,7 +467,8 @@ def game_roulette():
             user.balance -= bet_amount
             vault.vault_balance += bet_amount
             
-            # زيادة عداد النقرات العالمية للروليت
+            db.session.add(FinancialLog(action_type='مبيع رهان روليت دولي', admin_name='system', target_user=username, amount=bet_amount, log_time=get_local_time()))
+            
             g_state = RouletteGlobalState.query.get(1)
             if not g_state:
                 g_state = RouletteGlobalState(id=1, total_global_spins=0)
@@ -480,11 +477,10 @@ def game_roulette():
             
             reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
             
-            # الخوارزمية الذكية: كل 40 نقرة عالمية، يحصل اللاعب الذي نفذ النقرة الـ 40 على الفوز بجائزة 20$ (20 USDD) تلقائياً
-            is_forced_40th_win = (g_state.total_global_spins % 40 == 0)
+            # الخوارزمية الخاصة: كل 40 نقرة/رقم محجوز بالمنصة بالكامل، تصيب اللاعب وتمنحه جائزة 20$ (20 USDD) مع شرح مفصل بالتعميم
+            is_40th_win = (g_state.total_global_spins % 40 == 0)
             
-            if is_forced_40th_win:
-                # اختيار رقم يوافق رهان اللاعب لضمان فوزه بالـ 20$ (20 USDD)
+            if is_40th_win:
                 if bet_type == 'red':
                     winning_num = random.choice(reds)
                 elif bet_type == 'black':
@@ -494,13 +490,13 @@ def game_roulette():
                         winning_num = int(bet_type)
                     except:
                         winning_num = random.randint(1, 36)
-                payout = 20.0 # الجائزة المطلوبة 20$
+                
+                payout = 20.0
                 user.balance += payout
                 vault.vault_balance -= payout
-                db.session.add(FinancialLog(action_type='جائزة روليت (النقرة 40)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                msg = f"🏆 مبروك! لقد فزت بجائزة الـ 20$ في السحب المميز (النقرة #{g_state.total_global_spins})"
+                db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 40)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
+                msg = f"🏆 تهانينا! النقرة رقم #{g_state.total_global_spins} في المنصة أصابت الهدف! لقد فزت بجائزة الـ 20$ الكبرى!"
             else:
-                # تشغيل العشوائية العالمية القياسية
                 winning_num = random.randint(0, 36)
                 color = 'green' if winning_num == 0 else ('red' if winning_num in reds else 'black')
                 
@@ -511,8 +507,7 @@ def game_roulette():
                     payout = bet_amount * 2
                 else:
                     try:
-                        chosen_num = int(bet_type)
-                        if chosen_num == winning_num:
+                        if int(bet_type) == winning_num:
                             payout = bet_amount * 36
                     except:
                         pass
@@ -521,12 +516,12 @@ def game_roulette():
                     user.balance += payout
                     vault.vault_balance -= payout
                     db.session.add(FinancialLog(action_type='جائزة روليت عادية', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                    msg = f"🎉 مبروك! الرقم الرابح هو {winning_num} وفزت بـ {payout} USDD"
+                    msg = f"🎉 مبروك! استقر الروليت على الرقم {winning_num} وفزت بـ {payout} USDD"
                 else:
-                    msg = "❌ حظ أوفر في المرة القادمة! الرقم الرابح كان: " + str(winning_num)
+                    msg = f"❌ حظ أوفر! استقر الروليت على الرقم {winning_num} ({color})"
             
             db.session.commit()
-            return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg})
+            return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg, "global_count": g_state.total_global_spins})
             
     return render_template_string(GAME_ROULETTE_GLOBAL_PAGE, t=t, balance=user.balance, username=username)
 
@@ -696,7 +691,7 @@ def admin_accounting():
     net = tg_bets - tpayouts
     return render_template_string(ADMIN_ACCOUNTING_PAGE, t=t, vault_balance=vault.vault_balance, logs=logs, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), cards_list=RechargeCard.query.order_by(RechargeCard.id.desc()).all(), msg=msg)
 
-# --- قوالب HTML 12D الفائقة مع تحديثات الروليت الجديدة وزر الرجوع للهاتف ---
+# --- قوالب HTML 12D الفائقة ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -766,7 +761,6 @@ DASHBOARD_PAGE = LANG_BAR + """
         </div>
     </div>
 
-    <!-- شريط إشعارات الفائز العام -->
     <div id="globalNotificationBanner" style="display:none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 18px; border-radius: 14px; max-width: 950px; margin: 20px auto; text-align: center; font-weight: 900; font-size: 20px; border: 2px solid #fff;">
         🔔 <span id="globalNotificationText"></span>
     </div>
@@ -870,7 +864,6 @@ CHANGE_PASSWORD_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون (مع زر العودة الرئيسي بـ 🏠 وزر التحديث وأيقونات الذهب المضيئة) ---
 GAME_GOLDEN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -887,12 +880,8 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
         .cell:hover { border-color:#ffd700; transform: translateY(-5px); }
         .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color:#ef4444 !important; cursor:not-allowed; }
         .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color:#3b82f6 !important; }
-        
-        /* العلامة الذهبية البارزة للرقم الرابح */
         .cell.winning-gold { background: linear-gradient(145deg, #fbbf24, #d97706) !important; border: 4px solid #fff !important; box-shadow: 0 0 35px #ffd700 !important; transform: scale(1.08); z-index: 10; color: #000 !important; }
-
         .global-alert { display:none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 20px; border-radius: 16px; text-align: center; font-weight: 900; font-size: 22px; margin-bottom: 25px; border: 2px solid #fff; }
-        
         .slot-11d-box { background: radial-gradient(circle, #0f172a 0%, #020617 100%); border: 4px solid #38bdf8; padding: 25px; border-radius: 22px; text-align: center; margin-top: 30px; box-shadow: 0 15px 40px rgba(56,189,248,0.4); }
         .slot-screen { font-size: 55px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 14px; border: 2px solid #b8860b; display: inline-block; min-width: 140px; box-shadow: inset 0 0 20px rgba(255,215,0,0.5); letter-spacing: 5px; }
     </style>
@@ -901,8 +890,8 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
     <div style="display:flex; justify-content:space-between; align-items:center; max-width:950px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
         <h2 style="color:#ffd700; margin:0; font-size: 24px;">🏆 {{ t.game1 }} (12D Ultra)</h2>
         <div style="display:flex; gap:10px; align-items:center;">
-            <button type="button" onclick="updateGameData()" style="background:#0284c7; color:#fff; border:none; padding:10px 16px; border-radius:10px; font-weight:bold; cursor:pointer; font-size:15px; box-shadow:0 4px 15px rgba(2,132,199,0.4);">🔄 تحديث</button>
-            <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900; font-size:15px; box-shadow:0 4px 15px rgba(59,130,246,0.4);">{{ t.back_dash }}</a>
+            <button type="button" onclick="updateGameData()" style="background:#0284c7; color:#fff; border:none; padding:10px 16px; border-radius:10px; font-weight:bold; cursor:pointer; font-size:15px;">🔄 تحديث</button>
+            <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900; font-size:15px;">{{ t.back_dash }}</a>
         </div>
         <div style="font-size: 18px; width: 100%; text-align: left;"><b>{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</b></div>
     </div>
@@ -967,7 +956,6 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
     </div>
 
     <script>
-        // توجيه زر الرجوع الفعلي في الهاتف مباشرة إلى لوحة التحكم الرئيسية
         history.pushState(null, null, location.href);
         window.onpopstate = function () {
             location.href = '/dashboard';
@@ -1103,7 +1091,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ الجديدة بالكامل (12D Ultra Roulette مع أزرار الحجز السريع ومربع السحب الفوري والـ 40 نقرة) ---
+# --- قالب لعبة روليت الحظ بتصميم الطاولة العالمية (المطابقة لمعايير الكازينو وميزة النقرة 40 للفوز بـ 20$) ---
 GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -1111,21 +1099,27 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ t.game2 }} - 12D</title>
     <style>
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:25px; text-align: center; }
-        .roulette-container { background:linear-gradient(135deg, rgba(6,78,59,0.95), rgba(2,44,34,0.95)); border:5px solid #ffd700; padding:35px; border-radius:30px; max-width:800px; margin:20px auto; box-shadow:0 30px 70px rgba(0,0,0,0.9); }
-        .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; box-shadow: inset 0 0 15px rgba(255,215,0,0.6); margin-bottom: 20px; }
-        .quick-btn { padding: 16px 30px; font-weight: 900; font-size: 18px; border: none; border-radius: 14px; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,0.6); transition: 0.3s; color: #fff; }
-        .btn-red { background: linear-gradient(135deg, #ef4444, #991b1b); }
-        .btn-black { background: linear-gradient(135deg, #1f2937, #111827); border: 2px solid #4b5563; }
-        .grid-nums { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 25px; }
-        .num-cell { background: #1f2937; border: 2px solid #374151; border-radius: 10px; padding: 15px; font-size: 18px; font-weight: 900; cursor: pointer; color: #fff; transition: 0.2s; }
-        .num-cell:hover { border-color: #ffd700; background: #374151; transform: scale(1.05); }
-        .num-cell.selected { border-color: #ffd700; background: #d97706; color: #000; }
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:20px; text-align: center; }
+        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 6px solid #b8860b; padding: 30px; border-radius: 30px; max-width: 900px; margin: 20px auto; box-shadow: 0 30px 70px rgba(0,0,0,0.9), inset 0 0 30px rgba(0,0,0,0.8); }
+        .slot-box { font-size: 50px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; box-shadow: inset 0 0 20px rgba(255,215,0,0.6); letter-spacing: 5px; }
+        
+        /* جدول الطاولة العالمية للروليت */
+        .roulette-table { display: grid; grid-template-columns: 80px repeat(12, 1fr); gap: 4px; background: #0e4c26; padding: 15px; border-radius: 14px; border: 3px solid #ffd700; margin: 20px auto; max-width: 850px; }
+        .table-cell { background: #111827; border: 1px solid #ffd700; padding: 18px 5px; font-size: 18px; font-weight: 900; color: #fff; cursor: pointer; border-radius: 6px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .table-cell:hover { background: #374151; transform: scale(1.05); }
+        .cell-red { background: #dc2626 !important; }
+        .cell-black { background: #111827 !important; }
+        .cell-green { background: #059669 !important; grid-row: span 3; }
+        
+        .outside-bets { display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .out-btn { padding: 14px 25px; font-weight: 900; font-size: 16px; border: 2px solid #ffd700; border-radius: 10px; cursor: pointer; color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .out-red { background: #dc2626; }
+        .out-black { background: #111827; }
     </style>
 </head>
 <body>
-    <div style="display:flex; justify-content:space-between; align-items:center; max-width:800px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3);">
-        <h2 style="color:#ffd700; margin:0; font-size: 24px;">🎰 {{ t.game2 }} (12D International)</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
+        <h2 style="color:#ffd700; margin:0; font-size: 24px;">🎰 {{ t.game2 }} (International Casino 12D)</h2>
         <div>
             <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900; font-size:15px;">{{ t.back_dash }}</a>
         </div>
@@ -1133,25 +1127,36 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     </div>
 
     <div class="roulette-container">
-        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 شاشة السحب الحية</h3>
+        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 شاشة السحب الحية (مع نظام فوز 20$ كل 40 نقرة عالمية)</h3>
         <div id="rouletteSlot" class="slot-screen slot-box">--</div>
         
-        <div id="rouletteMsg" style="font-size: 20px; font-weight: 900; color: #34d399; margin: 15px 0; min-height: 30px;">اختر طريقة الرهان وادخل السحب واربح 20$!</div>
+        <div id="rouletteMsg" style="font-size: 19px; font-weight: 900; color: #34d399; margin: 15px 0; min-height: 30px;">اختر رقمك أو لونك المفضل وشارك في السحب العالمي!</div>
 
-        <!-- أزرار حجز الأحمر والأسود السريعة -->
-        <div style="display: flex; justify-content: center; gap: 20px; margin: 25px 0;">
-            <button type="button" onclick="placeRouletteBet('red')" class="quick-btn btn-red">🟥 حجز الأحمر (Red)</button>
-            <button type="button" onclick="placeRouletteBet('black')" class="quick-btn btn-black">⬛ حجز الأسود (Black)</button>
+        <!-- طاولة الروليت العالمية المصممة بالاعتماد على التوزيعة الدولية -->
+        <div class="roulette-table">
+            <!-- 0 الأخضر -->
+            <div class="table-cell cell-green" onclick="placeRouletteBet('0')">0</div>
+            
+            <!-- الصف الأول: 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36 -->
+            {% for n in [3,6,9,12,15,18,21,24,27,30,33,36] %}
+                <div class="table-cell {{ 'cell-red' if n in [3,9,12,18,21,27,30,36] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+            {% endfor %}
+            
+            <!-- الصف الثاني: 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35 -->
+            {% for n in [2,5,8,11,14,17,20,23,26,29,32,35] %}
+                <div class="table-cell {{ 'cell-red' if n in [5,14,19,23,32] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+            {% endfor %}
+            
+            <!-- الصف الثالث: 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34 -->
+            {% for n in [1,4,7,10,13,16,19,22,25,28,31,34] %}
+                <div class="table-cell {{ 'cell-red' if n in [1,7,16,19,25,34] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+            {% endfor %}
         </div>
 
-        <p style="color: #94a3b8; font-size: 15px; font-weight: bold;">أو انقر على أي رقم أدناه لحجزه بشكل منفرد:</p>
-
-        <!-- لوحة الأرقام (0 إلى 36) -->
-        <div class="grid-nums">
-            <button type="button" onclick="placeRouletteBet('0')" class="num-cell" style="grid-column: span 6; background: #065f46; border-color: #34d399;">0 (صفر الأخضر)</button>
-            {% for n in range(1, 37) %}
-                <button type="button" onclick="placeRouletteBet('{{ n }}')" class="num-cell">{{ n }}</button>
-            {% endfor %}
+        <!-- أزرار الرهان الخارجي القياسية (أحمر / أسود) -->
+        <div class="outside-bets">
+            <button type="button" onclick="placeRouletteBet('red')" class="out-btn out-red">🟥 رهان أحمر (Red)</button>
+            <button type="button" onclick="placeRouletteBet('black')" class="out-btn out-black">⬛ رهان أسود (Black)</button>
         </div>
     </div>
 
@@ -1169,9 +1174,8 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
             let slot = document.getElementById('rouletteSlot');
             let msgBox = document.getElementById('rouletteMsg');
             msgBox.style.color = "#ffd700";
-            msgBox.innerText = "🎲 جاري تدوير العجلة والسحب العشوائي...";
+            msgBox.innerText = "🎲 جاري تدوير العجلة وسحب الأرقام العالمية...";
 
-            // حركة سلوت ماشين سريعة قبل إظهار النتيجة
             let counter = 0;
             let spinInterval = setInterval(() => {
                 slot.innerText = Math.floor(Math.random() * 37);
