@@ -338,7 +338,7 @@ def api_luxury_golden_status():
     bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
     return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
 
-# --- مسارات الألعاب الست ---
+# --- مسارات الألعاب الست مع ربط الحركات بصندوق المحاسبة ---
 
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
@@ -355,7 +355,7 @@ def game_golden_number():
             if user.balance >= 2.0 and not GoldenNumberBooking.query.filter_by(number=number).first():
                 user.balance -= 2.0
                 vault.vault_balance += 2.0
-                db.session.add(FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
+                db.session.add(FinancialLog(action_type='مبيع رهان لعبة الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=number, booking_date=get_local_time()))
                 db.session.commit()
                 msg = f"تم حجز الرقم {number} مقابل 2 USDD!"
@@ -366,6 +366,7 @@ def game_golden_number():
                 db.session.delete(b)
                 user.balance += 2.0
                 vault.vault_balance -= 2.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.commit()
                 msg = "تم التراجع واسترداد 2 USDD!"
         elif 'admin_execute_draw' in request.form and username == 'admin1':
@@ -410,6 +411,7 @@ def game_numbers_empire():
                 db.session.delete(b)
                 user.balance += 2.0
                 vault.vault_balance -= 2.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.commit()
                 msg = "تم التراجع واسترداد 2 USDD!"
     bookings = {b.number: b.username for b in NumbersEmpireBooking.query.all()}
@@ -461,13 +463,16 @@ def game_number_wheel():
     if request.method == 'POST':
         nums = json.loads(request.form.get('selected_numbers', '[]'))
         if nums and user.balance >= len(nums):
-            user.balance -= len(nums)
-            vault.vault_balance += len(nums)
+            bet_amt = float(len(nums))
+            user.balance -= bet_amt
+            vault.vault_balance += bet_amt
+            db.session.add(FinancialLog(action_type='مبيع رهان عجلة الأرقام', admin_name='system', target_user=user.username, amount=bet_amt, log_time=get_local_time()))
             winning_num = random.randint(1, 20)
             if winning_num in nums:
                 is_win = True
                 user.balance += 15.0
                 vault.vault_balance -= 15.0
+                db.session.add(FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=user.username, amount=15.0, log_time=get_local_time()))
                 msg = f"Win! #{winning_num}"
             else: msg = f"Loss! #{winning_num}"
             db.session.commit()
@@ -484,12 +489,14 @@ def game_reveal_and_win():
         if user.balance >= 1.0:
             user.balance -= 1.0
             vault.vault_balance += 1.0
+            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=1.0, log_time=get_local_time()))
             items = ['1', '3', '5', '7', '🦁']
             rev = random.sample(items, 3)
             prize = 20.0 if rev[0] == rev[1] == rev[2] else 0.0
             if prize > 0:
                 user.balance += prize
                 vault.vault_balance -= prize
+                db.session.add(FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=user.username, amount=prize, log_time=get_local_time()))
                 msg = f"Win {prize} USDD!"
             else: msg = "Try Again!"
             db.session.commit()
@@ -511,6 +518,7 @@ def game_golden_boxes_new():
             if user.balance >= 50.0 and not LuxuryGoldenBooking.query.filter_by(box_number=box).first():
                 user.balance -= 50.0
                 vault.vault_balance += 50.0
+                db.session.add(FinancialLog(action_type='مبيع رهان الرقم الفاخر', admin_name='system', target_user=username, amount=50.0, log_time=get_local_time()))
                 db.session.add(LuxuryGoldenBooking(username=username, box_number=box, booking_date=get_local_time()))
                 db.session.commit()
                 msg = f"Box #{box} (50 USDD)"
@@ -522,6 +530,7 @@ def game_golden_boxes_new():
                 w_user = User.query.filter_by(username=winner.username).first()
                 w_user.balance += 200.0
                 vault.vault_balance -= 200.0
+                db.session.add(FinancialLog(action_type='جائزة الرقم الفاخر', admin_name='admin1', target_user=w_user.username, amount=200.0, log_time=get_local_time()))
                 l_state.winning_number, l_state.status, l_state.draw_end_time = box, 'finished', time.time() + 15.0
                 db.session.commit()
                 msg = f"Winner Box #{box} : {w_user.username}"
