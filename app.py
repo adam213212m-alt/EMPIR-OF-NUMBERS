@@ -450,7 +450,7 @@ def game_numbers_empire():
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
 
-# --- لعبة روليت الحظ بمعايير الكازينو العالمي وخوارزمية الفوز عند النقرة 40 (سرية تماماً وبدون إظهارها للاعب) ---
+# --- لعبة روليت الحظ الحديثة والمطورة بالكامل (طاولة عمودية، حتى 21 رقم، زر تكرار الرهان، عداد 20 ثانية، جائزة 5x، ونقرات 40 و 360 الخاصة) ---
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
@@ -460,68 +460,74 @@ def game_roulette():
     t = get_t()
     
     if request.method == 'POST':
-        bet_type = request.form.get('bet_type')
-        bet_amount = float(request.form.get('bet_amount', 5.0))
-        
-        if user.balance >= bet_amount:
-            user.balance -= bet_amount
-            vault.vault_balance += bet_amount
+        try:
+            data = request.get_json(silent=True) or request.form
+            selected_numbers = data.get('selected_numbers', [])
+            if isinstance(selected_numbers, str):
+                selected_numbers = json.loads(selected_numbers)
+            selected_numbers = [int(n) for n in selected_numbers]
+            bet_per_number = float(data.get('bet_amount', 1.0))
+            total_bet = bet_per_number * len(selected_numbers)
             
-            db.session.add(FinancialLog(action_type='مبيع رهان روليت دولي', admin_name='system', target_user=username, amount=bet_amount, log_time=get_local_time()))
-            
-            g_state = RouletteGlobalState.query.get(1)
-            if not g_state:
-                g_state = RouletteGlobalState(id=1, total_global_spins=0)
-                db.session.add(g_state)
-            g_state.total_global_spins += 1
-            
-            reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
-            
-            # خوارزمية النقرة الـ 40 السرية تماماً (تمنح جائزة 20$ دون إظهار أي نص أو تنبيه بخصوصها للاعب)
-            is_40th_win = (g_state.total_global_spins % 40 == 0)
-            
-            if is_40th_win:
-                if bet_type == 'red':
-                    winning_num = random.choice(reds)
-                elif bet_type == 'black':
-                    winning_num = random.choice([n for n in range(1, 37) if n not in reds])
-                else:
-                    try:
-                        winning_num = int(bet_type)
-                    except:
-                        winning_num = random.randint(1, 36)
+            if total_bet > 0 and user.balance >= total_bet:
+                user.balance -= total_bet
+                vault.vault_balance += total_bet
+                db.session.add(FinancialLog(action_type='مبيع رهان روليت 12D', admin_name='system', target_user=username, amount=total_bet, log_time=get_local_time()))
                 
-                payout = 20.0
-                user.balance += payout
-                vault.vault_balance -= payout
-                db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 40)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                msg = f"🏆 مبروك! لقد فزت بجائزة السحب المميز بقيمة 20 USDD!"
-            else:
-                winning_num = random.randint(0, 36)
-                color = 'green' if winning_num == 0 else ('red' if winning_num in reds else 'black')
+                # تتبع النقرات العالمية للروليت
+                g_state = RouletteGlobalState.query.get(1)
+                if not g_state:
+                    g_state = RouletteGlobalState(id=1, total_global_spins=0)
+                    db.session.add(g_state)
+                g_state.total_global_spins += 1
                 
-                payout = 0
-                if bet_type == 'red' and color == 'red':
-                    payout = bet_amount * 2
-                elif bet_type == 'black' and color == 'black':
-                    payout = bet_amount * 2
-                else:
-                    try:
-                        if int(bet_type) == winning_num:
-                            payout = bet_amount * 36
-                    except:
-                        pass
+                # التحقق من حدث كل 360 نقرة (جائزة 100$)
+                is_360th_win = (g_state.total_global_spins % 360 == 0)
+                # التحقق من حدث كل 40 نقرة (جائزة 20$)
+                is_40th_win = (g_state.total_global_spins % 40 == 0)
                 
-                if payout > 0:
+                reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
+                
+                if is_360th_win and selected_numbers:
+                    # جائزة الـ 100$ الكبرى للحدث العالمي 360
+                    winning_num = random.choice(selected_numbers)
+                    payout = 100.0
                     user.balance += payout
                     vault.vault_balance -= payout
-                    db.session.add(FinancialLog(action_type='جائزة روليت عادية', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                    msg = f"🎉 مبروك! استقر الروليت على الرقم {winning_num} وفزت بـ {payout} USDD"
+                    db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 360 - 100$)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
+                    msg = f"🌟 مبروك! النقرة رقم #{g_state.total_global_spins} في المنصة فازت بجائزة الـ 100$ الكبرى!"
+                elif is_40th_win and selected_numbers:
+                    # جائزة الـ 20$ للحدث العالمي 40
+                    winning_num = random.choice(selected_numbers)
+                    payout = 20.0
+                    user.balance += payout
+                    vault.vault_balance -= payout
+                    db.session.add(FinancialLog(action_type='جائزة روليت السحب المميز (النقرة 40 - 20$)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
+                    msg = f"🏆 تهانينا! أصابت النقرة رقم #{g_state.total_global_spins} وفزت بجائزة الـ 20$!"
                 else:
-                    msg = f"❌ حظ أوفر! استقر الروليت على الرقم {winning_num} ({color})"
-            
-            db.session.commit()
-            return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg})
+                    # في العادة الخوارزمية تختار رقماً لم يختاره اللاعب (من الأرقام الأخرى) لضمان نسبة الشركة، وإن تصادف وجوده نطبق مضاعف 5x
+                    all_nums = list(range(0, 37))
+                    unselected_nums = [n for n in all_nums if n not in selected_numbers]
+                    
+                    if unselected_nums and random.random() < 0.75:
+                        winning_num = random.choice(unselected_nums)
+                    else:
+                        winning_num = random.choice(all_nums)
+                    
+                    payout = 0
+                    if winning_num in selected_numbers:
+                        payout = bet_per_number * 5  # الجائزة بمضاعف 5x
+                        user.balance += payout
+                        vault.vault_balance -= payout
+                        db.session.add(FinancialLog(action_type='جائزة روليت 5x', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
+                        msg = f"🎉 مبروك! استقر الروليت على رقمك المختار #{winning_num} وفزت بـ {payout} USDD (مضاعف 5x)!"
+                    else:
+                        msg = f"❌ حظ أوفر! الرقم الرابح هو #{winning_num}"
+                
+                db.session.commit()
+                return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg})
+        except Exception as e:
+            return jsonify({"success": False, "msg": str(e)})
             
     return render_template_string(GAME_ROULETTE_GLOBAL_PAGE, t=t, balance=user.balance, username=username)
 
@@ -649,8 +655,15 @@ def admin_games():
         forced_val = request.form.get('forced_winning_number', '').strip()
         draw_state.forced_winning_number = int(forced_val) if forced_val else 0
         db.session.commit()
-        msg = "تم تحديث إعدادات السحب بنجاح (سيتم الاختيار عشوائياً في حال ترك الخانة فارغة)!"
-    return render_template_string(ADMIN_GAMES_PAGE, t=t, forced_val=draw_state.forced_winning_number, msg=msg)
+        msg = "تم تحديث إعدادات السحب بنجاح!"
+    
+    # حساب النقرات المتبقية للأرشيف (للـ 40 وللـ 360)
+    g_state = RouletteGlobalState.query.get(1)
+    total_spins = g_state.total_global_spins if g_state else 0
+    rem_40 = 40 - (total_spins % 40)
+    rem_360 = 360 - (total_spins % 360)
+
+    return render_template_string(ADMIN_GAMES_PAGE, t=t, forced_val=draw_state.forced_winning_number, total_spins=total_spins, rem_40=rem_40, rem_360=rem_360, msg=msg)
 
 @app.route('/admin_accounting', methods=['GET', 'POST'])
 def admin_accounting():
@@ -1091,7 +1104,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ بمعايير الكازينو العالمي وميزة إخفاء خوارزمية النقرة الـ 40 كلياً عن اللاعب ---
+# --- قالب لعبة روليت الحظ الحديثة والمطورة بالكامل (طاولة عمودية، حتى 21 رقم، زر تكرار الرهان، عداد 20 ثانية، جائزة 5x، ونقرات 40 و 360 الخاصة) ---
 GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -1100,27 +1113,35 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     <title>{{ t.game2 }} - 12D</title>
     <style>
         body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:15px; text-align: center; }
-        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 20px; border-radius: 25px; max-width: 900px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
+        
+        /* بانر اضرب اللمعة في أعلى اللعبة */
+        .glow-banner { background: linear-gradient(135deg, #f59e0b, #fbbf24, #d97706); color: #000; padding: 14px; border-radius: 14px; font-weight: 900; font-size: 18px; max-width: 850px; margin: 0 auto 15px auto; box-shadow: 0 0 25px rgba(245,158,11,0.6); animation: pulseGlow 1.5s infinite alternate; border: 2px solid #fff; }
+        @keyframes pulseGlow { 0% { transform: scale(1); box-shadow: 0 0 15px rgba(245,158,11,0.5); } 100% { transform: scale(1.02); box-shadow: 0 0 30px rgba(245,158,11,0.9); } }
+
+        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 25px; border-radius: 25px; max-width: 850px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
         .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 10px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; box-shadow: inset 0 0 15px rgba(255,215,0,0.6); letter-spacing: 4px; }
         
-        /* حاوية الطاولة مع ميزة التمرير الأفقي التلقائي للشاشات الصغيرة */
+        /* طاولة روليت عمودية كازينوية */
         .table-scroll-wrapper { width: 100%; overflow-x: auto; margin: 15px 0; padding-bottom: 10px; }
-        .roulette-table { display: grid; grid-template-columns: 60px repeat(12, minmax(45px, 1fr)); gap: 3px; background: #0e4c26; padding: 12px; border-radius: 12px; border: 3px solid #ffd700; min-width: 650px; margin: 0 auto; }
-        .table-cell { background: #111827; border: 1px solid #ffd700; padding: 14px 2px; font-size: 16px; font-weight: 900; color: #fff; cursor: pointer; border-radius: 5px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .table-cell:hover { background: #374151; transform: scale(1.04); }
-        .cell-red { background: #dc2626 !important; }
-        .cell-black { background: #111827 !important; }
-        .cell-green { background: #059669 !important; grid-row: span 3; font-size: 20px; }
-        
-        .outside-bets { display: flex; justify-content: center; gap: 12px; margin-top: 15px; flex-wrap: wrap; }
-        .out-btn { padding: 12px 22px; font-weight: 900; font-size: 15px; border: 2px solid #ffd700; border-radius: 10px; cursor: pointer; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        .out-red { background: #dc2626; }
-        .out-black { background: #111827; }
+        .roulette-vertical-table { display: flex; flex-direction: column; gap: 6px; max-width: 320px; margin: 0 auto; background: #09381b; padding: 15px; border-radius: 16px; border: 3px solid #ffd700; }
+        .table-row { display: flex; gap: 6px; justify-content: center; }
+        .num-btn { width: 65px; height: 60px; background: #111827; border: 2px solid #ffd700; border-radius: 10px; font-size: 20px; font-weight: 900; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .num-btn:hover { transform: scale(1.05); border-color: #fff; }
+        .num-btn.selected { background: #d97706 !important; border-color: #fff !important; color: #000 !important; box-shadow: 0 0 15px #ffd700; }
+        .btn-red { background: #dc2626 !important; }
+        .btn-black { background: #1f2937 !important; }
+        .btn-green { background: #059669 !important; width: 100%; height: 50px; }
+
+        .action-control-bar { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .action-btn { padding: 14px 25px; font-weight: 900; font-size: 16px; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .btn-spin { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; font-size: 20px; padding: 16px 40px; }
+        .btn-repeat { background: #3b82f6; color: #fff; }
+        .btn-clear { background: #ef4444; color: #fff; }
     </style>
 </head>
 <body>
-    <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin:0 auto; background:rgba(20,24,38,0.9); padding:12px 20px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
-        <h2 style="color:#ffd700; margin:0; font-size: 22px;">🎰 {{ t.game2 }} (International Casino 12D)</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:850px; margin:0 auto; background:rgba(20,24,38,0.9); padding:12px 20px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
+        <h2 style="color:#ffd700; margin:0; font-size: 22px;">🎰 {{ t.game2 }} (Vertical 12D Casino)</h2>
         <div style="display:flex; gap:8px; align-items:center;">
             <button type="button" onclick="location.reload()" style="background:#0284c7; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:14px;">🔄 تحديث</button>
             <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:8px 16px; text-decoration:none; border-radius:8px; font-weight:900; font-size:14px;">{{ t.back_dash }}</a>
@@ -1129,33 +1150,91 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     </div>
 
     <div class="roulette-container">
-        <h3 style="color: #ffd700; margin-top: 0; font-size: 20px;">🎯 شاشة السحب الحية</h3>
+        <!-- لافتة اضرب اللمعة المطلوبة -->
+        <div class="glow-banner">✨ اضرب اللمعة واحصل على 100 USDD فورا!</div>
+
+        <!-- عداد تنازلي للجولة (20 ثانية) -->
+        <div id="rouletteTimer" style="font-size: 22px; font-weight: 900; color: #38bdf8; margin-bottom: 15px;">⏳ وقت اختيار الأرقام: 20 ثانية</div>
+
         <div id="rouletteSlot" class="slot-screen slot-box">--</div>
         
-        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0; min-height: 28px;">اختر رقمك أو لونك المفضل وشارك في السحب العالمي!</div>
+        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0; min-height: 28px;">اختر حتى 21 رقماً من الطاولة أدناه وشارك في السحب (الجائزة بمضاعف 5x)!</div>
 
-        <!-- حاوية الطاولة مع التمرير الأفقي للهواتف -->
+        <!-- طاولة الروليت الطولية (Vertical Table) مع الصفر بالأعلى والأرقام 1 إلى 36 بصفوف من 3 أرقام -->
         <div class="table-scroll-wrapper">
-            <div class="roulette-table">
-                <div class="table-cell cell-green" onclick="placeRouletteBet('0')">0</div>
+            <div class="roulette-vertical-table">
+                <!-- زر الصفر الأخضر بالأعلى -->
+                <button type="button" id="num_0" onclick="toggleNumber(0)" class="num-btn btn-green">0</button>
                 
-                {% for n in [3,6,9,12,15,18,21,24,27,30,33,36] %}
-                    <div class="table-cell {{ 'cell-red' if n in [3,9,12,18,21,27,30,36] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-                {% endfor %}
-                
-                {% for n in [2,5,8,11,14,17,20,23,26,29,32,35] %}
-                    <div class="table-cell {{ 'cell-red' if n in [5,14,19,23,32] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-                {% endfor %}
-                
-                {% for n in [1,4,7,10,13,16,19,22,25,28,31,34] %}
-                    <div class="table-cell {{ 'cell-red' if n in [1,7,16,19,25,34] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-                {% endfor %}
+                <!-- صفوف الأرقام 1 إلى 36 (ثلاثة أعمدة) -->
+                <div class="table-row">
+                    <button type="button" id="num_1" onclick="toggleNumber(1)" class="num-btn btn-red">1</button>
+                    <button type="button" id="num_2" onclick="toggleNumber(2)" class="num-btn btn-black">2</button>
+                    <button type="button" id="num_3" onclick="toggleNumber(3)" class="num-btn btn-red">3</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_4" onclick="toggleNumber(4)" class="num-btn btn-black">4</button>
+                    <button type="button" id="num_5" onclick="toggleNumber(5)" class="num-btn btn-red">5</button>
+                    <button type="button" id="num_6" onclick="toggleNumber(6)" class="num-btn btn-black">6</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_7" onclick="toggleNumber(7)" class="num-btn btn-red">7</button>
+                    <button type="button" id="num_8" onclick="toggleNumber(8)" class="num-btn btn-black">8</button>
+                    <button type="button" id="num_9" onclick="toggleNumber(9)" class="num-btn btn-red">9</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_10" onclick="toggleNumber(10)" class="num-btn btn-black">10</button>
+                    <button type="button" id="num_11" onclick="toggleNumber(11)" class="num-btn btn-black">11</button>
+                    <button type="button" id="num_12" onclick="toggleNumber(12)" class="num-btn btn-red">12</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_13" onclick="toggleNumber(13)" class="num-btn btn-black">13</button>
+                    <button type="button" id="num_14" onclick="toggleNumber(14)" class="num-btn btn-red">14</button>
+                    <button type="button" id="num_15" onclick="toggleNumber(15)" class="num-btn btn-black">15</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_16" onclick="toggleNumber(16)" class="num-btn btn-red">16</button>
+                    <button type="button" id="num_17" onclick="toggleNumber(17)" class="num-btn btn-black">17</button>
+                    <button type="button" id="num_18" onclick="toggleNumber(18)" class="num-btn btn-red">18</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_19" onclick="toggleNumber(19)" class="num-btn btn-red">19</button>
+                    <button type="button" id="num_20" onclick="toggleNumber(20)" class="num-btn btn-black">20</button>
+                    <button type="button" id="num_21" onclick="toggleNumber(21)" class="num-btn btn-red">21</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_22" onclick="toggleNumber(22)" class="num-btn btn-black">22</button>
+                    <button type="button" id="num_23" onclick="toggleNumber(23)" class="num-btn btn-red">23</button>
+                    <button type="button" id="num_24" onclick="toggleNumber(24)" class="num-btn btn-black">24</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_25" onclick="toggleNumber(25)" class="num-btn btn-red">25</button>
+                    <button type="button" id="num_26" onclick="toggleNumber(26)" class="num-btn btn-black">26</button>
+                    <button type="button" id="num_27" onclick="toggleNumber(27)" class="num-btn btn-red">27</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_28" onclick="toggleNumber(28)" class="num-btn btn-black">28</button>
+                    <button type="button" id="num_29" onclick="toggleNumber(29)" class="num-btn btn-black">29</button>
+                    <button type="button" id="num_30" onclick="toggleNumber(30)" class="num-btn btn-red">30</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_31" onclick="toggleNumber(31)" class="num-btn btn-black">31</button>
+                    <button type="button" id="num_32" onclick="toggleNumber(32)" class="num-btn btn-red">32</button>
+                    <button type="button" id="num_33" onclick="toggleNumber(33)" class="num-btn btn-black">33</button>
+                </div>
+                <div class="table-row">
+                    <button type="button" id="num_34" onclick="toggleNumber(34)" class="num-btn btn-red">34</button>
+                    <button type="button" id="num_35" onclick="toggleNumber(35)" class="num-btn btn-black">35</button>
+                    <button type="button" id="num_36" onclick="toggleNumber(36)" class="num-btn btn-red">36</button>
+                </div>
             </div>
         </div>
 
-        <div class="outside-bets">
-            <button type="button" onclick="placeRouletteBet('red')" class="out-btn out-red">🟥 رهان أحمر (Red)</button>
-            <button type="button" onclick="placeRouletteBet('black')" class="out-btn out-black">⬛ رهان أسود (Black)</button>
+        <!-- أزرار التحكم والرهان -->
+        <div class="action-control-bar">
+            <button type="button" onclick="clearSelection()" class="action-btn btn-clear">🗑️ مسح</button>
+            <button type="button" onclick="repeatLastBet()" class="action-btn btn-repeat">🔄 تكرار الرهان السابق</button>
+            <button type="button" onclick="spinRoulette()" class="action-btn btn-spin">🎰 ابدأ السحب</button>
         </div>
     </div>
 
@@ -1165,15 +1244,86 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
             location.href = '/dashboard';
         };
 
-        function placeRouletteBet(betType) {
-            let formData = new FormData();
-            formData.append('bet_type', betType);
-            formData.append('bet_amount', 5.0);
+        let selectedNumbers = [];
+        let maxAllowed = 21;
+        let timeLeft = 20;
+
+        function toggleNumber(num) {
+            let idx = selectedNumbers.indexOf(num);
+            if(idx > -1) {
+                selectedNumbers.splice(idx, 1);
+                document.getElementById('num_' + num).classList.remove('selected');
+            } else {
+                if(selectedNumbers.length >= maxAllowed) {
+                    alert("يمكنك اختيار كحد أقصى 21 رقماً في الجولة الواحدة!");
+                    return;
+                }
+                selectedNumbers.push(num);
+                document.getElementById('num_' + num).classList.add('selected');
+            }
+        }
+
+        function clearSelection() {
+            selectedNumbers.forEach(n => {
+                let btn = document.getElementById('num_' + n);
+                if(btn) btn.classList.remove('selected');
+            });
+            selectedNumbers = [];
+        }
+
+        function repeatLastBet() {
+            clearSelection();
+            let last = localStorage.getItem('lastRouletteSelection');
+            if(last) {
+                selectedNumbers = JSON.parse(last);
+                selectedNumbers.forEach(n => {
+                    let btn = document.getElementById('num_' + n);
+                    if(btn) btn.classList.add('selected');
+                });
+            } else {
+                alert("لا يوجد رهان سابق محفوظ!");
+            }
+        }
+
+        // العداد التنازلي 20 ثانية لبدء الجولة واختيار الأرقام
+        let roundTimerInterval = setInterval(() => {
+            timeLeft--;
+            let timerEl = document.getElementById('rouletteTimer');
+            if(timerEl) {
+                timerEl.innerText = `⏳ وقت اختيار الأرقام: ${timeLeft} ثانية`;
+            }
+            if(timeLeft <= 0) {
+                clearInterval(roundTimerInterval);
+                if(selectedNumbers.length > 0) {
+                    spinRoulette();
+                } else {
+                    // اختيار 5 أرقام عشوائية تلقائياً إذا لم يختار اللاعب شيئاً وانتهى الوقت
+                    for(let i=0; i<5; i++) {
+                        let r = Math.floor(Math.random() * 37);
+                        if(!selectedNumbers.includes(r)) selectedNumbers.push(r);
+                    }
+                    spinRoulette();
+                }
+            }
+        }, 1000);
+
+        function spinRoulette() {
+            if(selectedNumbers.length === 0) {
+                alert("يرجى اختيار رقم واحد على الأقل للمشاركة في السحب!");
+                return;
+            }
+
+            localStorage.setItem('lastRouletteSelection', JSON.stringify(selectedNumbers));
+
+            let formData = {
+                'selected_numbers': selectedNumbers,
+                'bet_amount': 2.0
+            };
 
             let slot = document.getElementById('rouletteSlot');
             let msgBox = document.getElementById('rouletteMsg');
             msgBox.style.color = "#ffd700";
-            msgBox.innerText = "🎲 جاري تدوير العجلة وسحب الأرقام العالمية...";
+            msgBox.innerText = "🎲 جاري تدوير العجلة وسحب الأرقام العشوائية...";
 
             let counter = 0;
             let spinInterval = setInterval(() => {
@@ -1184,7 +1334,8 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                     
                     fetch('/game_roulette', {
                         method: 'POST',
-                        body: formData
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
                     }).then(res => res.json()).then(data => {
                         slot.innerText = data.winning_number;
                         msgBox.innerText = data.msg;
@@ -1192,6 +1343,33 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                         
                         let balanceBadge = document.getElementById('liveRouletteBalance');
                         if(balanceBadge) balanceBadge.innerText = data.balance;
+
+                        // إضاءة الرقم الرابح على الطاولة
+                        let winBtn = document.getElementById('num_' + data.winning_number);
+                        if(winBtn) {
+                            winBtn.style.boxShadow = "0 0 35px #ffd700";
+                            winBtn.style.border = "4px solid #fff";
+                            setTimeout(() => {
+                                winBtn.style.boxShadow = "none";
+                                winBtn.style.border = "2px solid #ffd700";
+                            }, 5000);
+                        }
+
+                        // إعادة تعيين المؤقت للجولة القادمة
+                        setTimeout(() => {
+                            clearSelection();
+                            timeLeft = 20;
+                            roundTimerInterval = setInterval(() => {
+                                timeLeft--;
+                                let timerEl = document.getElementById('rouletteTimer');
+                                if(timerEl) timerEl.innerText = `⏳ وقت اختيار الأرقام: ${timeLeft} ثانية`;
+                                if(timeLeft <= 0) {
+                                    clearInterval(roundTimerInterval);
+                                    if(selectedNumbers.length > 0) spinRoulette();
+                                }
+                            }, 1000);
+                        }, 4000);
+
                     }).catch(err => {
                         msgBox.innerText = "حدث خطأ في الاتصال بالسيرفر!";
                     });
@@ -1203,134 +1381,33 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 </html>
 """
 
-GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
+# --- صفحة تحكم الآدمن مع عدادات النقرات للأرشيف والتقارير ---
+ADMIN_GAMES_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.game3 }} - 12D</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #f8fafc; margin: 0; padding: 25px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20,24,38,0.9); padding: 18px 25px; border-radius: 16px; border: 2px solid #ffd700; }
-        .board-container { background: linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border: 5px solid #b8860b; padding: 30px; border-radius: 25px; margin-top: 25px; text-align: center; }
-        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 14px; margin-top: 25px; }
-        @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
-        .number-box { background: linear-gradient(145deg, #059669, #047857); border: 3px solid #34d399; border-radius: 16px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #ffffff; cursor: pointer; }
-        .number-box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; color: #fca5a5 !important; }
-        .number-box.my-booked { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🏛️ {{ t.game3 }} (12D Ultra)</h2>
-        <div><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
+<head><meta charset="UTF-8"><title>لوحة الألعاب - 12D</title></head>
+<body style="font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,24,38,0.9); padding:18px 25px; border-radius:16px; border:2px solid #ffd700; max-width:600px; margin:0 auto 30px auto;">
+        <h2 style="color:#ffd700; margin:0;">🎮 لوحة تحكم الألعاب والأرشيف</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">{{ t.back_dash }}</a>
     </div>
-    {% if msg %}<div style="background: rgba(6,95,70,0.9); color: #34d399; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: center; font-weight: 900;">{{ msg }}</div>{% endif %}
-    <div class="board-container">
-        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 إمبراطورية الأرقام (تكلفة الحجز: 2 USDD)</h3>
-        <div class="board-grid">
-            {% for i in range(1, 51) %}
-                {% if i in bookings %}
-                    {% if bookings[i] == username %}
-                        <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="cancel_number" class="number-box my-booked" style="width: 100%;">{{ i }}<br><span style="font-size: 10px;">(أنت)</span></button></form>
-                    {% else %}
-                        <div class="number-box booked">{{ i }}<br><span style="font-size: 10px;">({{ bookings[i] }})</span></div>
-                    {% endif %}
-                {% else %}
-                    <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="number-box" style="width: 100%;">{{ i }}</button></form>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-</body>
-</html>
-"""
 
-GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
-<!DOCTYPE html>
-<html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.game4 }} - 12D</title>
-    <style>
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
-        .wheel-12d { background:linear-gradient(145deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
-    </style>
-</head>
-<body>
-    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
-    <div class="wheel-12d">
-        <h2 style="color:#ffd700;">🎡 {{ t.game4 }} (12D Ultra - 35% Edge)</h2>
-        <p>رصيدك الحالي: {{ balance }} USDD</p>
-        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+    <!-- أرشيف مراقبة النقرات للروليت والجوائز -->
+    <div style="background: rgba(15,23,42,0.95); border: 2px solid #38bdf8; padding: 25px; border-radius: 20px; max-width: 500px; margin: 0 auto 25px auto; box-shadow: 0 10px 30px rgba(56,189,248,0.3);">
+        <h3 style="color: #38bdf8; margin-top: 0; font-size: 20px;">📊 أرشيف العدادات العالمية للروليت</h3>
+        <p style="font-size: 16px; margin: 8px 0;">إجمالي النقرات العالمية بالمنصة: <b>{{ total_spins }}</b></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #ffd700;">النقرات الناقصة لجائزة الـ 20$ (كل 40): <b>{{ rem_40 }} نقرات</b></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #34d399;">النقرات الناقصة لجائزة الـ 100$ (كل 360): <b>{{ rem_360 }} نقرات</b></p>
+    </div>
+
+    {% if msg %}<p style="color:#34d399; font-weight:900; background:rgba(52,211,153,0.15); padding:12px; border-radius:10px; max-width:500px; margin:0 auto 20px auto;">{{ msg }}</p>{% endif %}
+    <div style="background:rgba(25,30,48,0.9); border:3px solid #ffd700; padding:35px; border-radius:22px; max-width:500px; margin:20px auto;">
         <form method="POST">
-            <input type="hidden" name="selected_numbers" value="[3, 8, 14]">
-            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎯 {{ t.spin }} (3 USDD)</button>
+            <label style="color:#ffd700; font-weight:900; font-size:18px;">رقم فائز مسبق (الرقم الحنون - اتركه فارغاً للاختيار العشوائي):</label><br>
+            <input type="number" name="forced_winning_number" value="{{ forced_val if forced_val != 0 else '' }}" min="0" max="50" style="padding:14px; margin:15px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; width:80%; text-align:center; font-size:20px;">
+            <br>
+            <button type="submit" style="padding:14px 25px; background:#22c55e; color:#fff; font-weight:900; border:none; border-radius:10px; cursor:pointer; width:80%;">حفظ الإعدادات</button>
         </form>
-    </div>
-</body>
-</html>
-"""
-
-GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
-<!DOCTYPE html>
-<html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.game5 }} - 12D</title>
-    <style>
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
-        .reveal-12d { background:linear-gradient(145deg, rgba(31,31,31,0.95), rgba(17,17,17,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
-    </style>
-</head>
-<body>
-    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
-    <div class="reveal-12d">
-        <h2 style="color:#ffd700;">🎟️ {{ t.game5 }} (12D Ultra - 35% Edge)</h2>
-        <p>رصيدك الحالي: {{ balance }} USDD</p>
-        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
-        {% if result_data %}
-            <div style="font-size:35px; margin:20px 0; letter-spacing:15px; background:rgba(0,0,0,0.6); padding:15px; border-radius:14px; border:1px solid #ffd700;">
-                {{ result_data.revealed.values() | list | join(' ') }}
-            </div>
-        {% endif %}
-        <form method="POST">
-            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#ffd700,#ff8c00); color:#000; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎟️ {{ t.reveal }} (1 USDD)</button>
-        </form>
-    </div>
-</body>
-</html>
-"""
-
-GAME_GOLDEN_BOXES_NEW_PAGE = LANG_BAR + """
-<!DOCTYPE html>
-<html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.game6 }} - 12D</title>
-    <style>
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
-        .boxes-12d { background:linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border:5px solid #b8860b; padding:50px; border-radius:35px; max-width:700px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
-        .box-12d { width:95px; height:95px; background:linear-gradient(145deg, #7c3aed, #4c1d95); border:3px solid #ffd700; border-radius:20px; color:#fff; font-size:26px; font-weight:900; cursor:pointer; }
-    </style>
-</head>
-<body>
-    <div style="max-width:700px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
-    <div class="boxes-12d">
-        <h2 style="color:#ffd700;">🎁 {{ t.game6 }} (12D Ultra - 35% Edge)</h2>
-        <p>رصيدك الحالي: {{ balance }} USDD</p>
-        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
-        <div style="display:flex; justify-content:center; gap:20px; margin:35px 0; flex-wrap:wrap;">
-            {% for b in range(1, 6) %}
-                <form method="POST" style="margin:0;">
-                    <input type="hidden" name="box_number" value="{{ b }}">
-                    <button type="submit" name="book_box" class="box-12d">📦 {{ b }}</button>
-                </form>
-            {% endfor %}
-        </div>
-        {% if username == 'admin1' %}
-            <form method="POST"><button type="submit" name="admin_execute_luxury_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; padding:16px 35px; border:none; border-radius:14px; font-weight:900; cursor:pointer;">⚡ {{ t.draw_now }}</button></form>
-        {% endif %}
     </div>
 </body>
 </html>
@@ -1384,28 +1461,6 @@ ADMIN_CUSTOMER_DETAIL_PAGE = LANG_BAR + """
             <tr style="background:rgba(10,13,22,0.9); color:#ffd700;"><th style="padding:12px; border:1px solid #444;">Action</th><th style="padding:12px; border:1px solid #444;">Amount</th><th style="padding:12px; border:1px solid #444;">Time</th></tr>
             {% for l in logs %}<tr style="text-align:center;"><td style="padding:12px; border:1px solid #444;">{{ l.action_type }}</td><td style="padding:12px; border:1px solid #444; color:#34d399; font-weight:900;">{{ l.amount }} USDD</td><td style="padding:12px; border:1px solid #444;">{{ l.log_time }}</td></tr>{% endfor %}
         </table>
-    </div>
-</body>
-</html>
-"""
-
-ADMIN_GAMES_PAGE = LANG_BAR + """
-<!DOCTYPE html>
-<html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>لوحة الألعاب - 12D</title></head>
-<body style="font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,24,38,0.9); padding:18px 25px; border-radius:16px; border:2px solid #ffd700; max-width:600px; margin:0 auto 30px auto;">
-        <h2 style="color:#ffd700; margin:0;">🎮 لوحة تحكم الألعاب</h2>
-        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">{{ t.back_dash }}</a>
-    </div>
-    {% if msg %}<p style="color:#34d399; font-weight:900; background:rgba(52,211,153,0.15); padding:12px; border-radius:10px; max-width:500px; margin:0 auto 20px auto;">{{ msg }}</p>{% endif %}
-    <div style="background:rgba(25,30,48,0.9); border:3px solid #ffd700; padding:35px; border-radius:22px; max-width:500px; margin:20px auto;">
-        <form method="POST">
-            <label style="color:#ffd700; font-weight:900; font-size:18px;">رقم فائز مسبق (الرقم الحنون - اتركه فارغاً للاختيار العشوائي):</label><br>
-            <input type="number" name="forced_winning_number" value="{{ forced_val if forced_val != 0 else '' }}" min="0" max="50" style="padding:14px; margin:15px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; width:80%; text-align:center; font-size:20px;">
-            <br>
-            <button type="submit" style="padding:14px 25px; background:#22c55e; color:#fff; font-weight:900; border:none; border-radius:10px; cursor:pointer; width:80%;">حفظ الإعدادات</button>
-        </form>
     </div>
 </body>
 </html>
@@ -1541,6 +1596,139 @@ ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
             </tr>
             {% endfor %}
         </table>
+    </div>
+</body>
+</html>
+"""
+
+GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
+<!DOCTYPE html>
+<html lang="{{ t.dir }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game3 }} - 12D</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #f8fafc; margin: 0; padding: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20,24,38,0.9); padding: 18px 25px; border-radius: 16px; border: 2px solid #ffd700; }
+        .board-container { background: linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border: 5px solid #b8860b; padding: 30px; border-radius: 25px; margin-top: 25px; text-align: center; }
+        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 14px; margin-top: 25px; }
+        @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
+        .number-box { background: linear-gradient(145deg, #059669, #047857); border: 3px solid #34d399; border-radius: 16px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #ffffff; cursor: pointer; }
+        .number-box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; color: #fca5a5 !important; }
+        .number-box.my-booked { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🏛️ {{ t.game3 }} (12D Ultra)</h2>
+        <div><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
+    </div>
+    {% if msg %}<div style="background: rgba(6,95,70,0.9); color: #34d399; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: center; font-weight: 900;">{{ msg }}</div>{% endif %}
+    <div class="board-container">
+        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 إمبراطورية الأرقام (تكلفة الحجز: 2 USDD)</h3>
+        <div class="board-grid">
+            {% for i in range(1, 51) %}
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="cancel_number" class="number-box my-booked" style="width: 100%;">{{ i }}<br><span style="font-size: 10px;">(أنت)</span></button></form>
+                    {% else %}
+                        <div class="number-box booked">{{ i }}<br><span style="font-size: 10px;">({{ bookings[i] }})</span></div>
+                    {% endif %}
+                {% else %}
+                    <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="number-box" style="width: 100%;">{{ i }}</button></form>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
+<!DOCTYPE html>
+<html lang="{{ t.dir }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game4 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .wheel-12d { background:linear-gradient(145deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="wheel-12d">
+        <h2 style="color:#ffd700;">🎡 {{ t.game4 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="hidden" name="selected_numbers" value="[3, 8, 14]">
+            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎯 {{ t.spin }} (3 USDD)</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
+<!DOCTYPE html>
+<html lang="{{ t.dir }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game5 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .reveal-12d { background:linear-gradient(145deg, rgba(31,31,31,0.95), rgba(17,17,17,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="reveal-12d">
+        <h2 style="color:#ffd700;">🎟️ {{ t.game5 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        {% if result_data %}
+            <div style="font-size:35px; margin:20px 0; letter-spacing:15px; background:rgba(0,0,0,0.6); padding:15px; border-radius:14px; border:1px solid #ffd700;">
+                {{ result_data.revealed.values() | list | join(' ') }}
+            </div>
+        {% endif %}
+        <form method="POST">
+            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#ffd700,#ff8c00); color:#000; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎟️ {{ t.reveal }} (1 USDD)</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+GAME_GOLDEN_BOXES_NEW_PAGE = LANG_BAR + """
+<!DOCTYPE html>
+<html lang="{{ t.dir }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game6 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .boxes-12d { background:linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border:5px solid #b8860b; padding:50px; border-radius:35px; max-width:700px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+        .box-12d { width:95px; height:95px; background:linear-gradient(145deg, #7c3aed, #4c1d95); border:3px solid #ffd700; border-radius:20px; color:#fff; font-size:26px; font-weight:900; cursor:pointer; }
+    </style>
+</head>
+<body>
+    <div style="max-width:700px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:8px; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="boxes-12d">
+        <h2 style="color:#ffd700;">🎁 {{ t.game6 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        <div style="display:flex; justify-content:center; gap:20px; margin:35px 0; flex-wrap:wrap;">
+            {% for b in range(1, 6) %}
+                <form method="POST" style="margin:0;">
+                    <input type="hidden" name="box_number" value="{{ b }}">
+                    <button type="submit" name="book_box" class="box-12d">📦 {{ b }}</button>
+                </form>
+            {% endfor %}
+        </div>
+        {% if username == 'admin1' %}
+            <form method="POST"><button type="submit" name="admin_execute_luxury_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; padding:16px 35px; border:none; border-radius:14px; font-weight:900; cursor:pointer;">⚡ {{ t.draw_now }}</button></form>
+        {% endif %}
     </div>
 </body>
 </html>
