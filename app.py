@@ -310,10 +310,14 @@ def change_password():
 def api_golden_status():
     current_time = time.time()
     draw_state = GameDrawState.query.get(1)
-    status, winning_number, remaining = 'idle', 0, 0
+    status, winning_number, remaining, winner_username = 'idle', 0, 0, '---'
     if draw_state:
         status = draw_state.status
         winning_number = draw_state.winning_number
+        if status == 'finished':
+            log = FinancialLog.query.filter_by(action_type='جائزة الرقم الحنون').order_by(FinancialLog.id.desc()).first()
+            if log:
+                winner_username = log.target_user
         if status == 'finished' and current_time >= draw_state.draw_end_time:
             GoldenNumberBooking.query.delete()
             draw_state.winning_number, draw_state.status, draw_state.draw_end_time = 0, 'idle', 0
@@ -321,7 +325,21 @@ def api_golden_status():
             status, winning_number = 'idle', 0
         remaining = max(0, int(draw_state.draw_end_time - current_time)) if status == 'finished' else 0
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
-    return jsonify({"status": status, "winning_number": winning_number, "remaining_seconds": remaining, "bookings": bookings})
+    
+    username = session.get('username', '')
+    user = User.query.filter_by(username=username).first() if username else None
+    my_booked = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()] if username else []
+    
+    return jsonify({
+        "status": status,
+        "winning_number": winning_number,
+        "winner_username": winner_username,
+        "remaining_seconds": remaining,
+        "bookings": bookings,
+        "my_booked_nums": my_booked,
+        "my_total_spent": len(my_booked) * 2.0,
+        "balance": user.balance if user else 0.0
+    })
 
 @app.route('/api/luxury_golden_status')
 def api_luxury_golden_status():
@@ -350,17 +368,20 @@ def game_golden_number():
     t = get_t()
     msg = None
     if request.method == 'POST':
-        if 'book_number' in request.form and draw_state.status == 'idle':
-            number = int(request.form.get('number'))
+        action_type = request.form.get('action_type')
+        if action_type == 'book' and draw_state.status == 'idle':
+            number = int(request.form.get('number', 0))
             if user.balance >= 2.0 and not GoldenNumberBooking.query.filter_by(number=number).first():
                 user.balance -= 2.0
                 vault.vault_balance += 2.0
                 db.session.add(FinancialLog(action_type='مبيع رهان لعبة الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=number, booking_date=get_local_time()))
                 db.session.commit()
-                msg = f"تم حجز الرقم {number} مقابل 2 USDD!"
-        elif 'cancel_number' in request.form and draw_state.status == 'idle':
-            number = int(request.form.get('number'))
+                return jsonify({"success": True, "msg": f"تم حجز الرقم {number} مقابل 2 USDD!"})
+            else:
+                return jsonify({"success": False, "msg": "رصيد غير كافي أو الرقم محجوز مسبقاً!"})
+        elif action_type == 'cancel' and draw_state.status == 'idle':
+            number = int(request.form.get('number', 0))
             b = GoldenNumberBooking.query.filter_by(number=number, username=username).first()
             if b:
                 db.session.delete(b)
@@ -368,8 +389,8 @@ def game_golden_number():
                 vault.vault_balance -= 2.0
                 db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.commit()
-                msg = "تم التراجع واسترداد 2 USDD!"
-        elif 'admin_execute_draw' in request.form and username == 'admin1':
+                return jsonify({"success": True, "msg": "تم التراجع واسترداد 2 USDD!"})
+        elif action_type == 'admin_draw' and username == 'admin1':
             bookings = GoldenNumberBooking.query.all()
             booked_nums = [b.number for b in bookings]
             if booked_nums:
@@ -379,9 +400,10 @@ def game_golden_number():
                 winner_u.balance += 75.0
                 vault.vault_balance -= 75.0
                 db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=75.0, log_time=get_local_time()))
-                draw_state.winning_number, draw_state.status, draw_state.draw_end_time = winning_num, 'finished', time.time() + 15.0
+                draw_state.winning_number, draw_state.status, draw_state.draw_end_time = winning_num, 'finished', time.time() + 20.0
                 db.session.commit()
-                msg = f"Winner: {winner_u.username} (#{winning_num})"
+                return jsonify({"success": True, "msg": f"Winner: {winner_u.username} (#{winning_num})"})
+
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     my_nums = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_GOLDEN_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, winning_number=draw_state.winning_number, draw_status=draw_state.status, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
@@ -686,7 +708,12 @@ DASHBOARD_PAGE = LANG_BAR + """
         </div>
     </div>
 
-    {% if msg %}<div style="background:rgba(6,95,70,0.9); backdrop-filter:blur(10px); color:#34d399; padding:18px; border-radius:14px; max-width:950px; margin:25px auto; text-align:center; font-weight:900; border:1px solid #34d399; box-shadow:0 10px 30px rgba(0,0,0,0.6);">{{ msg }}</div>{% endif %}
+    <!-- شريط إشعارات الفائز العام -->
+    <div id="globalNotificationBanner" style="display:none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 18px; border-radius: 14px; max-width: 950px; margin: 20px auto; text-align: center; font-weight: 900; font-size: 20px; box-shadow: 0 10px 30px rgba(245,158,11,0.6); border: 2px solid #fff; animation: pulseBanner 1.5s infinite;">
+        🔔 <span id="globalNotificationText"></span>
+    </div>
+
+    {% if msg %}<div style="background:rgba(6,95,70,0.9); backdrop-filter:blur(10px); color:#34d399; padding:18px; border-radius:14px; max-width:950px; margin:20px auto; text-align:center; font-weight:900; border:1px solid #34d399; box-shadow:0 10px 30px rgba(0,0,0,0.6);">{{ msg }}</div>{% endif %}
 
     <div class="financial-bar">
         <div class="fin-card">
@@ -742,11 +769,25 @@ DASHBOARD_PAGE = LANG_BAR + """
         <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">{{ t.game6 }}</div></a>
     </div>
 
+    <style>
+        @keyframes pulseBanner { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+    </style>
     <script>
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
-                if(badge && badge.innerText !== data.balance) badge.innerText = data.balance;
+                if(badge && badge.innerText !== String(data.balance)) badge.innerText = data.balance;
+            }).catch(err => {});
+
+            fetch('/api/golden_status').then(res => res.json()).then(data => {
+                let banner = document.getElementById('globalNotificationBanner');
+                let text = document.getElementById('globalNotificationText');
+                if(data.status === 'finished' && data.winning_number) {
+                    text.innerText = `🎉 إشعار الفائز: الفائز في لعبة الرقم الحنون هو الرقم #${data.winning_number} والرابح هو الحساب (${data.winner_username})`;
+                    banner.style.display = 'block';
+                } else {
+                    banner.style.display = 'none';
+                }
             }).catch(err => {});
         }, 2000);
     </script>
@@ -774,6 +815,7 @@ CHANGE_PASSWORD_PAGE = LANG_BAR + """
 </html>
 """
 
+# --- القالب المحدث للعبة الرقم الحنون (الرقم 1) مع صندوق الأرقام، تنبيه 22:00، وتحديث 9D فوري كل ثانيتين دون رجوع لأعلى الصفحة ---
 GAME_GOLDEN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -781,42 +823,158 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
     <meta charset="UTF-8"><title>{{ t.game1 }} - 9D</title>
     <style>
         body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:25px; }
-        .card-3d { background:linear-gradient(135deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); backdrop-filter:blur(20px); border:4px solid #ffd700; padding:35px; border-radius:30px; max-width:900px; margin:20px auto; box-shadow:0 30px 70px rgba(0,0,0,0.9), inset 0 0 30px rgba(255,215,0,0.15); transform:perspective(1400px) rotateX(4deg); }
+        .card-3d { background:linear-gradient(135deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); backdrop-filter:blur(20px); border:4px solid #ffd700; padding:35px; border-radius:30px; max-width:950px; margin:20px auto; box-shadow:0 30px 70px rgba(0,0,0,0.9), inset 0 0 30px rgba(255,215,0,0.15); transform:perspective(1400px) rotateX(4deg); }
+        .notice-box { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); border: 2px solid #38bdf8; padding: 18px; border-radius: 16px; text-align: center; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(56,189,248,0.3); }
+        .my-box-panel { background: rgba(15,23,42,0.95); border: 2px solid #34d399; padding: 20px; border-radius: 18px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: 0 10px 25px rgba(52,211,153,0.2); }
         .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:12px; margin-top:25px; }
         @media(max-width: 768px) { .grid { grid-template-columns:repeat(5, 1fr); } }
-        .cell { background:linear-gradient(145deg, #7c3aed, #4c1d95); border:3px solid #a78bfa; border-radius:16px; height:75px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:900; cursor:pointer; transform:perspective(1000px) rotateX(12deg) translateZ(15px); box-shadow:0 12px 25px rgba(0,0,0,0.8); transition:0.3s; color:#fff; }
+        .cell { background:linear-gradient(145deg, #7c3aed, #4c1d95); border:3px solid #a78bfa; border-radius:16px; height:80px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:900; cursor:pointer; transform:perspective(1000px) rotateX(12deg) translateZ(15px); box-shadow:0 12px 25px rgba(0,0,0,0.8); transition:0.3s; color:#fff; font-size: 22px; }
         .cell:hover { transform:perspective(1000px) rotateX(0deg) translateY(-8px) translateZ(35px); border-color:#ffd700; box-shadow:0 20px 40px rgba(255,215,0,0.5); }
         .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color:#ef4444 !important; cursor:not-allowed; }
         .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color:#3b82f6 !important; }
+        .global-alert { display:none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 20px; border-radius: 16px; text-align: center; font-weight: 900; font-size: 22px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(245,158,11,0.6); border: 2px solid #fff; }
     </style>
 </head>
 <body>
-    <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3);">
-        <h2 style="color:#ffd700; margin:0;">🏆 {{ t.game1 }} (9D Ultra)</h2>
-        <div><b>{{ t.balance }}: {{ balance }} USDD</b> | <a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:950px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3);">
+        <h2 style="color:#ffd700; margin:0; font-size: 26px;">🏆 {{ t.game1 }} (9D Ultra)</h2>
+        <div style="font-size: 18px;"><b>{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</b> | <a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
     </div>
-    {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; max-width:900px; margin:15px auto; text-align:center; font-weight:900; border:1px solid #34d399;">{{ msg }}</div>{% endif %}
+
     <div class="card-3d">
-        <p style="text-align:center; color:#ffd700; font-size:18px; font-weight:bold; text-shadow:0 0 10px rgba(255,215,0,0.4);">{{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD</p>
-        <div class="grid">
+        <!-- إشعار الفائز العام -->
+        <div id="gameAlertBox" class="global-alert">
+            🔔 <span id="gameAlertText"></span>
+        </div>
+
+        <!-- تنبيه موعد السحب اليومي -->
+        <div class="notice-box">
+            <h3 style="color: #38bdf8; margin: 0 0 8px 0; font-size: 20px;">⏰ تنبيه موعد السحب اليومي</h3>
+            <p style="color: #f8fafc; margin: 0; font-size: 16px; font-weight: bold;">تجري عملية السحب لهذه اللعبة <b>مرة واحدة يومياً عند الساعة 22:00 (10 مساءً) بتوقيت بيروت</b>.</p>
+        </div>
+
+        <!-- صندوق الأرقام التي حجزها اللاعب وقيمتها بالـ USDD -->
+        <div class="my-box-panel">
+            <div>
+                <h4 style="color: #34d399; margin: 0 0 5px 0; font-size: 18px;">📦 صندوق أرقامك المحجوزة:</h4>
+                <div id="myNumbersDisplay" style="font-size: 20px; font-weight: 900; color: #fff; font-family: monospace;">
+                    {% if my_booked_nums %}{{ my_booked_nums | join(', ') }}{% else %}لا توجد أرقام محجوزة حالياً{% endif %}
+                </div>
+            </div>
+            <div style="text-align: left;">
+                <h4 style="color: #ffd700; margin: 0 0 5px 0; font-size: 18px;">💰 القيمة الإجمالية:</h4>
+                <div id="mySpentDisplay" style="font-size: 22px; font-weight: 900; color: #34d399;">{{ my_total_spent }} USDD</div>
+            </div>
+        </div>
+
+        <p style="text-align:center; color:#ffd700; font-size:20px; font-weight:900; text-shadow:0 0 10px rgba(255,215,0,0.4);">
+            {{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD
+        </p>
+
+        {% if msg %}<div id="actionMsg" style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:15px 0; text-align:center; font-weight:900; font-size:18px; border:1px solid #34d399;">{{ msg }}</div>{% endif %}
+
+        <!-- شبكة الأرقام (1 إلى 50) -->
+        <div class="grid" id="numbersGrid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
                     {% if bookings[i] == username %}
-                        <form method="POST" style="margin:0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="cancel_number" class="cell my" style="width:100%;">{{ i }}<br><small style="font-size:10px;">{{ t.cancel }}</small></button></form>
+                        <button type="button" onclick="handleAction('cancel', {{ i }})" class="cell my" style="width:100%;">
+                            {{ i }}<br><span style="font-size:12px; color:#93c5fd;">{{ t.cancel }} (أنت)</span>
+                        </button>
                     {% else %}
-                        <div class="cell booked">{{ i }}<br><small style="font-size:10px;">{{ t.booked }}</small></div>
+                        <div class="cell booked">{{ i }}<br><span style="font-size:12px; color:#fca5a5;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
-                    <form method="POST" style="margin:0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="cell" style="width:100%;">{{ i }}</button></form>
+                    <button type="button" onclick="handleAction('book', {{ i }})" class="cell" style="width:100%;">{{ i }}</button>
                 {% endif %}
             {% endfor %}
         </div>
+
         {% if username == 'admin1' %}
-            <form method="POST" style="margin-top:30px; text-align:center;">
-                <button type="submit" name="admin_execute_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:900; padding:16px 35px; border:none; border-radius:14px; cursor:pointer; font-size:18px; box-shadow:0 10px 30px rgba(34,197,94,0.5); transition:0.3s;">⚡ {{ t.draw_now }}</button>
-            </form>
+            <div style="margin-top:35px; text-align:center;">
+                <button type="button" onclick="handleAction('admin_draw', 0)" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:900; padding:18px 45px; border:none; border-radius:16px; cursor:pointer; font-size:20px; box-shadow:0 12px 35px rgba(34,197,94,0.6);">⚡ {{ t.draw_now }}</button>
+            </div>
         {% endif %}
     </div>
+
+    <script>
+        // إرسال الحجز والتراجع دون إعادة تحميل الصفحة أو العودة لأعلى الصفحة
+        function handleAction(actionType, numberVal) {
+            let formData = new FormData();
+            formData.append('action_type', actionType);
+            formData.append('number', numberVal);
+
+            fetch('/game_golden_number', {
+                method: 'POST',
+                body: formData
+            }).then(res => res.json()).then(data => {
+                if(data.msg) {
+                    let msgBox = document.getElementById('actionMsg');
+                    if(!msgBox) {
+                        msgBox = document.createElement('div');
+                        msgBox.id = 'actionMsg';
+                        msgBox.style = "background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:15px 0; text-align:center; font-weight:900; font-size:18px; border:1px solid #34d399;";
+                        document.querySelector('.card-3d').prepend(msgBox);
+                    }
+                    msgBox.innerText = data.msg;
+                }
+                updateGameData();
+            }).catch(err => console.error(err));
+        }
+
+        // تحديث البيانات تلقائياً كل ثانيتين في "برمشت عين" دون تغيير موضع السكرول (Scroll)
+        function updateGameData() {
+            fetch('/api/golden_status').then(res => res.json()).then(data => {
+                // تحديث الرصيد
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== String(data.balance)) {
+                    badge.innerText = data.balance;
+                }
+
+                // تحديث تنبيه الفائز العام
+                let alertBox = document.getElementById('gameAlertBox');
+                let alertText = document.getElementById('gameAlertText');
+                if(data.status === 'finished' && data.winning_number) {
+                    alertText.innerText = `🎉 إشعار الهواتف والمنصة: الفائز في لعبة الرقم الحنون هو الرقم #${data.winning_number} والرابح هو الحساب (${data.winner_username})`;
+                    alertBox.style.display = 'block';
+                } else {
+                    alertBox.style.display = 'none';
+                }
+
+                // تحديث صندوق أرقام اللاعب
+                let myNumDisplay = document.getElementById('myNumbersDisplay');
+                let mySpentDisplay = document.getElementById('mySpentDisplay');
+                if(myNumDisplay) {
+                    myNumDisplay.innerText = data.my_booked_nums.length > 0 ? data.my_booked_nums.join(', ') : 'لا توجد أرقام محجوزة حالياً';
+                }
+                if(mySpentDisplay) {
+                    mySpentDisplay.innerText = data.my_total_spent + ' USDD';
+                }
+
+                // تحديث الشبكة (1-50) ديناميكياً
+                let grid = document.getElementById('numbersGrid');
+                if(grid) {
+                    let currentUsername = "{{ username }}";
+                    let html = '';
+                    for(let i = 1; i <= 50; i++) {
+                        if(data.bookings[i]) {
+                            let owner = data.bookings[i];
+                            if(owner === currentUsername) {
+                                html += `<button type="button" onclick="handleAction('cancel', ${i})" class="cell my" style="width:100%;">${i}<br><span style="font-size:12px; color:#93c5fd;">تراجع (أنت)</span></button>`;
+                            } else {
+                                html += `<div class="cell booked">${i}<br><span style="font-size:12px; color:#fca5a5;">${owner}</span></div>`;
+                            }
+                        } else {
+                            html += `<button type="button" onclick="handleAction('book', ${i})" class="cell" style="width:100%;">${i}</button>`;
+                        }
+                    }
+                    grid.innerHTML = html;
+                }
+            }).catch(err => {});
+        }
+
+        setInterval(updateGameData, 2000);
+    </script>
 </body>
 </html>
 """
@@ -885,7 +1043,7 @@ GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
-                if(badge && badge.innerText !== data.balance) badge.innerText = data.balance;
+                if(badge && badge.innerText !== String(data.balance)) badge.innerText = data.balance;
             }).catch(err => {});
         }, 2000);
     </script>
