@@ -43,6 +43,15 @@ class FinancialLog(db.Model):
     amount = db.Column(db.Float)
     log_time = db.Column(db.String(50))
 
+class RechargeCard(db.Model):
+    __tablename__ = 'recharge_cards'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    amount = db.Column(db.Float, nullable=False)  # 10, 20, 50, 100
+    is_used = db.Column(db.Boolean, default=False)
+    used_by = db.Column(db.String(80), nullable=True)
+    created_at = db.Column(db.String(50))
+
 class GoldenNumberBooking(db.Model):
     __tablename__ = 'golden_number_bookings'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -135,7 +144,7 @@ with app.app_context():
     db.session.commit()
 
 
-# --- المسارات (Routes) والدعم التقني لـ PWA ---
+# --- المسارات (Routes) والدعم التقني ---
 
 @app.route('/manifest.json')
 def manifest():
@@ -190,14 +199,39 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
     if not user:
         return redirect(url_for('logout'))
-    return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance, password=user.password)
+    
+    msg = None
+    # معالجة شحن الكود من قبل اللاعب نفسه
+    if request.method == 'POST':
+        card_code = request.form.get('card_code', '').strip()
+        card = RechargeCard.query.filter_by(code=card_code, is_used=False).first()
+        vault = SystemVault.query.get(1)
+        
+        if card:
+            if vault.vault_balance >= card.amount:
+                # خصم من الخزنة الرئيسية (المليون) وإضافة للرصيد
+                vault.vault_balance -= card.amount
+                user.balance += card.amount
+                card.is_used = True
+                card.used_by = user.username
+                
+                log = FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+                db.session.commit()
+                msg = f"🎉 مبروك! تم شحن حسابك بنجاح بقيمة {card.amount} USDD"
+            else:
+                msg = "عذراً، خزنة الشركة غير قادرة على تلبية هذه القيمة حالياً!"
+        else:
+            msg = "❌ كود البطاقة غير صالح أو تم استخدامه مسبقاً!"
+
+    return render_template_string(DASHBOARD_PAGE, username=user.username, role=user.role, balance=user.balance, password=user.password, msg=msg)
 
 @app.route('/change_password', methods=['GET', 'POST'])
 def change_password():
@@ -744,7 +778,23 @@ def admin_customers():
 
     if request.method == 'POST':
         action = request.form.get('action')
-        if action == 'create_user':
+        
+        # إنشاء كود بطاقة شحن جديد (10, 20, 50, 100)
+        if action == 'generate_card':
+            amount = float(request.form.get('card_amount', 0))
+            if amount in [10.0, 20.0, 50.0, 100.0]:
+                # توليد كود عشوائي فريد مميز مثل EMP-50-XXXXX
+                rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                code = f"EMP-{int(amount)}-{rand_str}"
+                
+                new_card = RechargeCard(code=code, amount=amount, is_used=False, created_at=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(new_card)
+                db.session.commit()
+                msg = f"✅ تم خلق كود شحن بقيمة {amount} USDD بنجاح: {code}"
+            else:
+                msg = "قيمة البطاقة غير صالحة!"
+
+        elif action == 'create_user':
             new_u = request.form.get('new_username', '').strip()
             new_p = request.form.get('new_password', '').strip()
             new_owner = request.form.get('new_owner', '').strip()
@@ -788,8 +838,9 @@ def admin_customers():
 
     users_list = User.query.all()
     users_data = [(u.username, u.password, u.balance, u.role, u.created_by, u.owner_name) for u in users_list]
+    cards_list = RechargeCard.query.order_by(RechargeCard.id.desc()).all()
 
-    return render_template_string(ADMIN_CUSTOMERS_PAGE, vault_balance=vault.vault_balance, users_list=users_data, msg=msg)
+    return render_template_string(ADMIN_CUSTOMERS_PAGE, vault_balance=vault.vault_balance, users_list=users_data, cards_list=cards_list, msg=msg)
 
 @app.route('/admin_games', methods=['GET', 'POST'])
 def admin_games():
@@ -825,7 +876,7 @@ def admin_accounting():
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام'])).scalar() or 0.0
+    total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام', 'شحن عبر بطاقة كود'])).scalar() or 0.0
     
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
@@ -846,7 +897,7 @@ LOGIN_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - امبراطورية الأرقام</title><link rel="manifest" href="/manifest.json">
+    <title>تسجيل الدخول - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-box { background: linear-gradient(145deg, #1f1f1f, #121212); padding: 45px; border-radius: 20px; width: 360px; text-align: center; border: 3px solid #ffd700; box-shadow: 0 0 35px rgba(255,215,0,0.3); }
@@ -855,7 +906,6 @@ LOGIN_PAGE = """
         input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 14px; background: linear-gradient(135deg, #ffd700, #b8860b); color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
         .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; }
-        .no-account-btn { display: inline-block; margin-top: 15px; color: #38bdf8; text-decoration: none; font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -867,7 +917,6 @@ LOGIN_PAGE = """
             <input type="password" name="password" placeholder="كلمة المرور" required>
             <button type="submit">دخول للبرنامج</button>
         </form>
-        <a class="no-account-btn" href="https://wa.me/96176030208?text=اريد%20ان%20انشا%20حساب%20في%20لعبة%20امبراطورية%20الارقام" target="_blank">ليس لدي حساب؟ انقر هنا للتسجيل</a>
     </div>
 </body>
 </html>
@@ -878,7 +927,7 @@ DASHBOARD_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>امبراطورية الأرقام - لوحة التحكم الرئيسية</title><link rel="manifest" href="/manifest.json">
+    <title>امبراطورية الأرقام - لوحة التحكم الرئيسية</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
@@ -889,24 +938,40 @@ DASHBOARD_PAGE = """
         .user-creds { background: #1f1f1f; padding: 8px 14px; border-radius: 8px; font-size: 14px; color: #cbd5e1; border: 1px dashed #ffd700; }
         .balance-badge { background: #065f46; color: #34d399; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 18px; border: 1px solid #10b981; }
         .nav-buttons { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .download-btn { background: #3b82f6; color: white; padding: 8px 14px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #60a5fa; cursor: pointer; }
         .whatsapp-btn { background: #25d366; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        .withdraw-btn { background: #f59e0b; color: black; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .pass-btn { background: #8b5cf6; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; }
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
-        .promo-banner {
-            background: linear-gradient(145deg, #1a1505, #0a0802);
-            border: 4px solid #ffd700;
-            padding: 20px 40px;
-            border-radius: 25px;
-            font-size: 32px;
-            font-weight: 900;
-            margin: 30px auto 10px auto;
+        .redeem-box {
+            background: linear-gradient(145deg, #182232, #0f172a);
+            border: 2px solid #38bdf8;
+            padding: 20px;
+            border-radius: 16px;
             max-width: 750px;
+            margin: 20px auto;
             text-align: center;
-            color: #ffd700;
+            box-shadow: 0 4px 20px rgba(56,189,248,0.2);
+        }
+        .redeem-box input {
+            padding: 10px 15px;
+            width: 60%;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #1e293b;
+            color: #fff;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        .redeem-box button {
+            padding: 10px 20px;
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
         }
 
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 30px; max-width: 900px; margin-left: auto; margin-right: auto; }
@@ -929,10 +994,7 @@ DASHBOARD_PAGE = """
             text-decoration: none; 
             aspect-ratio: 1; 
         }
-        .icon-card:hover { 
-            border-color: #ffd700; 
-            transform: translateY(-8px) scale(1.03); 
-        }
+        .icon-card:hover { border-color: #ffd700; transform: translateY(-8px) scale(1.03); }
         .icon-logo { font-size: 70px; margin-bottom: 15px; }
         .icon-title { color: #ffd700; font-size: 21px; font-weight: 900; }
     </style>
@@ -945,9 +1007,7 @@ DASHBOARD_PAGE = """
             <div class="balance-badge">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
         </div>
         <div class="nav-buttons">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20تعبئة%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💬 شحن رصيد</a>
-            <a class="withdraw-btn" href="https://wa.me/96176030208?text=اريد%20سحب%20رصيد%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20لديكم%20-%20الحساب:%20{{ username }}%20-%20الباسورد:%20{{ password }}" target="_blank">💸 سحب رصيد</a>
+            <a class="whatsapp-btn" href="https://wa.me/96176030208?text=اريد%20شراء%20بطاقة%20شحن%20لعبة%20امبراطورية%20الارقام%20وهذا%20هو%20حسابي%20-%20الحساب:%20{{ username }}" target="_blank">💬 شراء بطاقة (واتساب)</a>
             <a href="/change_password" class="pass-btn">🔑 تغيير الباسورد</a>
             {% if username == 'admin1' %}
                 <a href="/admin_customers" class="admin-link">👥 إدارة الزبائن والخزنة</a>
@@ -958,8 +1018,15 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <div class="promo-banner">
-        ✨ العب واربح جوائز بقيمة 500,000 USDD ✨
+    <!-- نافذة شحن الكود للزبون نفسه -->
+    <div class="redeem-box">
+        <h3 style="color: #38bdf8; margin-top: 0;">💳 شحن الرصيد الفوري عبر بطاقة الكود</h3>
+        <p style="color: #94a3b8; font-size: 13px; margin-bottom: 15px;">قم بإدخال كود البطاقة التي اشتريتها من الشركة لتعبئة رصيدك فوراً:</p>
+        {% if msg %}<div style="background: {% if 'مبروك' in msg %}#065f46{% else %}#7f1d1d{% endif %}; color: white; padding: 10px; border-radius: 6px; margin-bottom: 12px; font-weight: bold;">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="text" name="card_code" placeholder="أدخل كود البطاقة هنا (مثال: EMP-50-XXXX)" required>
+            <button type="submit">تفعيل الشحن</button>
+        </form>
     </div>
 
     <div class="icons-grid">
@@ -983,10 +1050,6 @@ DASHBOARD_PAGE = """
                 })
                 .catch(err => {});
         }, 2000);
-
-        function installApp() {
-            alert("لتثبيت التطبيق على جهازك، اختر 'إضافة إلى الشاشة الرئيسية' من قائمة المتصفح.");
-        }
     </script>
 </body>
 </html>
@@ -1032,7 +1095,6 @@ GAME_NUMBERS_EMPIRE_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
@@ -1601,120 +1663,6 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
 </html>
 """
 
-GAME_GOLDEN_PAGE = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الرقم الحنون - امبراطورية الأرقام</title>
-    <style>
-        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-        .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; text-align: center; }
-        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
-        @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
-        .number-box { background: #3d2314; border: 2px solid #8b5a2b; border-radius: 10px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #ffffff; cursor: pointer; }
-        .number-box.booked { background: #7f1d1d !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
-        .number-box.my-booked { background: #1e3a8a !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
-        .number-box.winning { background: linear-gradient(135deg, #ffd700, #ff8c00) !important; color: #000 !important; }
-        .draw-panel { background: #18181b; border: 3px solid #ffd700; padding: 25px; border-radius: 16px; margin-top: 25px; text-align: center; }
-        .big-slot-screen { background: radial-gradient(circle, #3d2c00 0%, #000000 100%); border: 4px solid #ffd700; color: #ffd700; font-size: 70px; font-weight: bold; padding: 15px; width: 240px; margin: 15px auto; border-radius: 20px; }
-        .win-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; border: 3px solid #fff; padding: 20px; border-radius: 15px; margin: 20px auto; width: 90%; max-width: 500px; text-align: center; font-size: 24px; font-weight: bold; }
-        .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الحنون</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
-            <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
-        </div>
-    </div>
-    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-top: 15px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
-    <div class="user-stats-box">
-        <div><b style="color: #ffd700;">👤 حسابك:</b> <span style="color: #cbd5e1;">{{ username }}</span></div>
-        <div><b style="color: #38bdf8;">أرقامك:</b> <span style="color: #fff; font-family: monospace; background: #000; padding: 4px 8px; border-radius: 4px;">{% if my_booked_nums %}{{ my_booked_nums | join(', ') }}{% else %}لا توجد{% endif %}</span></div>
-        <div><b style="color: #34d399;">المصروف:</b> <span style="color: #34d399; font-weight: bold;">{{ my_total_spent }} USDD</span></div>
-    </div>
-    <div class="board-container">
-        <h3 style="color: #ffd700; margin-top: 0;">🎯 اختر أرقامك (تكلفة الحجز: 2 USDD | الجائزة: 75 USDD)</h3>
-        <div class="board-grid">
-            {% for i in range(1, 51) %}
-                {% if i in bookings %}
-                    {% if bookings[i] == username %}
-                        <form method="POST" style="margin: 0;">
-                            <input type="hidden" name="number" value="{{ i }}">
-                            <button type="submit" name="cancel_number" id="box-{{ i }}" class="number-box my-booked" style="width: 100%; height: 60px;" title="تراجع واسترداد 2 USDD">
-                                {{ i }}<br><span style="font-size: 9px;">(أنت) ❌</span>
-                            </button>
-                        </form>
-                    {% else %}
-                        <div id="box-{{ i }}" class="number-box booked" title="محجوز بواسطة {{ bookings[i] }}">
-                            {{ i }}<br><span style="font-size: 9px; color: #fca5a5;">({{ bookings[i] }})</span>
-                        </div>
-                    {% endif %}
-                {% else %}
-                    <form method="POST" style="margin: 0;">
-                        <input type="hidden" name="number" value="{{ i }}">
-                        <button type="submit" name="book_number" id="box-{{ i }}" class="number-box" style="width: 100%; height: 60px;">{{ i }}</button>
-                    </form>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-    <div class="draw-panel">
-        <h3 style="color: #ffd700; margin-top: 0;">🎰 شاشة السحب الفوري</h3>
-        <p id="statusText" style="color: #cbd5e1; font-size: 16px;">{% if draw_status == 'finished' %}🎉 تم إعلان الفائز!{% else %}في انتظار ضغط زر السحب من المؤسس{% endif %}</p>
-        <div class="big-slot-screen" id="slotDisplay">{% if draw_status == 'finished' and winning_number %}{{ winning_number }}{% else %}?{% endif %}</div>
-        <div id="winNotificationContainer">
-            {% if draw_status == 'finished' and winning_number %}
-            <div class="win-badge">مبروك 75 USDD للفائز بالرقم {{ winning_number }}!</div>
-            {% endif %}
-        </div>
-        {% if username == 'admin1' %}
-            <form method="POST" style="margin-top: 20px; border-top: 1px dashed #555; padding-top: 15px;">
-                <button type="submit" name="admin_execute_draw" style="background: linear-gradient(135deg, #22c55e, #15803d); color: white; font-weight: bold; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; display: block; margin: 12px auto; font-size: 18px;">⚡ اسحب الآن</button>
-            </form>
-        {% endif %}
-    </div>
-    <script>
-        setInterval(() => {
-            fetch('/api/sync_balance').then(res => res.json()).then(data => {
-                let badge = document.getElementById('liveBalance');
-                if(badge && badge.innerText !== data.balance + " USDD") badge.innerText = data.balance + " USDD";
-            }).catch(err => {});
-        }, 2000);
-
-        let lastStatus = "{{ draw_status }}";
-        let isRefreshing = false;
-        function checkGameRealtime() {
-            if (isRefreshing) return;
-            fetch('/api/golden_status')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status !== lastStatus && !isRefreshing) {
-                        isRefreshing = true;
-                        setTimeout(() => { location.reload(); }, 200);
-                        return;
-                    }
-                    let slotEl = document.getElementById('slotDisplay');
-                    let statusText = document.getElementById('statusText');
-                    if (data.status === 'finished') {
-                        slotEl.innerText = data.winning_number;
-                        statusText.innerText = "🎉 تم إعلان الفائز فوراً!";
-                        let winBox = document.getElementById('box-' + data.winning_number);
-                        if (winBox) winBox.className = "number-box winning";
-                    }
-                });
-        }
-        setInterval(checkGameRealtime, 1000);
-    </script>
-</body>
-</html>
-"""
-
 ADMIN_CUSTOMERS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1733,6 +1681,7 @@ ADMIN_CUSTOMERS_PAGE = """
         .btn-create { background: #3b82f6; color: white; }
         .btn-sell { background: #22c55e; color: black; }
         .btn-buy { background: #ef4444; color: white; }
+        .btn-card { background: #ffd700; color: black; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
         th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
@@ -1746,10 +1695,28 @@ ADMIN_CUSTOMERS_PAGE = """
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="vault-box">
-        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (الخصم الفوري لعمليات البيع)</h3>
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (رصيد المليون USDD)</h3>
         <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0;">{{ vault_balance }} USDD</div>
     </div>
+    
     <div class="panel-grid">
+        <!-- قسم توليد بطاقات الشحن الأكواد -->
+        <div class="panel-box" style="border: 2px dashed #ffd700;">
+            <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
+            <p style="color: #94a3b8; font-size: 12px;">اختر فئة الكود المطلوب توليده:</p>
+            <form method="POST">
+                <input type="hidden" name="action" value="generate_card">
+                <label>فئة البطاقة:</label>
+                <select name="card_amount" required>
+                    <option value="10">10 USDD</option>
+                    <option value="20">20 USDD</option>
+                    <option value="50">50 USDD</option>
+                    <option value="100">100 USDD</option>
+                </select>
+                <button type="submit" class="btn-card">توليد كود بطاقة جديد</button>
+            </form>
+        </div>
+
         <div class="panel-box">
             <h3 style="color: #3b82f6; margin-top: 0;">👤 خلق حساب جديد</h3>
             <form method="POST">
@@ -1760,8 +1727,9 @@ ADMIN_CUSTOMERS_PAGE = """
                 <button type="submit" class="btn-create">إنشاء الحساب</button>
             </form>
         </div>
+
         <div class="panel-box">
-            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات للزبون</h3>
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="sell_currency">
                 <label>اختر الزبون:</label>
@@ -1773,20 +1741,31 @@ ADMIN_CUSTOMERS_PAGE = """
                 <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
             </form>
         </div>
-        <div class="panel-box">
-            <h3 style="color: #ef4444; margin-top: 0;">💸 شراء العملات وإعادتها</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="buy_back_currency">
-                <label>اختر الزبون:</label>
-                <select name="target_user" required>
-                    <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: {{ u[2] }} USDD)</option>{% endfor %}
-                </select>
-                <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
-                <button type="submit" class="btn-buy">استرجاع للخزنة</button>
-            </form>
-        </div>
     </div>
+
+    <!-- جدول عرض بطاقات الشحن المُولدة -->
+    <div class="panel-box" style="margin-top: 25px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
+        <table>
+            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>مستخدم من قِبل</th><th>تاريخ الإنشاء</th></tr>
+            {% for card in cards_list %}
+            <tr>
+                <td><code style="color: #ffd700; font-size: 15px;">{{ card.code }}</code></td>
+                <td style="font-weight: bold;">{{ card.amount }} USDD</td>
+                <td>
+                    {% if card.is_used %}
+                        <span style="color: #ef4444; font-weight: bold;">مستخدمة ❌</span>
+                    {% else %}
+                        <span style="color: #34d399; font-weight: bold;">متاحة للبيع ✅</span>
+                    {% endif %}
+                </td>
+                <td>{{ card.used_by if card.used_by else '---' }}</td>
+                <td>{{ card.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
     <div class="panel-box" style="margin-top: 25px;">
         <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات الثابتة والمسجلة</h3>
         <table>
@@ -1877,7 +1856,7 @@ ADMIN_ACCOUNTING_PAGE = """
     </div>
     <div class="stats-grid">
         <div class="stat-card">
-            <div style="color: #94a3b8;">إجمالي المبيعات (الواردات + كافة رهانات الألعاب)</div>
+            <div style="color: #94a3b8;">إجمالي المبيعات (الواردات + رهانات الألعاب + الشحن بالأكواد)</div>
             <div class="stat-val" style="color: #22c55e;">{{ total_sales }} USDD</div>
         </div>
         <div class="stat-card">
@@ -1885,7 +1864,7 @@ ADMIN_ACCOUNTING_PAGE = """
             <div class="stat-val" style="color: #ef4444;">{{ total_payouts }} USDD</div>
         </div>
         <div class="stat-card">
-            <div style="color: #94a3b8;">رصيد الخزنة الأساسية</div>
+            <div style="color: #94a3b8;">رصيد الخزنة الأساسية (المليون)</div>
             <div class="stat-val" style="color: #38bdf8;">{{ vault_balance }} USDD</div>
         </div>
         <div class="stat-card" style="border: 2px solid #ffd700; background: linear-gradient(135deg, #252010, #161616);">
