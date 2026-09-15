@@ -312,9 +312,8 @@ def api_golden_status():
         status = draw_state.status
         winning_number = draw_state.winning_number
         if status == 'finished':
-            log = FinancialLog.query.filter_by(action_type='جائزة الرقم الحنون').order_by(FinancialLog.id.desc()).first()
-            if log:
-                winner_username = log.target_user
+            winner_b = GoldenNumberBooking.query.filter_by(number=winning_number).first()
+            winner_username = winner_b.username if winner_b else "لا يوجد رابح (رقم غير محجوز)"
         if status == 'finished' and current_time >= draw_state.draw_end_time:
             GoldenNumberBooking.query.delete()
             draw_state.winning_number, draw_state.status, draw_state.draw_end_time = 0, 'idle', 0
@@ -353,7 +352,7 @@ def api_luxury_golden_status():
     bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
     return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
 
-# --- الألعاب مع ضمان هامش ربح 35% للشركة ---
+# --- لعبة الرقم الحنون مع دعم السحب من 1 إلى 50 حتى لو لم تكن هناك رهانات، وربط زِِر الآدمن ---
 
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
@@ -388,22 +387,29 @@ def game_golden_number():
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم التراجع واسترداد 2 USDD!"})
         elif action_type == 'admin_draw' and username == 'admin1':
-            bookings = GoldenNumberBooking.query.all()
-            booked_nums = [b.number for b in bookings]
-            if booked_nums:
-                if draw_state.forced_winning_number == 0 or draw_state.forced_winning_number not in booked_nums:
-                    winning_num = random.choice(booked_nums)
-                else:
-                    winning_num = draw_state.forced_winning_number
+            # التحقق من وجود رقم مسبق محدد من الآدمن (بين 1 و 50) أو اختيار عشوائي من 1 إلى 50
+            if draw_state.forced_winning_number >= 1 and draw_state.forced_winning_number <= 50:
+                winning_num = draw_state.forced_winning_number
+            else:
+                winning_num = random.randint(1, 50)
 
-                winner_b = GoldenNumberBooking.query.filter_by(number=winning_num).first()
+            winner_name = "لا يوجد رابح (رقم لم يتم حجزه)"
+            winner_b = GoldenNumberBooking.query.filter_by(number=winning_num).first()
+            if winner_b:
+                winner_name = winner_b.username
                 winner_u = User.query.filter_by(username=winner_b.username).first()
-                winner_u.balance += 75.0
-                vault.vault_balance -= 75.0
-                db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=75.0, log_time=get_local_time()))
-                draw_state.winning_number, draw_state.status, draw_state.draw_end_time = winning_num, 'finished', time.time() + 20.0
-                db.session.commit()
-                return jsonify({"success": True, "msg": f"Winner: {winner_u.username} (#{winning_num})"})
+                if winner_u:
+                    winner_u.balance += 75.0
+                    vault.vault_balance -= 75.0
+                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=75.0, log_time=get_local_time()))
+            
+            draw_state.winning_number = winning_num
+            draw_state.status = 'finished'
+            draw_state.draw_end_time = time.time() + 20.0
+            # إعادة تعيين الرقم الإجباري بعد السحب
+            draw_state.forced_winning_number = 0
+            db.session.commit()
+            return jsonify({"success": True, "msg": f"Winner: #{winning_num} | الرابح: {winner_name}"})
 
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     my_nums = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
@@ -650,8 +656,7 @@ def admin_accounting():
     net = tg_bets - tpayouts
     return render_template_string(ADMIN_ACCOUNTING_PAGE, t=t, vault_balance=vault.vault_balance, logs=logs, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), cards_list=RechargeCard.query.order_by(RechargeCard.id.desc()).all(), msg=msg)
 
-
-# --- القوالب الفائقة 12D الكاملة ---
+# --- قوالب HTML 12D الفائقة ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -825,7 +830,7 @@ CHANGE_PASSWORD_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون (الرقم 1) بتصميم 12D وتحديث فوري كل ثانيتين دون رجوع لأعلى الصفحة ---
+# --- قالب لعبة الرقم الحنون (الرقم 1) مع صندوق الروليت 11D والتحديث الفوري ومربع السحب ---
 GAME_GOLDEN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -843,6 +848,10 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
         .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color:#ef4444 !important; cursor:not-allowed; }
         .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color:#3b82f6 !important; }
         .global-alert { display:none; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 20px; border-radius: 16px; text-align: center; font-weight: 900; font-size: 22px; margin-bottom: 25px; border: 2px solid #fff; }
+        
+        /* مربع السحب بصيغة 11D التفاعلي */
+        .slot-11d-box { background: radial-gradient(circle, #0f172a 0%, #020617 100%); border: 4px solid #38bdf8; padding: 25px; border-radius: 22px; text-align: center; margin-top: 30px; box-shadow: 0 15px 40px rgba(56,189,248,0.4); }
+        .slot-screen { font-size: 55px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 14px; border: 2px solid #b8860b; display: inline-block; min-width: 140px; box-shadow: inset 0 0 20px rgba(255,215,0,0.5); letter-spacing: 5px; }
     </style>
 </head>
 <body>
@@ -857,11 +866,19 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
         </div>
 
         <div class="notice-box">
-            <h3 style="color: #38bdf8; margin: 0 0 8px 0; font-size: 20px;">⏰ تنبيه موعد السحب اليومي</h3>
+            <h3 style="color: #38bdf8; margin: 0 0 8px 0; font-size: 20px;">⏰ تنبيه موعد السحب اليومي والعداد التنازلي</h3>
             <p style="color: #f8fafc; margin: 0; font-size: 16px; font-weight: bold;">تجري عملية السحب لهذه اللعبة <b>مرة واحدة يومياً عند الساعة 22:00 (10 مساءً) بتوقيت بيروت</b>.</p>
+            <div id="countdownTimer" style="font-size: 22px; font-weight: 900; color: #ffd700; margin-top: 10px;">⏳ وقت السحب المتبقي: جارِ الحساب...</div>
         </div>
 
-        <div class="my-box-panel">
+        <!-- مربع العرض بصيغة 11D للسحب وروليت الأرقام -->
+        <div class="slot-11d-box">
+            <h4 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 20px;">🎰 شاشة السحب الحية (11D Reel)</h4>
+            <div id="slotScreen" class="slot-screen">--</div>
+            <div id="winnerAnnouncement" style="font-size: 18px; color: #34d399; margin-top: 12px; font-weight: 900;"></div>
+        </div>
+
+        <div class="my-box-panel" style="margin-top: 30px;">
             <div>
                 <h4 style="color: #34d399; margin: 0 0 5px 0; font-size: 18px;">📦 صندوق أرقامك المحجوزة:</h4>
                 <div id="myNumbersDisplay" style="font-size: 20px; font-weight: 900; color: #fff; font-family: monospace;">
@@ -875,7 +892,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
         </div>
 
         <p style="text-align:center; color:#ffd700; font-size:20px; font-weight:900;">
-            {{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD
+            {{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD (يتم السحب من 1 إلى 50)
         </p>
 
         {% if msg %}<div id="actionMsg" style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:15px 0; text-align:center; font-weight:900; font-size:18px;">{{ msg }}</div>{% endif %}
@@ -927,6 +944,31 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
             }).catch(err => {});
         }
 
+        // عداد تنازلي حقيقي حتى الساعة 22:00 بتوقيت بيروت (UTC+3)
+        function updateCountdown() {
+            let now = new Date();
+            let utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            let beirutTime = new Date(utc + (3600000 * 3));
+            
+            let target = new Date(beirutTime);
+            target.setHours(22, 0, 0, 0);
+            if (beirutTime > target) {
+                target.setDate(target.getDate() + 1); // سحب الغد
+            }
+            
+            let diff = target - beirutTime;
+            let hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            let minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            let seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            let timerEl = document.getElementById('countdownTimer');
+            if(timerEl) {
+                timerEl.innerText = `⏳ وقت السحب المتبقي: ${hours}س ${minutes}د ${seconds}ث`;
+            }
+        }
+        setInterval(updateCountdown, 1000);
+
+        let isRolling = false;
         function updateGameData() {
             fetch('/api/golden_status').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -936,11 +978,33 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 
                 let alertBox = document.getElementById('gameAlertBox');
                 let alertText = document.getElementById('gameAlertText');
+                let slotScreen = document.getElementById('slotScreen');
+                let winnerAnnounce = document.getElementById('winnerAnnouncement');
+
                 if(data.status === 'finished' && data.winning_number) {
                     alertText.innerText = `🎉 إشعار الفائز: الفائز في لعبة الرقم الحنون هو الرقم #${data.winning_number} والرابح هو الحساب (${data.winner_username})`;
                     alertBox.style.display = 'block';
+
+                    if(!isRolling) {
+                        isRolling = true;
+                        let counter = 0;
+                        let rollInterval = setInterval(() => {
+                            slotScreen.innerText = Math.floor(Math.random() * 50) + 1;
+                            counter++;
+                            if(counter > 15) {
+                                clearInterval(rollInterval);
+                                slotScreen.innerText = `#${data.winning_number}`;
+                                winnerAnnounce.innerText = `🏆 الرقم الفائز: #${data.winning_number} | الرابح: ${data.winner_username}`;
+                                isRolling = false;
+                            }
+                        }, 100);
+                    }
                 } else {
                     alertBox.style.display = 'none';
+                    if(slotScreen && slotScreen.innerText === '--') {
+                        slotScreen.innerText = 'جاهز';
+                        winnerAnnounce.innerText = 'في انتظار بدء السحب اليومي...';
+                    }
                 }
 
                 let myNumDisplay = document.getElementById('myNumbersDisplay');
