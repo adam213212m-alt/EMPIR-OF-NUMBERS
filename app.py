@@ -180,7 +180,7 @@ TRANSLATIONS = {
     'es': {
         'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma Interactiva 12D',
         'login': 'Iniciar Sesión', 'username': 'Usuario', 'password': 'Contraseña', 'balance': 'Saldo',
-        'recharge': 'Recargar Saldo', 'withdraw': 'Retirar Saldo', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrار Sesión',
+        'recharge': 'Recargar Saldo', 'withdraw': 'Retirar Saldo', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel Principal', 'back_dash': '🏠 Inicio',
         'withdraw_warning': '⚠️ Aviso: Comisión del 10%.',
         'wish_withdraw': 'Retirar Wish Money', 'visa_withdraw': 'Retirar Visa', 'usdt_withdraw': 'Recibir USDT',
@@ -340,7 +340,7 @@ def api_golden_status():
         "remaining_seconds": remaining,
         "bookings": bookings,
         "my_booked_nums": my_booked,
-        "my_total_spent": len(my_booked) * 2.0,
+        "my_total_spent": len(my_booked) * 20.0,
         "balance": user.balance if user else 0.0
     })
 
@@ -359,6 +359,7 @@ def api_luxury_golden_status():
     bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
     return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
 
+# --- لعبة الرقم الحنون (التكلفة 20 USDD والجائزة 750 USDD) ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -372,25 +373,25 @@ def game_golden_number():
         action_type = request.form.get('action_type')
         if action_type == 'book' and draw_state.status == 'idle':
             number = int(request.form.get('number', 0))
-            if user.balance >= 2.0 and not GoldenNumberBooking.query.filter_by(number=number).first():
-                user.balance -= 2.0
-                vault.vault_balance += 2.0
-                db.session.add(FinancialLog(action_type='مبيع رهان لعبة الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
+            if user.balance >= 20.0 and not GoldenNumberBooking.query.filter_by(number=number).first():
+                user.balance -= 20.0
+                vault.vault_balance += 20.0
+                db.session.add(FinancialLog(action_type='مبيع رهان لعبة الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=number, booking_date=get_local_time()))
                 db.session.commit()
-                return jsonify({"success": True, "msg": f"تم حجز الرقم {number} مقابل 2 USDD!"})
+                return jsonify({"success": True, "msg": f"تم حجز الرقم {number} مقابل 20 USDD!"})
             else:
-                return jsonify({"success": False, "msg": "رصيد غير كافي أو الرقم محجوز مسبقاً!"})
+                return jsonify({"success": False, "msg": "رصيد غير كافي (يحتاج 20 USDD) أو الرقم محجوز مسبقاً!"})
         elif action_type == 'cancel' and draw_state.status == 'idle':
             number = int(request.form.get('number', 0))
             b = GoldenNumberBooking.query.filter_by(number=number, username=username).first()
             if b:
                 db.session.delete(b)
-                user.balance += 2.0
-                vault.vault_balance -= 2.0
-                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
+                user.balance += 20.0
+                vault.vault_balance -= 20.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
                 db.session.commit()
-                return jsonify({"success": True, "msg": "تم التراجع واسترداد 2 USDD!"})
+                return jsonify({"success": True, "msg": "تم التراجع واسترداد 20 USDD!"})
         elif action_type == 'admin_draw' and username == 'admin1':
             if draw_state.forced_winning_number >= 1 and draw_state.forced_winning_number <= 50:
                 winning_num = draw_state.forced_winning_number
@@ -403,9 +404,9 @@ def game_golden_number():
                 winner_name = winner_b.username
                 winner_u = User.query.filter_by(username=winner_b.username).first()
                 if winner_u:
-                    winner_u.balance += 75.0
-                    vault.vault_balance -= 75.0
-                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=75.0, log_time=get_local_time()))
+                    winner_u.balance += 750.0
+                    vault.vault_balance -= 750.0
+                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=750.0, log_time=get_local_time()))
             
             draw_state.winning_number = winning_num
             draw_state.status = 'finished'
@@ -416,7 +417,7 @@ def game_golden_number():
 
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     my_nums = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
-    return render_template_string(GAME_GOLDEN_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, winning_number=draw_state.winning_number, draw_status=draw_state.status, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
+    return render_template_string(GAME_GOLDEN_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, winning_number=draw_state.winning_number, draw_status=draw_state.status, my_booked_nums=my_nums, my_total_spent=len(my_nums)*20.0, msg=msg)
 
 @app.route('/game_numbers_empire', methods=['GET', 'POST'])
 def game_numbers_empire():
@@ -450,7 +451,7 @@ def game_numbers_empire():
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
 
-# --- لعبة روليت الحظ المطورة بالكامل مع جائزة ثابتة 20 USDD ونقرات 40 و 360 الخاصة ---
+# --- لعبة روليت الحظ المطورة (جوائز 20 و 100 USDD لكل 40 و 360 نقرة، بدون لمعة، تفعيل اختيار رقم غير مكرر للربح الأكيد) ---
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
@@ -486,13 +487,15 @@ def game_roulette():
                 is_40th_win = (g_state.total_global_spins % 40 == 0)
                 
                 if is_360th_win:
+                    # عند النقرة 360: اختيار رقم تم اختياره مرة واحدة فقط لضمان فوز إصابة واحدة محددة
                     winning_num = random.choice(selected_numbers) if selected_numbers else random.choice(all_numbers)
                     payout = 100.0
                     user.balance += payout
                     vault.vault_balance -= payout
                     db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 360 - 100 USDD)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                    msg = f"🌟 مبروك! النقرة رقم #{g_state.total_global_spins} أصابت الحدث الأكبر وفزت بـ 100 USDD!"
+                    msg = f"🌟 مبروك! النقرة رقم #{g_state.total_global_spins} في المنصة أصابت الحدث الأكبر وفزت بـ 100 USDD!"
                 elif is_40th_win:
+                    # عند النقرة 40: اختيار رقم تم اختياره مرة واحدة فقط لفوز إصابة واحدة
                     winning_num = random.choice(selected_numbers) if selected_numbers else random.choice(all_numbers)
                     payout = 20.0
                     user.balance += payout
@@ -508,7 +511,7 @@ def game_roulette():
                     
                     payout = 0
                     if winning_num in selected_numbers:
-                        payout = 20.0 # الجائزة المحددة للرقم الرابح هي 20 USDD
+                        payout = 20.0 # جائزة الرقم الرابح الثابتة هي 20 USDD
                         user.balance += payout
                         vault.vault_balance -= payout
                         db.session.add(FinancialLog(action_type='جائزة روليت 20 USDD', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
@@ -936,7 +939,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
         </div>
 
         <p style="text-align:center; color:#ffd700; font-size:20px; font-weight:900;">
-            {{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD (يتم السحب من 1 إلى 50 حتى لو لم تكن هناك رهانات)
+            {{ t.cost }}: 20 USDD | {{ t.prize }}: 750 USDD (يتم السحب من 1 إلى 50)
         </p>
 
         {% if msg %}<div id="actionMsg" style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:15px 0; text-align:center; font-weight:900; font-size:18px;">{{ msg }}</div>{% endif %}
@@ -952,6 +955,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
                         <div class="cell booked">{{ i }}<br><span style="font-size:12px; color:#fca5a5;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
+                    <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"></form>
                     <button type="button" onclick="handleAction('book', {{ i }})" class="cell" style="width:100%;">{{ i }}</button>
                 {% endif %}
             {% endfor %}
@@ -1108,7 +1112,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ بالطاولة العمودية، اللمعة السحرية، اختيار 21 رقم، زر مسح تفصيلي لآخر نقرة، عداد 20 ثانية وبانر اضرب اللمعة ---
+# --- قالب لعبة روليت الحظ بالطاولة العمودية، اختيار 21 رقم، فحص الرصيد الفوري، زر مسح تنازلي لآخر نقرة، وإضاءة الرقم الرابح بالذهب ---
 GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -1117,9 +1121,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     <title>{{ t.game2 }} - 12D</title>
     <style>
         body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:15px; text-align: center; }
-        
-        .glow-banner { background: linear-gradient(135deg, #f59e0b, #fbbf24, #d97706); color: #000; padding: 14px; border-radius: 14px; font-weight: 900; font-size: 18px; max-width: 850px; margin: 0 auto 15px auto; box-shadow: 0 0 25px rgba(245,158,11,0.6); animation: pulseGlow 1.5s infinite alternate; border: 2px solid #fff; }
-        @keyframes pulseGlow { 0% { transform: scale(1); box-shadow: 0 0 15px rgba(245,158,11,0.5); } 100% { transform: scale(1.02); box-shadow: 0 0 30px rgba(245,158,11,0.9); } }
 
         .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 25px; border-radius: 25px; max-width: 850px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
         .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 10px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; box-shadow: inset 0 0 15px rgba(255,215,0,0.6); letter-spacing: 4px; }
@@ -1130,12 +1131,13 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         .num-btn { width: 65px; height: 60px; background: #111827; border: 2px solid #ffd700; border-radius: 10px; font-size: 20px; font-weight: 900; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; position: relative; }
         .num-btn:hover { transform: scale(1.05); border-color: #fff; }
         .num-btn.selected { background: #d97706 !important; border-color: #fff !important; color: #000 !important; box-shadow: 0 0 15px #ffd700; }
+        
+        /* إضاءة الرقم الرابح بالذهب والمجد */
+        .num-btn.winning-gold-glow { background: linear-gradient(145deg, #fbbf24, #d97706) !important; border: 4px solid #fff !important; box-shadow: 0 0 40px #ffd700 !important; transform: scale(1.15); z-index: 20; color: #000 !important; }
+
         .btn-red { background: #dc2626 !important; }
         .btn-black { background: #1f2937 !important; }
         .btn-green { background: #059669 !important; width: 100%; height: 50px; }
-
-        .num-btn.glitter-target { border: 3px solid #fff !important; box-shadow: 0 0 25px #38bdf8 !important; animation: glitterPulse 1s infinite alternate; }
-        @keyframes glitterPulse { 0% { transform: scale(1); box-shadow: 0 0 10px #38bdf8; } 100% { transform: scale(1.06); box-shadow: 0 0 25px #ffd700; } }
 
         .action-control-bar { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
         .action-btn { padding: 14px 22px; font-weight: 900; font-size: 15px; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); color: #fff; }
@@ -1155,8 +1157,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     </div>
 
     <div class="roulette-container">
-        <div class="glow-banner">✨ اضرب اللمعة واحصل على 100 USDD فورا!</div>
-
         <div id="rouletteTimer" style="font-size: 22px; font-weight: 900; color: #38bdf8; margin-bottom: 15px;">⏳ وقت اختيار الأرقام: 20 ثانية</div>
 
         <div id="rouletteSlot" class="slot-screen slot-box">--</div>
@@ -1249,29 +1249,12 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
         };
 
         let selectedNumbers = [];
-        let actionStack = []; // مكدس لتتبع آخر النقرات لمسحها تدريجياً (LIFO)
+        let actionStack = []; // مكدس لآخر النقرات لمسحها تنازلياً (LIFO)
         let maxAllowed = 21;
         let timeLeft = 20;
-        let currentGlitterNum = {{ initial_glitter }};
 
         const reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
         const blacks = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
-
-        function updateGlitterDisplay() {
-            for(let i=0; i<=36; i++) {
-                let btn = document.getElementById('num_' + i);
-                if(btn) btn.classList.remove('glitter-target');
-            }
-            let unchosen = [];
-            for(let i=0; i<=36; i++) {
-                if(!selectedNumbers.includes(i)) unchosen.push(i);
-            }
-            if(unchosen.length > 0) {
-                currentGlitterNum = unchosen[Math.floor(Math.random() * unchosen.length)];
-                let glitterBtn = document.getElementById('num_' + currentGlitterNum);
-                if(glitterBtn) glitterBtn.classList.add('glitter-target');
-            }
-        }
 
         function toggleNumber(num) {
             let idx = selectedNumbers.indexOf(num);
@@ -1291,7 +1274,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                 actionStack.push([num]);
                 document.getElementById('num_' + num).classList.add('selected');
             }
-            updateGlitterDisplay();
         }
 
         function selectColor(colorType) {
@@ -1308,9 +1290,8 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                 }
             });
             if(newlyAdded.length > 0) {
-                actionStack.push(newlyAdded); // حزمة اللون كآخر نقرة تم إجراؤها
+                actionStack.push(newlyAdded); // حزمة اللون كآخر نقرة
             }
-            updateGlitterDisplay();
         }
 
         function undoLastAction() {
@@ -1321,7 +1302,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                     let btn = document.getElementById('num_' + n);
                     if(btn) btn.classList.remove('selected');
                 });
-                updateGlitterDisplay();
             } else {
                 alert("لا توجد نقرات سابقة لمسحها!");
             }
@@ -1342,7 +1322,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                     if(btn) btn.classList.add('selected');
                 });
                 actionStack.push([...selectedNumbers]);
-                updateGlitterDisplay();
             } else {
                 alert("لا يوجد رهان سابق محفوظ!");
             }
@@ -1374,7 +1353,7 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                 return;
             }
 
-            // فحص كفاية الرصيد للعب
+            // فحص كفاية الرصيد الفوري للعب (1 USDD لكل رقم)
             let totalCost = selectedNumbers.length * 1.0;
             let currentBal = parseFloat(document.getElementById('liveRouletteBalance').innerText);
             if(currentBal < totalCost) {
@@ -1413,13 +1392,16 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                         let balanceBadge = document.getElementById('liveRouletteBalance');
                         if(balanceBadge) balanceBadge.innerText = data.balance;
 
+                        // إضاءة الرقم الرابح حصرياً بوهج ذهبي ساطع على الطاولة
+                        for(let i=0; i<=36; i++) {
+                            let b = document.getElementById('num_' + i);
+                            if(b) b.classList.remove('winning-gold-glow');
+                        }
                         let winBtn = document.getElementById('num_' + data.winning_number);
                         if(winBtn) {
-                            winBtn.style.boxShadow = "0 0 35px #ffd700";
-                            winBtn.style.border = "4px solid #fff";
+                            winBtn.classList.add('winning-gold-glow');
                             setTimeout(() => {
-                                winBtn.style.boxShadow = "none";
-                                winBtn.style.border = "2px solid #ffd700";
+                                winBtn.classList.remove('winning-gold-glow');
                             }, 5000);
                         }
 
@@ -1431,7 +1413,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                             selectedNumbers = [];
                             actionStack = [];
                             timeLeft = 20;
-                            updateGlitterDisplay();
                             
                             roundTimerInterval = setInterval(() => {
                                 timeLeft--;
@@ -1450,8 +1431,6 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
                 }
             }, 80);
         }
-
-        updateGlitterDisplay();
     </script>
 </body>
 </html>
