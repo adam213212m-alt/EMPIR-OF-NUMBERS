@@ -100,7 +100,7 @@ class LuxuryGoldenState(db.Model):
     draw_end_time = db.Column(db.Float, default=0)
     forced_winning_number = db.Column(db.Integer, default=0)
 
-# --- تهيئة الجداول وحفظ البيانات بأمان تام ---
+# --- تهيئة الجداول وحفظ البيانات تماماً من الحذف ---
 with app.app_context():
     db.create_all()
     vault = SystemVault.query.get(1)
@@ -119,7 +119,7 @@ with app.app_context():
 # --- قاموس الترجمات الشامل للغات الست ---
 TRANSLATIONS = {
     'ar': {
-        'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 9D (أرباح مضمونة 35%)',
+        'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
         'login': 'دخول للبرنامج', 'username': 'اسم المستخدم', 'password': 'كلمة المرور', 'balance': 'الرصيد',
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '⬅️ العودة للوحة التحكم',
@@ -132,7 +132,7 @@ TRANSLATIONS = {
         'spin': 'تدوير العجلة', 'reveal': 'اكشف الصناديق', 'draw_now': 'اسحب الآن (للآدمن)'
     },
     'en': {
-        'dir': 'ltr', 'title': 'Empire of Numbers', 'subtitle': 'The Ultimate 9D Platform (35% Guaranteed Edge)',
+        'dir': 'ltr', 'title': 'Empire of Numbers', 'subtitle': 'The Ultimate 12D Interactive Platform',
         'login': 'Login', 'username': 'Username', 'password': 'Password', 'balance': 'Balance',
         'recharge': 'Recharge Balance', 'withdraw': 'Withdraw Balance', 'change_pass': 'Change Password', 'logout': 'Logout',
         'dashboard': 'Dashboard', 'back_dash': '⬅️ Back to Dashboard',
@@ -145,7 +145,7 @@ TRANSLATIONS = {
         'spin': 'Spin Wheel', 'reveal': 'Reveal Boxes', 'draw_now': 'Draw Now (Admin)'
     },
     'fr': {
-        'dir': 'ltr', 'title': 'Empire des Nombres', 'subtitle': 'Plateforme 9D (Marge 35% Garantie)',
+        'dir': 'ltr', 'title': 'Empire des Nombres', 'subtitle': 'Plateforme Interactive 12D',
         'login': 'Connexion', 'username': "Nom d'utilisateur", 'password': 'Mot de passe', 'balance': 'Solde',
         'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
         'dashboard': 'Tableau de bord', 'back_dash': '⬅️ Retour au tableau de bord',
@@ -158,7 +158,7 @@ TRANSLATIONS = {
         'spin': 'Tourner la roue', 'reveal': 'Révéler les boîtes', 'draw_now': 'Tirage (Admin)'
     },
     'fa': {
-        'dir': 'rtl', 'title': 'امپراتوری اعداد', 'subtitle': 'پلتفرم 9D (سود تضمینی ۳۵٪)',
+        'dir': 'rtl', 'title': 'امپراتوری اعداد', 'subtitle': 'پلتفرم فوق پیشرفته 12D',
         'login': 'ورود به برنامه', 'username': 'نام کاربری', 'password': 'رمز عبور', 'balance': 'موجودی',
         'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
         'dashboard': 'داشبورد', 'back_dash': '⬅️ بازگشت به داشبورد',
@@ -171,7 +171,7 @@ TRANSLATIONS = {
         'spin': 'چرخش گردونه', 'reveal': 'باز کردن جعبه‌ها', 'draw_now': 'قرعه‌کشی (مدیر)'
     },
     'es': {
-        'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma 9D (Margen 35% Garantizado)',
+        'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma Interactiva 12D',
         'login': 'Iniciar Sesión', 'username': 'Usuario', 'password': 'Contraseña', 'balance': 'Saldo',
         'recharge': 'Recargar Saldo', 'withdraw': 'Retirar Saldo', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel Principal', 'back_dash': '⬅️ Volver al Panel',
@@ -184,7 +184,7 @@ TRANSLATIONS = {
         'spin': 'Girar Ruleta', 'reveal': 'Destapar Cajas', 'draw_now': 'Sorteo (Admin)'
     },
     'de': {
-        'dir': 'ltr', 'title': 'Imperium der Zahlen', 'subtitle': 'Die 9D Plattform (35% Marge)',
+        'dir': 'ltr', 'title': 'Imperium der Zahlen', 'subtitle': 'Die 12D Gaming-Plattform',
         'login': 'Anmelden', 'username': 'Benutzername', 'password': 'Passwort', 'balance': 'Guthaben',
         'recharge': 'Guthaben aufladen', 'withdraw': 'Guthaben abheben', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
         'dashboard': 'Dashboard', 'back_dash': '⬅️ Zurück zum Dashboard',
@@ -221,7 +221,7 @@ def set_lang(lang):
 
 @app.route('/manifest.json')
 def manifest():
-    return jsonify({"name": "Empire of Numbers 9D", "short_name": "Empire9D", "start_url": "/", "display": "standalone", "background_color": "#0b0f19", "theme_color": "#ffd700"})
+    return jsonify({"name": "Empire of Numbers 12D", "short_name": "Empire12D", "start_url": "/", "display": "standalone", "background_color": "#0b0f19", "theme_color": "#ffd700"})
 
 @app.route('/sw.js')
 def service_worker():
@@ -391,7 +391,6 @@ def game_golden_number():
             bookings = GoldenNumberBooking.query.all()
             booked_nums = [b.number for b in bookings]
             if booked_nums:
-                # إذا كانت خانة الآدمن فارغة أو غير محددة (0)، يتم الاختيار عشوائياً
                 if draw_state.forced_winning_number == 0 or draw_state.forced_winning_number not in booked_nums:
                     winning_num = random.choice(booked_nums)
                 else:
@@ -459,9 +458,8 @@ def game_roulette():
                 vault.vault_balance += total_bet
                 db.session.add(FinancialLog(action_type='مبيع رهان روليت 35% Edge', admin_name='system', target_user=username, amount=total_bet, log_time=get_local_time()))
                 
-                # خوارزمية تضمن عائد House Edge 35%
                 if random.random() < 0.65:
-                    winning_num = 99 # رقم وهمي لخسارة الرهان وضمان نسبة الشركة
+                    winning_num = 99
                     color = 'none'
                 else:
                     winning_num = random.randint(0, 36)
@@ -501,7 +499,6 @@ def game_number_wheel():
             vault.vault_balance += bet_amt
             db.session.add(FinancialLog(action_type='مبيع رهان عجلة الأرقام 35%', admin_name='system', target_user=user.username, amount=bet_amt, log_time=get_local_time()))
             
-            # ضمان هامش 35% ربح للشركة
             if random.random() < 0.65:
                 winning_num = 99
             else:
@@ -509,7 +506,7 @@ def game_number_wheel():
 
             if winning_num in nums:
                 is_win = True
-                user.balance += 12.0 # ضبط الجائزة لتحقيق 35% هامش أرباح
+                user.balance += 12.0
                 vault.vault_balance -= 12.0
                 db.session.add(FinancialLog(action_type='جائزة عجلة الأرقام 35%', admin_name='system', target_user=user.username, amount=12.0, log_time=get_local_time()))
                 msg = f"Win! #{winning_num}"
@@ -530,13 +527,12 @@ def game_reveal_and_win():
             vault.vault_balance += 1.0
             db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح 35%', admin_name='system', target_user=user.username, amount=1.0, log_time=get_local_time()))
             
-            # ضمان هامش 35% ربح للشركة
             if random.random() < 0.65:
-                rev = ['1', '3', '5'] # خسارة
+                rev = ['1', '3', '5']
                 prize = 0.0
             else:
-                rev = ['7', '7', '7'] # ربح
-                prize = 13.0 # معدلة لضمان نسبة الشركة
+                rev = ['7', '7', '7']
+                prize = 13.0
                 user.balance += prize
                 vault.vault_balance -= prize
                 db.session.add(FinancialLog(action_type='جائزة اكشف واربح 35%', admin_name='system', target_user=user.username, amount=prize, log_time=get_local_time()))
@@ -571,7 +567,7 @@ def game_golden_boxes_new():
                 box = random.choice([b.box_number for b in books])
                 winner = LuxuryGoldenBooking.query.filter_by(box_number=box).first()
                 w_user = User.query.filter_by(username=winner.username).first()
-                w_user.balance += 150.0 # معدلة لضمان ربح الشركة 35%
+                w_user.balance += 150.0
                 vault.vault_balance -= 150.0
                 db.session.add(FinancialLog(action_type='جائزة الرقم الفاخر 35%', admin_name='admin1', target_user=w_user.username, amount=150.0, log_time=get_local_time()))
                 l_state.winning_number, l_state.status, l_state.draw_end_time = box, 'finished', time.time() + 15.0
@@ -654,15 +650,16 @@ def admin_accounting():
     net = tg_bets - tpayouts
     return render_template_string(ADMIN_ACCOUNTING_PAGE, t=t, vault_balance=vault.vault_balance, logs=logs, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), cards_list=RechargeCard.query.order_by(RechargeCard.id.desc()).all(), msg=msg)
 
-# --- القوالب الفائقة 9D ---
+
+# --- القوالب الفائقة 12D الكاملة ---
 
 LOGIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head>
-    <meta charset="UTF-8"><title>{{ t.title }} - 9D</title>
+    <meta charset="UTF-8"><title>{{ t.title }} - 12D</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #1a1c29 0%, #0b0f19 100%); color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 90vh; margin: 0; flex-direction: column; overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #1a1c29 0%, #0b0f19 100%); color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 90vh; margin: 0; flex-direction: column; }
         .login-box { background: rgba(20, 24, 38, 0.85); backdrop-filter: blur(25px); padding: 50px; border-radius: 25px; width: 380px; text-align: center; border: 2px solid rgba(255,215,0,0.5); box-shadow: 0 30px 60px rgba(0,0,0,0.9); }
         input { width: 100%; padding: 15px; margin: 12px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(10, 13, 22, 0.8); color: white; box-sizing: border-box; font-size: 16px; outline: none; }
         button { width: 100%; padding: 15px; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 10px 30px rgba(255,215,0,0.5); }
@@ -689,7 +686,7 @@ DASHBOARD_PAGE = LANG_BAR + """
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ t.dashboard }} - 9D</title>
+    <title>{{ t.dashboard }} - 12D</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #fff; margin: 0; padding: 20px; min-height: 100vh; }
         .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20, 24, 38, 0.9); backdrop-filter: blur(20px); padding: 18px 30px; border-radius: 18px; border-bottom: 3px solid #ffd700; flex-wrap: wrap; gap: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.7); }
@@ -709,7 +706,7 @@ DASHBOARD_PAGE = LANG_BAR + """
 <body>
     <div class="header">
         <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap;">
-            <h2 style="color:#ffd700; margin:0;">👑 {{ t.title }} (9D)</h2>
+            <h2 style="color:#ffd700; margin:0;">👑 {{ t.title }} (12D)</h2>
             <div style="background:rgba(15,20,32,0.9); padding:8px 15px; border-radius:10px;">👤 <b>{{ username }}</b></div>
             <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:8px 18px; border-radius:10px; font-weight:900;">{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</div>
         </div>
@@ -828,11 +825,12 @@ CHANGE_PASSWORD_PAGE = LANG_BAR + """
 </html>
 """
 
+# --- قالب لعبة الرقم الحنون (الرقم 1) بتصميم 12D وتحديث فوري كل ثانيتين دون رجوع لأعلى الصفحة ---
 GAME_GOLDEN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head>
-    <meta charset="UTF-8"><title>{{ t.game1 }} - 9D</title>
+    <meta charset="UTF-8"><title>{{ t.game1 }} - 12D</title>
     <style>
         body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:25px; }
         .card-3d { background:linear-gradient(135deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); border:4px solid #ffd700; padding:35px; border-radius:30px; max-width:950px; margin:20px auto; box-shadow:0 30px 70px rgba(0,0,0,0.9); }
@@ -849,7 +847,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </head>
 <body>
     <div style="display:flex; justify-content:space-between; align-items:center; max-width:950px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3);">
-        <h2 style="color:#ffd700; margin:0; font-size: 26px;">🏆 {{ t.game1 }} (9D Ultra)</h2>
+        <h2 style="color:#ffd700; margin:0; font-size: 26px;">🏆 {{ t.game1 }} (12D Ultra)</h2>
         <div style="font-size: 18px;"><b>{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</b> | <a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
     </div>
 
@@ -984,10 +982,42 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game3 }}</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>{{ t.game3 }}</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game3 }} - 12D</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #f8fafc; margin: 0; padding: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20,24,38,0.9); padding: 18px 25px; border-radius: 16px; border: 2px solid #ffd700; }
+        .board-container { background: linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border: 5px solid #b8860b; padding: 30px; border-radius: 25px; margin-top: 25px; text-align: center; }
+        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 14px; margin-top: 25px; }
+        @media(max-width: 768px) { .board-grid { grid-template-columns: repeat(5, 1fr); } }
+        .number-box { background: linear-gradient(145deg, #059669, #047857); border: 3px solid #34d399; border-radius: 16px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #ffffff; cursor: pointer; }
+        .number-box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; color: #fca5a5 !important; }
+        .number-box.my-booked { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color: #ffd700; margin: 0;">🏛️ {{ t.game3 }} (12D Ultra)</h2>
+        <div><a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    </div>
+    {% if msg %}<div style="background: rgba(6,95,70,0.9); color: #34d399; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: center; font-weight: 900;">{{ msg }}</div>{% endif %}
+    <div class="board-container">
+        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 إمبراطورية الأرقام (تكلفة الحجز: 2 USDD)</h3>
+        <div class="board-grid">
+            {% for i in range(1, 51) %}
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="cancel_number" class="number-box my-booked" style="width: 100%;">{{ i }}<br><span style="font-size: 10px;">(أنت)</span></button></form>
+                    {% else %}
+                        <div class="number-box booked">{{ i }}<br><span style="font-size: 10px;">({{ bookings[i] }})</span></div>
+                    {% endif %}
+                {% else %}
+                    <form method="POST" style="margin: 0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="number-box" style="width: 100%;">{{ i }}</button></form>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
 </body>
 </html>
 """
@@ -995,10 +1025,25 @@ GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
 GAME_ROULETTE_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game2 }}</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>{{ t.game2 }} (35% Edge)</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game2 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .roulette-12d { background:linear-gradient(145deg, rgba(6,78,59,0.95), rgba(2,44,34,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:700px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div style="max-width:700px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="roulette-12d">
+        <h2 style="color:#ffd700;">🎰 {{ t.game2 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="hidden" name="bets_data" value='[{"type": "straight", "value": 7, "amount": 5}]'>
+            <input type="hidden" name="total_bet_amount" value="5">
+            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#ffd700,#ff8c00); color:#000; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎡 {{ t.spin }} (5 USDD)</button>
+        </form>
+    </div>
 </body>
 </html>
 """
@@ -1006,10 +1051,24 @@ GAME_ROULETTE_PAGE = LANG_BAR + """
 GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game4 }}</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>{{ t.game4 }} (35% Edge)</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game4 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .wheel-12d { background:linear-gradient(145deg, rgba(31,26,15,0.95), rgba(13,13,13,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="wheel-12d">
+        <h2 style="color:#ffd700;">🎡 {{ t.game4 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        <form method="POST">
+            <input type="hidden" name="selected_numbers" value="[3, 8, 14]">
+            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎯 {{ t.spin }} (3 USDD)</button>
+        </form>
+    </div>
 </body>
 </html>
 """
@@ -1017,10 +1076,28 @@ GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
 GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game5 }}</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>{{ t.game5 }} (35% Edge)</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game5 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .reveal-12d { background:linear-gradient(145deg, rgba(31,31,31,0.95), rgba(17,17,17,0.95)); border:5px solid #ffd700; padding:50px; border-radius:35px; max-width:600px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <div style="max-width:600px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="reveal-12d">
+        <h2 style="color:#ffd700;">🎟️ {{ t.game5 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        {% if result_data %}
+            <div style="font-size:35px; margin:20px 0; letter-spacing:15px; background:rgba(0,0,0,0.6); padding:15px; border-radius:14px; border:1px solid #ffd700;">
+                {{ result_data.revealed.values() | list | join(' ') }}
+            </div>
+        {% endif %}
+        <form method="POST">
+            <button type="submit" style="padding:18px 45px; background:linear-gradient(135deg,#ffd700,#ff8c00); color:#000; font-weight:900; font-size:20px; border:none; border-radius:16px; cursor:pointer;">🎟️ {{ t.reveal }} (1 USDD)</button>
+        </form>
+    </div>
 </body>
 </html>
 """
@@ -1028,10 +1105,32 @@ GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
 GAME_GOLDEN_BOXES_NEW_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game6 }}</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>{{ t.game6 }} (35% Edge)</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game6 }} - 12D</title>
+    <style>
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px; }
+        .boxes-12d { background:linear-gradient(135deg, rgba(17,13,6,0.95), rgba(0,0,0,0.95)); border:5px solid #b8860b; padding:50px; border-radius:35px; max-width:700px; margin:30px auto; box-shadow:0 35px 80px rgba(0,0,0,0.9); }
+        .box-12d { width:95px; height:95px; background:linear-gradient(145deg, #7c3aed, #4c1d95); border:3px solid #ffd700; border-radius:20px; color:#fff; font-size:26px; font-weight:900; cursor:pointer; }
+    </style>
+</head>
+<body>
+    <div style="max-width:700px; margin:0 auto 20px auto; text-align:left;"><a href="/dashboard" style="color:#38bdf8; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a></div>
+    <div class="boxes-12d">
+        <h2 style="color:#ffd700;">🎁 {{ t.game6 }} (12D Ultra - 35% Edge)</h2>
+        <p>رصيدك الحالي: {{ balance }} USDD</p>
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:15px; border-radius:12px; margin:20px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+        <div style="display:flex; justify-content:center; gap:20px; margin:35px 0; flex-wrap:wrap;">
+            {% for b in range(1, 6) %}
+                <form method="POST" style="margin:0;">
+                    <input type="hidden" name="box_number" value="{{ b }}">
+                    <button type="submit" name="book_box" class="box-12d">📦 {{ b }}</button>
+                </form>
+            {% endfor %}
+        </div>
+        {% if username == 'admin1' %}
+            <form method="POST"><button type="submit" name="admin_execute_luxury_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; padding:16px 35px; border:none; border-radius:14px; font-weight:900; cursor:pointer;">⚡ {{ t.draw_now }}</button></form>
+        {% endif %}
+    </div>
 </body>
 </html>
 """
@@ -1039,10 +1138,32 @@ GAME_GOLDEN_BOXES_NEW_PAGE = LANG_BAR + """
 ADMIN_CUSTOMERS_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>إدارة الزبائن</title></head>
-<body style="background:#0b0f19; color:#fff; padding:30px; text-align:center;">
-    <h2>إدارة الزبائن</h2>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head><meta charset="UTF-8"><title>إدارة الزبائن - 12D</title></head>
+<body style="font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; padding:30px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,24,38,0.9); padding:18px 25px; border-radius:16px; border:2px solid #ffd700; max-width:900px; margin:0 auto 25px auto;">
+        <h2 style="color:#ffd700; margin:0;">👑 إدارة الزبائن والحسابات</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">{{ t.back_dash }}</a>
+    </div>
+    {% if msg %}<p style="color:#34d399; text-align:center; font-weight:bold;">{{ msg }}</p>{% endif %}
+    <div style="background:rgba(25,30,48,0.9); padding:30px; border-radius:20px; max-width:480px; margin:20px auto; border:2px solid #ffd700;">
+        <h3 style="color:#38bdf8; margin-top:0;">خلق حساب جديد</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="create_user">
+            <input type="text" name="new_username" placeholder="Username" required style="width:100%; padding:14px; margin:10px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; box-sizing:border-box;">
+            <input type="password" name="new_password" placeholder="Password" required style="width:100%; padding:14px; margin:10px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; box-sizing:border-box;">
+            <input type="text" name="new_owner" placeholder="Owner Name" required style="width:100%; padding:14px; margin:10px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; box-sizing:border-box;">
+            <button type="submit" style="width:100%; padding:14px; background:#3b82f6; color:#fff; font-weight:900; border:none; border-radius:10px; cursor:pointer;">إنشاء</button>
+        </form>
+    </div>
+    <div style="background:rgba(25,30,48,0.9); padding:30px; border-radius:20px; max-width:900px; margin:25px auto;">
+        <h3 style="color:#ffd700; margin-top:0;">سجل الحسابات</h3>
+        <table style="width:100%; border-collapse:collapse;">
+            <tr style="background:rgba(10,13,22,0.9); color:#ffd700;"><th style="padding:12px; border:1px solid #444;">User</th><th style="padding:12px; border:1px solid #444;">Pass</th><th style="padding:12px; border:1px solid #444;">Owner</th><th style="padding:12px; border:1px solid #444;">Balance</th></tr>
+            {% for u in users_list %}
+            <tr style="text-align:center;"><td style="padding:12px; border:1px solid #444;"><a href="/admin_customer_detail/{{ u.username }}" style="color:#38bdf8; font-weight:900; text-decoration:none;">📂 {{ u.username }}</a></td><td style="padding:12px; border:1px solid #444;">{{ u.password }}</td><td style="padding:12px; border:1px solid #444;">{{ u.owner_name }}</td><td style="padding:12px; border:1px solid #444; color:#34d399; font-weight:900;">{{ u.balance }} USDD</td></tr>
+            {% endfor %}
+        </table>
+    </div>
 </body>
 </html>
 """
@@ -1050,10 +1171,19 @@ ADMIN_CUSTOMERS_PAGE = LANG_BAR + """
 ADMIN_CUSTOMER_DETAIL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>ذاكرة الزبون</title></head>
-<body style="background:#0b0f19; color:#fff; padding:30px; text-align:center;">
-    <h2>تفاصيل الزبون</h2>
-    <a href="/admin_customers" style="color:#38bdf8;">الرجوع للزبائن</a>
+<head><meta charset="UTF-8"><title>ذاكرة الزبون - 12D</title></head>
+<body style="font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; padding:30px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,24,38,0.9); padding:18px 25px; border-radius:16px; border:2px solid #ffd700; max-width:900px; margin:0 auto 25px auto;">
+        <h2 style="color:#ffd700; margin:0;">📂 ذاكرة وتفاصيل: {{ user.username }} ({{ user.owner_name }})</h2>
+        <a href="/admin_customers" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرجوع للزبائن</a>
+    </div>
+    <div style="background:rgba(25,30,48,0.9); padding:30px; border-radius:20px; margin:20px auto; max-width:900px;">
+        <h3 style="color:#38bdf8; margin-top:0;">سجل العمليات (توقيت بيروت)</h3>
+        <table style="width:100%; border-collapse:collapse;">
+            <tr style="background:rgba(10,13,22,0.9); color:#ffd700;"><th style="padding:12px; border:1px solid #444;">Action</th><th style="padding:12px; border:1px solid #444;">Amount</th><th style="padding:12px; border:1px solid #444;">Time</th></tr>
+            {% for l in logs %}<tr style="text-align:center;"><td style="padding:12px; border:1px solid #444;">{{ l.action_type }}</td><td style="padding:12px; border:1px solid #444; color:#34d399; font-weight:900;">{{ l.amount }} USDD</td><td style="padding:12px; border:1px solid #444;">{{ l.log_time }}</td></tr>{% endfor %}
+        </table>
+    </div>
 </body>
 </html>
 """
@@ -1061,17 +1191,21 @@ ADMIN_CUSTOMER_DETAIL_PAGE = LANG_BAR + """
 ADMIN_GAMES_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>لوحة الألعاب</title></head>
-<body style="background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2>لوحة تحكم الألعاب (الرقم الحنون)</h2>
-    {% if msg %}<p style="color:#34d399; font-weight:bold;">{{ msg }}</p>{% endif %}
-    <form method="POST">
-        <label style="color:#ffd700; font-weight:bold;">رقم فائز مسبق (اتركه فارغاً للاختيار العشوائي):</label><br>
-        <input type="number" name="forced_winning_number" value="{{ forced_val if forced_val != 0 else '' }}" min="0" max="50" style="padding:12px; margin:12px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:8px; width:200px; text-align:center; font-size:18px;">
-        <br>
-        <button type="submit" style="padding:12px 25px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:8px; cursor:pointer;">حفظ الإعدادات</button>
-    </form>
-    <br><a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head><meta charset="UTF-8"><title>لوحة الألعاب - 12D</title></head>
+<body style="font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; text-align:center; padding:35px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,24,38,0.9); padding:18px 25px; border-radius:16px; border:2px solid #ffd700; max-width:600px; margin:0 auto 30px auto;">
+        <h2 style="color:#ffd700; margin:0;">🎮 لوحة تحكم الألعاب</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">{{ t.back_dash }}</a>
+    </div>
+    {% if msg %}<p style="color:#34d399; font-weight:900; background:rgba(52,211,153,0.15); padding:12px; border-radius:10px; max-width:500px; margin:0 auto 20px auto;">{{ msg }}</p>{% endif %}
+    <div style="background:rgba(25,30,48,0.9); border:3px solid #ffd700; padding:35px; border-radius:22px; max-width:500px; margin:20px auto;">
+        <form method="POST">
+            <label style="color:#ffd700; font-weight:900; font-size:18px;">رقم فائز مسبق (الرقم الحنون - اتركه فارغاً للاختيار العشوائي):</label><br>
+            <input type="number" name="forced_winning_number" value="{{ forced_val if forced_val != 0 else '' }}" min="0" max="50" style="padding:14px; margin:15px 0; background:rgba(10,13,22,0.9); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:10px; width:80%; text-align:center; font-size:20px;">
+            <br>
+            <button type="submit" style="padding:14px 25px; background:#22c55e; color:#fff; font-weight:900; border:none; border-radius:10px; cursor:pointer; width:80%;">حفظ الإعدادات</button>
+        </form>
+    </div>
 </body>
 </html>
 """
@@ -1079,11 +1213,134 @@ ADMIN_GAMES_PAGE = LANG_BAR + """
 ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>برنامج المحاسبة</title></head>
-<body style="background:#0b0f19; color:#fff; padding:30px; text-align:center;">
-    <h2>برنامج المحاسبة والخزنة المركزية</h2>
-    <p>رصيد الخزنة: {{ vault_balance }} USDD</p>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج المحاسبة - 12D</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #f8fafc; padding: 25px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: rgba(20,24,38,0.9); padding: 18px 25px; border-radius: 16px; border: 2px solid #ffd700; margin-bottom: 30px; }
+        .vault-box { background: linear-gradient(135deg, rgba(6,95,70,0.95), rgba(4,120,87,0.95)); border: 3px solid #34d399; padding: 30px; border-radius: 22px; text-align: center; margin-bottom: 30px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        @media(max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        .stat-card { background: rgba(25,30,48,0.9); padding: 22px; border-radius: 16px; text-align: center; }
+        .stat-val { font-size: 28px; font-weight: 900; color: #34d399; margin-top: 10px; }
+        .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        @media(max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
+        .panel-box { background: rgba(25,30,48,0.9); padding: 22px; border-radius: 16px; }
+        input, select { width: 100%; padding: 14px; margin: 10px 0; border-radius: 10px; background: rgba(10,13,22,0.9); color: white; border: 1px solid rgba(255,255,255,0.2); box-sizing: border-box; }
+        button { padding: 14px; font-weight: 900; border: none; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; display: block; overflow-x: auto; }
+        th, td { border: 1px solid #444; padding: 12px; text-align: center; font-size: 14px; }
+        th { background: rgba(10,13,22,0.9); color: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والخزنة المركزية (12D)</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">{{ t.back_dash }}</a>
+    </div>
+    
+    {% if msg %}<div style="background: rgba(6,95,70,0.9); color: #34d399; padding: 14px; border-radius: 12px; margin-bottom: 25px; text-align: center; font-weight: 900;">{{ msg }}</div>{% endif %}
+
+    <div class="vault-box">
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 20px;">🏦 خزنة الشركة الأساسية (رصيد المليون USDD)</h3>
+        <div style="font-size: 50px; font-weight: 900; color: #fff; margin: 15px 0;">{{ vault_balance }} USDD</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card" style="border: 2px solid #38bdf8;">
+            <div style="color: #38bdf8; font-weight: 900;">صندوق النقاط المباعة</div>
+            <div class="stat-val" style="color: #38bdf8;">{{ total_points_sold }} USDD</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: #94a3b8;">صندوق رهانات الألعاب</div>
+            <div class="stat-val" style="color: #22c55e;">{{ total_game_bets }} USDD</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: #94a3b8;">صندوق الجوائز المدفوعة</div>
+            <div class="stat-val" style="color: #ef4444;">{{ total_payouts }} USDD</div>
+        </div>
+        <div class="stat-card" style="border: 2px solid #ffd700; background: linear-gradient(135deg, rgba(37,32,16,0.9), rgba(22,22,22,0.9));">
+            <div style="color: #ffd700; font-weight: 900;">أرباح / خسارة الشركة</div>
+            <div class="stat-val" style="color: {% if net_game_result >= 0 %}#34d399{% else %}#ef4444{% endif %};">
+                {% if net_game_result > 0 %}+{{ net_game_result }}{% else %}{{ net_game_result }}{% endif %} USDD
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-grid">
+        <div class="panel-box" style="border: 2px dashed #ffd700;">
+            <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="generate_card">
+                <label>فئة البطاقة:</label>
+                <select name="card_amount" required>
+                    <option value="10">10 USDD</option><option value="20">20 USDD</option><option value="50">50 USDD</option><option value="100">100 USDD</option>
+                </select>
+                <button type="submit" style="background:#ffd700; color:#000;">توليد كود بطاقة جديد</button>
+            </form>
+        </div>
+
+        <div class="panel-box">
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="sell_currency">
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }} USDD)</option>{% endfor %}
+                </select>
+                <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" style="background:#22c55e; color:#000;">إتمام البيع من الخزنة</button>
+            </form>
+        </div>
+
+        <div class="panel-box" style="border: 2px solid #ef4444;">
+            <h3 style="color: #ef4444; margin-top: 0;">💸 استرجاع العملات من الزبون</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="buy_back_currency">
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }} USDD)</option>{% endfor %}
+                </select>
+                <label>المبلغ المراد استرجاعه (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" style="background:#ef4444; color:#fff;">استرجاع الرصيد للخزنة</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel-box" style="margin-bottom: 30px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
+        <table>
+            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>مستخدم من قِبل</th><th>تاريخ الإنشاء</th></tr>
+            {% for card in cards_list %}
+            <tr>
+                <td><code style="color: #ffd700; font-size: 16px; font-weight:900;">{{ card.code }}</code></td>
+                <td style="font-weight: 900;">{{ card.amount }} USDD</td>
+                <td>
+                    {% if card.is_used %}<span style="color: #ef4444; font-weight: 900;">مستخدمة ❌</span>
+                    {% else %}<span style="color: #34d399; font-weight: 900;">متاحة للبيع ✅</span>{% endif %}
+                </td>
+                <td>{{ card.used_by if card.used_by else '---' }}</td>
+                <td>{{ card.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="panel-box">
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية</h3>
+        <table>
+            <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ (USDD)</th><th>التوقيت المحلي</th></tr>
+            {% for log in logs %}
+            <tr>
+                <td><b>{{ log.action_type }}</b></td><td style="color: #ffd700; font-weight:900;">{{ log.admin_name }}</td><td>{{ log.target_user }}</td>
+                <td style="color: #34d399; font-weight: 900;">{{ log.amount }} USDD</td><td>{{ log.log_time }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
 </body>
 </html>
 """
