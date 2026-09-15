@@ -208,7 +208,6 @@ def dashboard():
         return redirect(url_for('logout'))
     
     msg = None
-    # معالجة شحن الكود من قبل اللاعب نفسه
     if request.method == 'POST':
         card_code = request.form.get('card_code', '').strip()
         card = RechargeCard.query.filter_by(code=card_code, is_used=False).first()
@@ -216,7 +215,6 @@ def dashboard():
         
         if card:
             if vault.vault_balance >= card.amount:
-                # خصم من الخزنة الرئيسية (المليون) وإضافة للرصيد
                 vault.vault_balance -= card.amount
                 user.balance += card.amount
                 card.is_used = True
@@ -331,7 +329,7 @@ def game_golden_number():
                     existing_booking = GoldenNumberBooking.query.filter_by(number=number).first()
                     if not existing_booking:
                         user.balance -= cost
-                        vault.vault_balance += cost # الخسارة/الرهان يعود للخزنة فوراً
+                        vault.vault_balance += cost # الرهان الخاسر يعود للخزنة
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -374,9 +372,17 @@ def game_golden_number():
                 winner_booking = GoldenNumberBooking.query.filter_by(number=winning_num).first()
                 winner_user = User.query.filter_by(username=winner_booking.username).first()
                 
-                winner_user.balance += 75.0
-                vault.vault_balance -= 75.0 # الجائزة تُخصم من الخزنة فوراً
-                log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=75.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                prize = 75.0
+                winner_user.balance += prize
+                
+                # خصم الجائزة من الواردات أو من صندوق الشركة مباشرة إذا لم يكفِ
+                # في هذه المنصة، الجوائز تُمول من الخزنة الأساسية (المليون) ورهانات الألعاب
+                if vault.vault_balance >= prize:
+                    vault.vault_balance -= prize
+                else:
+                    vault.vault_balance -= prize  # يسمح بالسحب من الخزنة
+                
+                log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
                 draw_state.winning_number = winning_num
@@ -415,7 +421,7 @@ def game_numbers_empire():
                 existing = NumbersEmpireBooking.query.filter_by(number=number).first()
                 if not existing:
                     user.balance -= cost
-                    vault.vault_balance += cost # الرهان يعود للخزنة
+                    vault.vault_balance += cost
                     log_sale = FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
 
@@ -469,7 +475,7 @@ def game_roulette():
             if total_bet_amount > 0:
                 if user.balance >= total_bet_amount:
                     user.balance -= total_bet_amount
-                    vault.vault_balance += total_bet_amount # الرهانات تعود للخزنة
+                    vault.vault_balance += total_bet_amount # الرهان الخاسر يصب في الصندوق
                     
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet_amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
@@ -526,7 +532,7 @@ def game_roulette():
 
                     if total_payout > 0:
                         user.balance += total_payout
-                        vault.vault_balance -= total_payout # الأرباح تُخصم من الخزنة
+                        vault.vault_balance -= total_payout # الأرباح تخصم من الخزنة
                         log = FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=username, amount=total_payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
 
@@ -577,7 +583,7 @@ def game_number_wheel():
                 total_bet = float(len(selected_numbers))
                 if user.balance >= total_bet:
                     user.balance -= total_bet
-                    vault.vault_balance += total_bet # الرهان يعود للخزنة
+                    vault.vault_balance += total_bet
 
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
@@ -588,7 +594,7 @@ def game_number_wheel():
                         is_win = True
                         payout = 15.0
                         user.balance += payout
-                        vault.vault_balance -= payout # الجائزة تُخصم من الخزنة
+                        vault.vault_balance -= payout
                         log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
                         msg = f"🎉 مبروك! استقرت العجلة على الرقم الفائز ({winning_num}) وهو ضمن أرقامك المختارة! فزت بـ {payout} USDD!"
@@ -625,7 +631,7 @@ def game_reveal_and_win():
         else:
             if user.balance >= cost:
                 user.balance -= cost
-                vault.vault_balance += cost # تكلفة المحاولة تعود للخزنة
+                vault.vault_balance += cost
 
                 log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log_sale)
@@ -664,7 +670,7 @@ def game_reveal_and_win():
 
                 if prize > 0:
                     user.balance += prize
-                    vault.vault_balance -= prize # الجائزة تُخصم من الخزنة
+                    vault.vault_balance -= prize
                     log_prize = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_prize)
 
@@ -705,7 +711,7 @@ def game_golden_boxes_new():
                     existing = LuxuryGoldenBooking.query.filter_by(box_number=box_num).first()
                     if not existing:
                         user.balance -= cost
-                        vault.vault_balance += cost # الحجز يعود للخزنة
+                        vault.vault_balance += cost
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -745,9 +751,11 @@ def game_golden_boxes_new():
                 winner_booking = LuxuryGoldenBooking.query.filter_by(box_number=winning_box).first()
                 winner_user = User.query.filter_by(username=winner_booking.username).first()
                 
-                winner_user.balance += 200.0
-                vault.vault_balance -= 200.0 # الجائزة تُخصم من الخزنة
-                log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=200.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                prize = 200.0
+                winner_user.balance += prize
+                vault.vault_balance -= prize
+                
+                log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
                 l_state.winning_number = winning_box
@@ -779,11 +787,9 @@ def admin_customers():
     if request.method == 'POST':
         action = request.form.get('action')
         
-        # إنشاء كود بطاقة شحن جديد (10, 20, 50, 100)
         if action == 'generate_card':
             amount = float(request.form.get('card_amount', 0))
             if amount in [10.0, 20.0, 50.0, 100.0]:
-                # توليد كود عشوائي فريد مميز مثل EMP-50-XXXXX
                 rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
                 code = f"EMP-{int(amount)}-{rand_str}"
                 
@@ -814,7 +820,7 @@ def admin_customers():
                 vault.vault_balance -= amount # الخصم الفوري من المليون USDD
                 target_user = User.query.filter_by(username=target).first()
                 if target_user:
-                    target_user.balance += amount # التحويل الفوري لرصيد اللاعب
+                    target_user.balance += amount
                     log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log)
                     db.session.commit()
@@ -828,7 +834,7 @@ def admin_customers():
             target_user = User.query.filter_by(username=target).first()
             if target_user and target_user.balance >= amount and amount > 0:
                 target_user.balance -= amount
-                vault.vault_balance += amount # الاسترجاع للخزنة
+                vault.vault_balance += amount
                 log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 db.session.commit()
@@ -876,8 +882,13 @@ def admin_accounting():
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام', 'شحن عبر بطاقة كود'])).scalar() or 0.0
+    # 1. صندوق النقاط المباعة للزبائن (بطاقات الشحن والشحن المباشر)
+    total_points_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود'])).scalar() or 0.0
     
+    # 2. صندوق رهانات الألعاب (الأموال التي يخسرها أو يدفعها اللاعبون في الألعاب وتعود للنظام)
+    total_game_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام'])).scalar() or 0.0
+    
+    # 3. صندوق الجوائز المصروفة للزبائن (الواردات / الأرباح التي يفوز بها الزبون)
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
@@ -885,9 +896,11 @@ def admin_accounting():
     payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
     total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
-    net_profits = total_sales - total_payouts
+    
+    # 4. صندوق أرباح أو خسارة الشركة من الألعاب (الرهانات ناقص الجوائز)
+    net_game_result = total_game_bets - total_payouts
 
-    return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
+    return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_points_sold=total_points_sold, total_game_bets=total_game_bets, total_payouts=total_payouts, net_game_result=net_game_result)
 
 
 # --- قوالب HTML ---
@@ -1018,7 +1031,6 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- نافذة شحن الكود للزبون نفسه -->
     <div class="redeem-box">
         <h3 style="color: #38bdf8; margin-top: 0;">💳 شحن الرصيد الفوري عبر بطاقة الكود</h3>
         <p style="color: #94a3b8; font-size: 13px; margin-bottom: 15px;">قم بإدخال كود البطاقة التي اشتريتها من الشركة لتعبئة رصيدك فوراً:</p>
@@ -1080,7 +1092,7 @@ CHANGE_PASSWORD_PAGE = """
             <input type="password" name="confirm_password" placeholder="تأكيد كلمة المرور الجديدة" required>
             <button type="submit">تحديث الباسورد</button>
         </form>
-        <a href="/dashboard" class="back-link">⬅️ العودة للرئيسية</a>
+        <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
     </div>
 </body>
 </html>
@@ -1700,7 +1712,6 @@ ADMIN_CUSTOMERS_PAGE = """
     </div>
     
     <div class="panel-grid">
-        <!-- قسم توليد بطاقات الشحن الأكواد -->
         <div class="panel-box" style="border: 2px dashed #ffd700;">
             <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
             <p style="color: #94a3b8; font-size: 12px;">اختر فئة الكود المطلوب توليده:</p>
@@ -1743,7 +1754,6 @@ ADMIN_CUSTOMERS_PAGE = """
         </div>
     </div>
 
-    <!-- جدول عرض بطاقات الشحن المُولدة -->
     <div class="panel-box" style="margin-top: 25px;">
         <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
         <table>
@@ -1855,22 +1865,28 @@ ADMIN_ACCOUNTING_PAGE = """
         <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
     <div class="stats-grid">
-        <div class="stat-card">
-            <div style="color: #94a3b8;">إجمالي المبيعات (الواردات + رهانات الألعاب + الشحن بالأكواد)</div>
-            <div class="stat-val" style="color: #22c55e;">{{ total_sales }} USDD</div>
+        <div class="stat-card" style="border: 2px solid #38bdf8;">
+            <div style="color: #38bdf8; font-weight: bold;">صندوق النقاط المباعة للزبائن (بطاقات وشحن)</div>
+            <div class="stat-val" style="color: #38bdf8;">{{ total_points_sold }} USDD</div>
         </div>
         <div class="stat-card">
-            <div style="color: #94a3b8;">إجمالي الجوائز (الصادرات)</div>
+            <div style="color: #94a3b8;">صندوق رهانات الألعاب (الأموال العائدة للنظام)</div>
+            <div class="stat-val" style="color: #22c55e;">{{ total_game_bets }} USDD</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: #94a3b8;">صندوق الجوائز المدفوعة (الواردات المصروفة)</div>
             <div class="stat-val" style="color: #ef4444;">{{ total_payouts }} USDD</div>
         </div>
-        <div class="stat-card">
-            <div style="color: #94a3b8;">رصيد الخزنة الأساسية (المليون)</div>
-            <div class="stat-val" style="color: #38bdf8;">{{ vault_balance }} USDD</div>
-        </div>
         <div class="stat-card" style="border: 2px solid #ffd700; background: linear-gradient(135deg, #252010, #161616);">
-            <div style="color: #ffd700; font-weight: bold;">صافي الأرباح</div>
-            <div class="stat-val" style="color: #ffd700;">{{ net_profits }} USDD</div>
+            <div style="color: #ffd700; font-weight: bold;">صندوق أرباح / خسارة الشركة</div>
+            <div class="stat-val" style="color: {% if net_game_result >= 0 %}#34d399{% else %}#ef4444{% endif %};">
+                {% if net_game_result > 0 %}+{{ net_game_result }}{% else %}{{ net_game_result }}{% endif %} USDD
+            </div>
         </div>
+    </div>
+    <div class="panel-box" style="margin-bottom: 20px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">🏦 رصيد الخزنة الأساسية (المليون USDD)</h3>
+        <div style="font-size: 35px; font-weight: bold; color: #fff;">{{ vault_balance }} USDD</div>
     </div>
     <div class="panel-box">
         <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية والواردات والصادرات</h3>
