@@ -450,7 +450,7 @@ def game_numbers_empire():
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
 
-# --- لعبة روليت الحظ بمعايير الكازينو العالمي وخوارزمية الفوز عند النقرة 40 ---
+# --- لعبة روليت الحظ بمعايير الكازينو العالمي وخوارزمية الفوز عند النقرة 40 (سرية تماماً وبدون إظهارها للاعب) ---
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
@@ -460,7 +460,7 @@ def game_roulette():
     t = get_t()
     
     if request.method == 'POST':
-        bet_type = request.form.get('bet_type') # 'red', 'black', or number '0'-'36'
+        bet_type = request.form.get('bet_type')
         bet_amount = float(request.form.get('bet_amount', 5.0))
         
         if user.balance >= bet_amount:
@@ -477,7 +477,7 @@ def game_roulette():
             
             reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
             
-            # الخوارزمية الخاصة: كل 40 نقرة/رقم محجوز بالمنصة بالكامل، تصيب اللاعب وتمنحه جائزة 20$ (20 USDD) مع شرح مفصل بالتعميم
+            # خوارزمية النقرة الـ 40 السرية تماماً (تمنح جائزة 20$ دون إظهار أي نص أو تنبيه بخصوصها للاعب)
             is_40th_win = (g_state.total_global_spins % 40 == 0)
             
             if is_40th_win:
@@ -495,7 +495,7 @@ def game_roulette():
                 user.balance += payout
                 vault.vault_balance -= payout
                 db.session.add(FinancialLog(action_type='جائزة روليت الكبرى (النقرة 40)', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                msg = f"🏆 تهانينا! النقرة رقم #{g_state.total_global_spins} في المنصة أصابت الهدف! لقد فزت بجائزة الـ 20$ الكبرى!"
+                msg = f"🏆 مبروك! لقد فزت بجائزة السحب المميز بقيمة 20 USDD!"
             else:
                 winning_num = random.randint(0, 36)
                 color = 'green' if winning_num == 0 else ('red' if winning_num in reds else 'black')
@@ -521,7 +521,7 @@ def game_roulette():
                     msg = f"❌ حظ أوفر! استقر الروليت على الرقم {winning_num} ({color})"
             
             db.session.commit()
-            return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg, "global_count": g_state.total_global_spins})
+            return jsonify({"success": True, "winning_number": winning_num, "balance": user.balance, "msg": msg})
             
     return render_template_string(GAME_ROULETTE_GLOBAL_PAGE, t=t, balance=user.balance, username=username)
 
@@ -1091,7 +1091,7 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ بتصميم الطاولة العالمية (المطابقة لمعايير الكازينو وميزة النقرة 40 للفوز بـ 20$) ---
+# --- قالب لعبة روليت الحظ بمعايير الكازينو العالمي وميزة إخفاء خوارزمية النقرة الـ 40 كلياً عن اللاعب ---
 GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
@@ -1099,61 +1099,60 @@ GAME_ROULETTE_GLOBAL_PAGE = LANG_BAR + """
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ t.game2 }} - 12D</title>
     <style>
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:20px; text-align: center; }
-        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 6px solid #b8860b; padding: 30px; border-radius: 30px; max-width: 900px; margin: 20px auto; box-shadow: 0 30px 70px rgba(0,0,0,0.9), inset 0 0 30px rgba(0,0,0,0.8); }
-        .slot-box { font-size: 50px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; box-shadow: inset 0 0 20px rgba(255,215,0,0.6); letter-spacing: 5px; }
+        body { font-family:'Segoe UI', Tahoma, sans-serif; background:radial-gradient(circle at center, #151928 0%, #070a12 100%); color:#fff; margin:0; padding:15px; text-align: center; }
+        .roulette-container { background: linear-gradient(135deg, #0e4c26 0%, #062e17 100%); border: 5px solid #b8860b; padding: 20px; border-radius: 25px; max-width: 900px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
+        .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 10px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 120px; box-shadow: inset 0 0 15px rgba(255,215,0,0.6); letter-spacing: 4px; }
         
-        /* جدول الطاولة العالمية للروليت */
-        .roulette-table { display: grid; grid-template-columns: 80px repeat(12, 1fr); gap: 4px; background: #0e4c26; padding: 15px; border-radius: 14px; border: 3px solid #ffd700; margin: 20px auto; max-width: 850px; }
-        .table-cell { background: #111827; border: 1px solid #ffd700; padding: 18px 5px; font-size: 18px; font-weight: 900; color: #fff; cursor: pointer; border-radius: 6px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .table-cell:hover { background: #374151; transform: scale(1.05); }
+        /* حاوية الطاولة مع ميزة التمرير الأفقي التلقائي للشاشات الصغيرة */
+        .table-scroll-wrapper { width: 100%; overflow-x: auto; margin: 15px 0; padding-bottom: 10px; }
+        .roulette-table { display: grid; grid-template-columns: 60px repeat(12, minmax(45px, 1fr)); gap: 3px; background: #0e4c26; padding: 12px; border-radius: 12px; border: 3px solid #ffd700; min-width: 650px; margin: 0 auto; }
+        .table-cell { background: #111827; border: 1px solid #ffd700; padding: 14px 2px; font-size: 16px; font-weight: 900; color: #fff; cursor: pointer; border-radius: 5px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .table-cell:hover { background: #374151; transform: scale(1.04); }
         .cell-red { background: #dc2626 !important; }
         .cell-black { background: #111827 !important; }
-        .cell-green { background: #059669 !important; grid-row: span 3; }
+        .cell-green { background: #059669 !important; grid-row: span 3; font-size: 20px; }
         
-        .outside-bets { display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
-        .out-btn { padding: 14px 25px; font-weight: 900; font-size: 16px; border: 2px solid #ffd700; border-radius: 10px; cursor: pointer; color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .outside-bets { display: flex; justify-content: center; gap: 12px; margin-top: 15px; flex-wrap: wrap; }
+        .out-btn { padding: 12px 22px; font-weight: 900; font-size: 15px; border: 2px solid #ffd700; border-radius: 10px; cursor: pointer; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
         .out-red { background: #dc2626; }
         .out-black { background: #111827; }
     </style>
 </head>
 <body>
-    <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin:0 auto; background:rgba(20,24,38,0.9); padding:15px 25px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
-        <h2 style="color:#ffd700; margin:0; font-size: 24px;">🎰 {{ t.game2 }} (International Casino 12D)</h2>
-        <div>
-            <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900; font-size:15px;">{{ t.back_dash }}</a>
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin:0 auto; background:rgba(20,24,38,0.9); padding:12px 20px; border-radius:15px; border:1px solid rgba(255,215,0,0.3); flex-wrap:wrap; gap:10px;">
+        <h2 style="color:#ffd700; margin:0; font-size: 22px;">🎰 {{ t.game2 }} (International Casino 12D)</h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button type="button" onclick="location.reload()" style="background:#0284c7; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:14px;">🔄 تحديث</button>
+            <a href="/dashboard" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; padding:8px 16px; text-decoration:none; border-radius:8px; font-weight:900; font-size:14px;">{{ t.back_dash }}</a>
         </div>
-        <div style="font-size: 18px; width: 100%; text-align: left;"><b>{{ t.balance }}: <span id="liveRouletteBalance">{{ balance }}</span> USDD</b></div>
+        <div style="font-size: 17px; width: 100%; text-align: left;"><b>{{ t.balance }}: <span id="liveRouletteBalance">{{ balance }}</span> USDD</b></div>
     </div>
 
     <div class="roulette-container">
-        <h3 style="color: #ffd700; margin-top: 0; font-size: 22px;">🎯 شاشة السحب الحية (مع نظام فوز 20$ كل 40 نقرة عالمية)</h3>
+        <h3 style="color: #ffd700; margin-top: 0; font-size: 20px;">🎯 شاشة السحب الحية</h3>
         <div id="rouletteSlot" class="slot-screen slot-box">--</div>
         
-        <div id="rouletteMsg" style="font-size: 19px; font-weight: 900; color: #34d399; margin: 15px 0; min-height: 30px;">اختر رقمك أو لونك المفضل وشارك في السحب العالمي!</div>
+        <div id="rouletteMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 12px 0; min-height: 28px;">اختر رقمك أو لونك المفضل وشارك في السحب العالمي!</div>
 
-        <!-- طاولة الروليت العالمية المصممة بالاعتماد على التوزيعة الدولية -->
-        <div class="roulette-table">
-            <!-- 0 الأخضر -->
-            <div class="table-cell cell-green" onclick="placeRouletteBet('0')">0</div>
-            
-            <!-- الصف الأول: 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36 -->
-            {% for n in [3,6,9,12,15,18,21,24,27,30,33,36] %}
-                <div class="table-cell {{ 'cell-red' if n in [3,9,12,18,21,27,30,36] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-            {% endfor %}
-            
-            <!-- الصف الثاني: 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35 -->
-            {% for n in [2,5,8,11,14,17,20,23,26,29,32,35] %}
-                <div class="table-cell {{ 'cell-red' if n in [5,14,19,23,32] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-            {% endfor %}
-            
-            <!-- الصف الثالث: 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34 -->
-            {% for n in [1,4,7,10,13,16,19,22,25,28,31,34] %}
-                <div class="table-cell {{ 'cell-red' if n in [1,7,16,19,25,34] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
-            {% endfor %}
+        <!-- حاوية الطاولة مع التمرير الأفقي للهواتف -->
+        <div class="table-scroll-wrapper">
+            <div class="roulette-table">
+                <div class="table-cell cell-green" onclick="placeRouletteBet('0')">0</div>
+                
+                {% for n in [3,6,9,12,15,18,21,24,27,30,33,36] %}
+                    <div class="table-cell {{ 'cell-red' if n in [3,9,12,18,21,27,30,36] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+                {% endfor %}
+                
+                {% for n in [2,5,8,11,14,17,20,23,26,29,32,35] %}
+                    <div class="table-cell {{ 'cell-red' if n in [5,14,19,23,32] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+                {% endfor %}
+                
+                {% for n in [1,4,7,10,13,16,19,22,25,28,31,34] %}
+                    <div class="table-cell {{ 'cell-red' if n in [1,7,16,19,25,34] else 'cell-black' }}" onclick="placeRouletteBet('{{ n }}')">{{ n }}</div>
+                {% endfor %}
+            </div>
         </div>
 
-        <!-- أزرار الرهان الخارجي القياسية (أحمر / أسود) -->
         <div class="outside-bets">
             <button type="button" onclick="placeRouletteBet('red')" class="out-btn out-red">🟥 رهان أحمر (Red)</button>
             <button type="button" onclick="placeRouletteBet('black')" class="out-btn out-black">⬛ رهان أسود (Black)</button>
