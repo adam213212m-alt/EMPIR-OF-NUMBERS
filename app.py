@@ -329,7 +329,7 @@ def game_golden_number():
                     existing_booking = GoldenNumberBooking.query.filter_by(number=number).first()
                     if not existing_booking:
                         user.balance -= cost
-                        vault.vault_balance += cost # الرهان الخاسر يعود للخزنة
+                        vault.vault_balance += cost
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -374,13 +374,7 @@ def game_golden_number():
                 
                 prize = 75.0
                 winner_user.balance += prize
-                
-                # خصم الجائزة من الواردات أو من صندوق الشركة مباشرة إذا لم يكفِ
-                # في هذه المنصة، الجوائز تُمول من الخزنة الأساسية (المليون) ورهانات الألعاب
-                if vault.vault_balance >= prize:
-                    vault.vault_balance -= prize
-                else:
-                    vault.vault_balance -= prize  # يسمح بالسحب من الخزنة
+                vault.vault_balance -= prize
                 
                 log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
@@ -475,7 +469,7 @@ def game_roulette():
             if total_bet_amount > 0:
                 if user.balance >= total_bet_amount:
                     user.balance -= total_bet_amount
-                    vault.vault_balance += total_bet_amount # الرهان الخاسر يصب في الصندوق
+                    vault.vault_balance += total_bet_amount
                     
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet_amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
@@ -532,7 +526,7 @@ def game_roulette():
 
                     if total_payout > 0:
                         user.balance += total_payout
-                        vault.vault_balance -= total_payout # الأرباح تخصم من الخزنة
+                        vault.vault_balance -= total_payout
                         log = FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=username, amount=total_payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
 
@@ -781,26 +775,10 @@ def admin_customers():
     if 'username' not in session or session.get('username') != 'admin1':
         return redirect(url_for('dashboard'))
     
-    vault = SystemVault.query.get(1)
     msg = None
-
     if request.method == 'POST':
         action = request.form.get('action')
-        
-        if action == 'generate_card':
-            amount = float(request.form.get('card_amount', 0))
-            if amount in [10.0, 20.0, 50.0, 100.0]:
-                rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                code = f"EMP-{int(amount)}-{rand_str}"
-                
-                new_card = RechargeCard(code=code, amount=amount, is_used=False, created_at=time.strftime('%Y-%m-%d %H:%M'))
-                db.session.add(new_card)
-                db.session.commit()
-                msg = f"✅ تم خلق كود شحن بقيمة {amount} USDD بنجاح: {code}"
-            else:
-                msg = "قيمة البطاقة غير صالحة!"
-
-        elif action == 'create_user':
+        if action == 'create_user':
             new_u = request.form.get('new_username', '').strip()
             new_p = request.form.get('new_password', '').strip()
             new_owner = request.form.get('new_owner', '').strip()
@@ -813,40 +791,10 @@ def admin_customers():
             else:
                 msg = "اسم المستخدم موجود مسبقاً!"
 
-        elif action == 'sell_currency':
-            target = request.form.get('target_user')
-            amount = float(request.form.get('amount', 0))
-            if vault.vault_balance >= amount and amount > 0:
-                vault.vault_balance -= amount # الخصم الفوري من المليون USDD
-                target_user = User.query.filter_by(username=target).first()
-                if target_user:
-                    target_user.balance += amount
-                    log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                    db.session.add(log)
-                    db.session.commit()
-                    msg = f"تم بيع رصيد بقيمة {amount} USDD للحساب {target} بنجاح!"
-            else:
-                msg = "رصيد الخزنة غير كافٍ أو المبلغ غير صالح!"
-
-        elif action == 'buy_back_currency':
-            target = request.form.get('target_user')
-            amount = float(request.form.get('amount', 0))
-            target_user = User.query.filter_by(username=target).first()
-            if target_user and target_user.balance >= amount and amount > 0:
-                target_user.balance -= amount
-                vault.vault_balance += amount
-                log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
-                db.session.add(log)
-                db.session.commit()
-                msg = f"تم استرجاع رصيد بقيمة {amount} USDD من الحساب {target} إلى الخزنة بنجاح!"
-            else:
-                msg = "رصيد الزبون غير كافٍ أو المبلغ غير صالح!"
-
     users_list = User.query.all()
     users_data = [(u.username, u.password, u.balance, u.role, u.created_by, u.owner_name) for u in users_list]
-    cards_list = RechargeCard.query.order_by(RechargeCard.id.desc()).all()
 
-    return render_template_string(ADMIN_CUSTOMERS_PAGE, vault_balance=vault.vault_balance, users_list=users_data, cards_list=cards_list, msg=msg)
+    return render_template_string(ADMIN_CUSTOMERS_PAGE, users_list=users_data, msg=msg)
 
 @app.route('/admin_games', methods=['GET', 'POST'])
 def admin_games():
@@ -873,22 +821,72 @@ def admin_games():
 
     return render_template_string(ADMIN_GAMES_PAGE, forced_val=draw_state.forced_winning_number, forced_lux=l_state.forced_winning_number, msg=msg)
 
-@app.route('/admin_accounting')
+@app.route('/admin_accounting', methods=['GET', 'POST'])
 def admin_accounting():
     if 'username' not in session or session.get('username') != 'admin1':
         return redirect(url_for('dashboard'))
     
     vault = SystemVault.query.get(1)
+    msg = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        # توليد كود بطاقة الشحن من غرفة المحاسبة
+        if action == 'generate_card':
+            amount = float(request.form.get('card_amount', 0))
+            if amount in [10.0, 20.0, 50.0, 100.0]:
+                rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                code = f"EMP-{int(amount)}-{rand_str}"
+                
+                new_card = RechargeCard(code=code, amount=amount, is_used=False, created_at=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(new_card)
+                db.session.commit()
+                msg = f"✅ تم خلق كود شحن بقيمة {amount} USDD بنجاح: {code}"
+            else:
+                msg = "قيمة البطاقة غير صالحة!"
+
+        # بيع عملات مباشر من غرفة المحاسبة
+        elif action == 'sell_currency':
+            target = request.form.get('target_user')
+            amount = float(request.form.get('amount', 0))
+            if vault.vault_balance >= amount and amount > 0:
+                vault.vault_balance -= amount
+                target_user = User.query.filter_by(username=target).first()
+                if target_user:
+                    target_user.balance += amount
+                    log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                    db.session.add(log)
+                    db.session.commit()
+                    msg = f"تم بيع رصيد بقيمة {amount} USDD للحساب {target} بنجاح!"
+            else:
+                msg = "رصيد الخزنة غير كافٍ أو المبلغ غير صالح!"
+
+        # استرجاع العملات للخزنة
+        elif action == 'buy_back_currency':
+            target = request.form.get('target_user')
+            amount = float(request.form.get('amount', 0))
+            target_user = User.query.filter_by(username=target).first()
+            if target_user and target_user.balance >= amount and amount > 0:
+                target_user.balance -= amount
+                vault.vault_balance += amount
+                log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
+                db.session.add(log)
+                db.session.commit()
+                msg = f"تم استرجاع رصيد بقيمة {amount} USDD من الحساب {target} إلى الخزنة بنجاح!"
+            else:
+                msg = "رصيد الزبون غير كافٍ أو المبلغ غير صالح!"
+
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    # 1. صندوق النقاط المباعة للزبائن (بطاقات الشحن والشحن المباشر)
+    # صندوق النقاط المباعة للزبائن (بطاقات الشحن والشحن المباشر)
     total_points_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود'])).scalar() or 0.0
     
-    # 2. صندوق رهانات الألعاب (الأموال التي يخسرها أو يدفعها اللاعبون في الألعاب وتعود للنظام)
+    # صندوق رهانات الألعاب (الأموال التي يخسرها أو يدفعها اللاعبون في الألعاب وتعود للنظام)
     total_game_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام'])).scalar() or 0.0
     
-    # 3. صندوق الجوائز المصروفة للزبائن (الواردات / الأرباح التي يفوز بها الزبون)
+    # صندوق الجوائز المصروفة للزبائن (الواردات / الأرباح التي يفوز بها الزبون)
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
     payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
@@ -897,10 +895,14 @@ def admin_accounting():
 
     total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
     
-    # 4. صندوق أرباح أو خسارة الشركة من الألعاب (الرهانات ناقص الجوائز)
+    # صندوق أرباح أو خسارة الشركة من الألعاب (الرهانات ناقص الجوائز)
     net_game_result = total_game_bets - total_payouts
 
-    return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_points_sold=total_points_sold, total_game_bets=total_game_bets, total_payouts=total_payouts, net_game_result=net_game_result)
+    users_list = User.query.all()
+    users_data = [(u.username, u.password, u.balance, u.role, u.created_by, u.owner_name) for u in users_list]
+    cards_list = RechargeCard.query.order_by(RechargeCard.id.desc()).all()
+
+    return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_points_sold=total_points_sold, total_game_bets=total_game_bets, total_payouts=total_payouts, net_game_result=net_game_result, users_list=users_data, cards_list=cards_list, msg=msg)
 
 
 # --- قوالب HTML ---
@@ -1092,7 +1094,7 @@ CHANGE_PASSWORD_PAGE = """
             <input type="password" name="confirm_password" placeholder="تأكيد كلمة المرور الجديدة" required>
             <button type="submit">تحديث الباسورد</button>
         </form>
-        <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
+        <a href="/dashboard" class="back-link">⬅️ العودة للرئيسية</a>
     </div>
 </body>
 </html>
@@ -1680,20 +1682,14 @@ ADMIN_CUSTOMERS_PAGE = """
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة الزبائن والخزنة - امبراطورية الأرقام</title>
+    <title>إدارة الزبائن - امبراطورية الأرقام</title>
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; }
-        .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        @media(max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
-        .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
+        .panel-box { background: #1f1f1f; padding: 25px; border-radius: 12px; border: 1px solid #444; max-width: 500px; margin: 0 auto 25px auto; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
         button { padding: 12px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
         .btn-create { background: #3b82f6; color: white; }
-        .btn-sell { background: #22c55e; color: black; }
-        .btn-buy { background: #ef4444; color: white; }
-        .btn-card { background: #ffd700; color: black; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
         th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
@@ -1702,82 +1698,24 @@ ADMIN_CUSTOMERS_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - امبراطورية الأرقام</h2>
+        <h2 style="color: #ffd700; margin: 0;">👑 إدارة الزبائن والحسابات</h2>
         <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
-    <div class="vault-box">
-        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (رصيد المليون USDD)</h3>
-        <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0;">{{ vault_balance }} USDD</div>
-    </div>
     
-    <div class="panel-grid">
-        <div class="panel-box" style="border: 2px dashed #ffd700;">
-            <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
-            <p style="color: #94a3b8; font-size: 12px;">اختر فئة الكود المطلوب توليده:</p>
-            <form method="POST">
-                <input type="hidden" name="action" value="generate_card">
-                <label>فئة البطاقة:</label>
-                <select name="card_amount" required>
-                    <option value="10">10 USDD</option>
-                    <option value="20">20 USDD</option>
-                    <option value="50">50 USDD</option>
-                    <option value="100">100 USDD</option>
-                </select>
-                <button type="submit" class="btn-card">توليد كود بطاقة جديد</button>
-            </form>
-        </div>
-
-        <div class="panel-box">
-            <h3 style="color: #3b82f6; margin-top: 0;">👤 خلق حساب جديد</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="create_user">
-                <label>اسم المستخدم:</label><input type="text" name="new_username" placeholder="اسم المستخدم" required>
-                <label>الرقم السري:</label><input type="password" name="new_password" placeholder="كلمة المرور" required>
-                <label>صاحب الحساب:</label><input type="text" name="new_owner" placeholder="اسم صاحب الحساب الحقيقي" required>
-                <button type="submit" class="btn-create">إنشاء الحساب</button>
-            </form>
-        </div>
-
-        <div class="panel-box">
-            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="sell_currency">
-                <label>اختر الزبون:</label>
-                <select name="target_user" required>
-                    <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: {{ u[2] }} USDD)</option>{% endfor %}
-                </select>
-                <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
-                <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
-            </form>
-        </div>
+    <div class="panel-box">
+        <h3 style="color: #3b82f6; margin-top: 0;">👤 خلق حساب جديد للزبون</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="create_user">
+            <label>اسم المستخدم:</label><input type="text" name="new_username" placeholder="اسم المستخدم" required>
+            <label>الرقم السري:</label><input type="password" name="new_password" placeholder="كلمة المرور" required>
+            <label>صاحب الحساب:</label><input type="text" name="new_owner" placeholder="اسم صاحب الحساب الحقيقي" required>
+            <button type="submit" class="btn-create">إنشاء الحساب</button>
+        </form>
     </div>
 
-    <div class="panel-box" style="margin-top: 25px;">
-        <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
-        <table>
-            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>مستخدم من قِبل</th><th>تاريخ الإنشاء</th></tr>
-            {% for card in cards_list %}
-            <tr>
-                <td><code style="color: #ffd700; font-size: 15px;">{{ card.code }}</code></td>
-                <td style="font-weight: bold;">{{ card.amount }} USDD</td>
-                <td>
-                    {% if card.is_used %}
-                        <span style="color: #ef4444; font-weight: bold;">مستخدمة ❌</span>
-                    {% else %}
-                        <span style="color: #34d399; font-weight: bold;">متاحة للبيع ✅</span>
-                    {% endif %}
-                </td>
-                <td>{{ card.used_by if card.used_by else '---' }}</td>
-                <td>{{ card.created_at }}</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
-
-    <div class="panel-box" style="margin-top: 25px;">
-        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات الثابتة والمسجلة</h3>
+    <div class="panel-box" style="max-width: 1000px;">
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل كافة الحسابات المسجلة</h3>
         <table>
             <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>صاحب الحساب</th><th>نوع الحساب</th><th>الرصيد الحالي</th><th>المُنشئ</th></tr>
             {% for u in users_list %}
@@ -1848,11 +1786,19 @@ ADMIN_ACCOUNTING_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
+        .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width:900px){ .stats-grid { grid-template-columns: 1fr; } }
         .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 12px; text-align: center; }
         .stat-val { font-size: 28px; font-weight: bold; color: #34d399; margin-top: 8px; }
+        .panel-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px; }
+        @media(max-width:900px){ .panel-grid { grid-template-columns: 1fr; } }
         .panel-box { background: #1f1f1f; padding: 20px; border-radius: 12px; border: 1px solid #444; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
+        button { padding: 12px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-sell { background: #22c55e; color: black; }
+        .btn-buy { background: #ef4444; color: white; }
+        .btn-card { background: #ffd700; color: black; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
         th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
@@ -1861,12 +1807,22 @@ ADMIN_ACCOUNTING_PAGE = """
 </head>
 <body>
     <div class="admin-header">
-        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية</h2>
+        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والخزنة المركزية</h2>
         <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
+    
+    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
+
+    <!-- رصيد الخزنة الأساسية المليون USDD -->
+    <div class="vault-box">
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (رصيد المليون USDD)</h3>
+        <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0;">{{ vault_balance }} USDD</div>
+    </div>
+
+    <!-- صناديق الإحصائيات والمحاسبة -->
     <div class="stats-grid">
         <div class="stat-card" style="border: 2px solid #38bdf8;">
-            <div style="color: #38bdf8; font-weight: bold;">صندوق النقاط المباعة للزبائن (بطاقات وشحن)</div>
+            <div style="color: #38bdf8; font-weight: bold;">صندوق النقاط المباعة (بطاقات وشحن)</div>
             <div class="stat-val" style="color: #38bdf8;">{{ total_points_sold }} USDD</div>
         </div>
         <div class="stat-card">
@@ -1884,10 +1840,61 @@ ADMIN_ACCOUNTING_PAGE = """
             </div>
         </div>
     </div>
-    <div class="panel-box" style="margin-bottom: 20px;">
-        <h3 style="color: #38bdf8; margin-top: 0;">🏦 رصيد الخزنة الأساسية (المليون USDD)</h3>
-        <div style="font-size: 35px; font-weight: bold; color: #fff;">{{ vault_balance }} USDD</div>
+
+    <!-- لوحات التحكم وخلق الكودات وبيع العملات داخل المحاسبة -->
+    <div class="panel-grid">
+        <div class="panel-box" style="border: 2px dashed #ffd700;">
+            <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="generate_card">
+                <label>فئة البطاقة:</label>
+                <select name="card_amount" required>
+                    <option value="10">10 USDD</option>
+                    <option value="20">20 USDD</option>
+                    <option value="50">50 USDD</option>
+                    <option value="100">100 USDD</option>
+                </select>
+                <button type="submit" class="btn-card">توليد كود بطاقة جديد</button>
+            </form>
+        </div>
+
+        <div class="panel-box">
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="sell_currency">
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u[0] }}">{{ u[0] }} (صاحبه: {{ u[5] }} | رصيده: {{ u[2] }} USDD)</option>{% endfor %}
+                </select>
+                <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
+            </form>
+        </div>
     </div>
+
+    <div class="panel-box" style="margin-bottom: 25px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
+        <table>
+            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>مستخدم من قِبل</th><th>تاريخ الإنشاء</th></tr>
+            {% for card in cards_list %}
+            <tr>
+                <td><code style="color: #ffd700; font-size: 15px;">{{ card.code }}</code></td>
+                <td style="font-weight: bold;">{{ card.amount }} USDD</td>
+                <td>
+                    {% if card.is_used %}
+                        <span style="color: #ef4444; font-weight: bold;">مستخدمة ❌</span>
+                    {% else %}
+                        <span style="color: #34d399; font-weight: bold;">متاحة للبيع ✅</span>
+                    {% endif %}
+                </td>
+                <td>{{ card.used_by if card.used_by else '---' }}</td>
+                <td>{{ card.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
     <div class="panel-box">
         <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية والواردات والصادرات</h3>
         <table>
