@@ -93,7 +93,7 @@ class RevealAndWinState(db.Model):
     pool_json = db.Column(db.Text, nullable=False)
 
 
-# --- إنشاء الجداول وتثبيت الـ 100 حساب الثابتة ---
+# --- إنشاء الجداول وتثبيت الحسابات والخزنة ---
 with app.app_context():
     db.create_all()
     
@@ -297,7 +297,7 @@ def game_golden_number():
                     existing_booking = GoldenNumberBooking.query.filter_by(number=number).first()
                     if not existing_booking:
                         user.balance -= cost
-                        vault.vault_balance += cost
+                        vault.vault_balance += cost # الخسارة/الرهان يعود للخزنة فوراً
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -341,7 +341,7 @@ def game_golden_number():
                 winner_user = User.query.filter_by(username=winner_booking.username).first()
                 
                 winner_user.balance += 75.0
-                vault.vault_balance -= 75.0
+                vault.vault_balance -= 75.0 # الجائزة تُخصم من الخزنة فوراً
                 log = FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=75.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
@@ -381,7 +381,7 @@ def game_numbers_empire():
                 existing = NumbersEmpireBooking.query.filter_by(number=number).first()
                 if not existing:
                     user.balance -= cost
-                    vault.vault_balance += cost
+                    vault.vault_balance += cost # الرهان يعود للخزنة
                     log_sale = FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
 
@@ -435,7 +435,7 @@ def game_roulette():
             if total_bet_amount > 0:
                 if user.balance >= total_bet_amount:
                     user.balance -= total_bet_amount
-                    vault.vault_balance += total_bet_amount
+                    vault.vault_balance += total_bet_amount # الرهانات تعود للخزنة
                     
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet_amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
@@ -492,7 +492,7 @@ def game_roulette():
 
                     if total_payout > 0:
                         user.balance += total_payout
-                        vault.vault_balance -= total_payout
+                        vault.vault_balance -= total_payout # الأرباح تُخصم من الخزنة
                         log = FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=username, amount=total_payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
 
@@ -543,7 +543,7 @@ def game_number_wheel():
                 total_bet = float(len(selected_numbers))
                 if user.balance >= total_bet:
                     user.balance -= total_bet
-                    vault.vault_balance += total_bet
+                    vault.vault_balance += total_bet # الرهان يعود للخزنة
 
                     log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=total_bet, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_sale)
@@ -554,7 +554,7 @@ def game_number_wheel():
                         is_win = True
                         payout = 15.0
                         user.balance += payout
-                        vault.vault_balance -= payout
+                        vault.vault_balance -= payout # الجائزة تُخصم من الخزنة
                         log = FinancialLog(action_type='جائزة عجلة الأرقام', admin_name='system', target_user=username, amount=payout, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log)
                         msg = f"🎉 مبروك! استقرت العجلة على الرقم الفائز ({winning_num}) وهو ضمن أرقامك المختارة! فزت بـ {payout} USDD!"
@@ -591,7 +591,7 @@ def game_reveal_and_win():
         else:
             if user.balance >= cost:
                 user.balance -= cost
-                vault.vault_balance += cost
+                vault.vault_balance += cost # تكلفة المحاولة تعود للخزنة
 
                 log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log_sale)
@@ -630,7 +630,7 @@ def game_reveal_and_win():
 
                 if prize > 0:
                     user.balance += prize
-                    vault.vault_balance -= prize
+                    vault.vault_balance -= prize # الجائزة تُخصم من الخزنة
                     log_prize = FinancialLog(action_type='جائزة اكشف واربح', admin_name='system', target_user=username, amount=prize, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log_prize)
 
@@ -671,7 +671,7 @@ def game_golden_boxes_new():
                     existing = LuxuryGoldenBooking.query.filter_by(box_number=box_num).first()
                     if not existing:
                         user.balance -= cost
-                        vault.vault_balance += cost
+                        vault.vault_balance += cost # الحجز يعود للخزنة
                         log_sale = FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=cost, log_time=time.strftime('%Y-%m-%d %H:%M'))
                         db.session.add(log_sale)
 
@@ -712,7 +712,7 @@ def game_golden_boxes_new():
                 winner_user = User.query.filter_by(username=winner_booking.username).first()
                 
                 winner_user.balance += 200.0
-                vault.vault_balance -= 200.0
+                vault.vault_balance -= 200.0 # الجائزة تُخصم من الخزنة
                 log = FinancialLog(action_type='جائزة الرقم الحنون الفاخر', admin_name='admin1', target_user=winner_user.username, amount=200.0, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 
@@ -761,10 +761,10 @@ def admin_customers():
             target = request.form.get('target_user')
             amount = float(request.form.get('amount', 0))
             if vault.vault_balance >= amount and amount > 0:
-                vault.vault_balance -= amount
+                vault.vault_balance -= amount # الخصم الفوري من المليون USDD
                 target_user = User.query.filter_by(username=target).first()
                 if target_user:
-                    target_user.balance += amount
+                    target_user.balance += amount # التحويل الفوري لرصيد اللاعب
                     log = FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                     db.session.add(log)
                     db.session.commit()
@@ -778,7 +778,7 @@ def admin_customers():
             target_user = User.query.filter_by(username=target).first()
             if target_user and target_user.balance >= amount and amount > 0:
                 target_user.balance -= amount
-                vault.vault_balance += amount
+                vault.vault_balance += amount # الاسترجاع للخزنة
                 log = FinancialLog(action_type='شراء وإعادة للخزنة', admin_name='admin1', target_user=target, amount=amount, log_time=time.strftime('%Y-%m-%d %H:%M'))
                 db.session.add(log)
                 db.session.commit()
@@ -825,16 +825,15 @@ def admin_accounting():
     logs_records = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
     logs = [(l.action_type, l.admin_name, l.target_user, l.amount, l.log_time) for l in logs_records]
     
-    total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة'])).scalar() or 0.0
+    total_sales = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'مبيع رهان لعبة', 'مبيع رهان إمبراطورية الأرقام'])).scalar() or 0.0
     
     payout_res1 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون').scalar() or 0.0
     payout_res3 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة روليت الحظ').scalar() or 0.0
-    payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة تحدي البالون').scalar() or 0.0
-    payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
-    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون الفاخر').scalar() or 0.0
-    payout_res7 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
+    payout_res4 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة عجلة الأرقام').scalar() or 0.0
+    payout_res5 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة الرقم الحنون الفاخر').scalar() or 0.0
+    payout_res6 = db.session.query(db.func.sum(FinancialLog.amount)).filter_by(action_type='جائزة اكشف واربح').scalar() or 0.0
 
-    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6 + payout_res7
+    total_payouts = payout_res1 + payout_res3 + payout_res4 + payout_res5 + payout_res6
     net_profits = total_sales - total_payouts
 
     return render_template_string(ADMIN_ACCOUNTING_PAGE, vault_balance=vault.vault_balance, logs=logs, total_sales=total_sales, total_payouts=total_payouts, net_profits=net_profits)
@@ -857,7 +856,6 @@ LOGIN_PAGE = """
         button { width: 100%; padding: 14px; background: linear-gradient(135deg, #ffd700, #b8860b); color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
         .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; }
         .no-account-btn { display: inline-block; margin-top: 15px; color: #38bdf8; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .no-account-btn:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -898,12 +896,6 @@ DASHBOARD_PAGE = """
         .logout-btn { background: #ef4444; color: white; padding: 8px 15px; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; }
         .admin-link { background: #ffd700; color: black; padding: 8px 12px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; }
 
-        @keyframes glowAndColor {
-            0% { color: #ffd700; text-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
-            33% { color: #ff4500; text-shadow: 0 0 15px #ff4500, 0 0 30px #ff0000; border-color: #ff4500; box-shadow: 0 0 20px rgba(255,69,0,0.5); }
-            66% { color: #00ffcc; text-shadow: 0 0 15px #00ffcc, 0 0 30px #00bfff; border-color: #00ffcc; box-shadow: 0 0 20px rgba(0,255,204,0.5); }
-            100% { color: #ffd700; text-shadow: 0 0 15px #ffd700, 0 0 30px #ff8c00; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
-        }
         .promo-banner {
             background: linear-gradient(145deg, #1a1505, #0a0802);
             border: 4px solid #ffd700;
@@ -913,9 +905,8 @@ DASHBOARD_PAGE = """
             font-weight: 900;
             margin: 30px auto 10px auto;
             max-width: 750px;
-            animation: glowAndColor 3s infinite;
             text-align: center;
-            letter-spacing: 1px;
+            color: #ffd700;
         }
 
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 30px; max-width: 900px; margin-left: auto; margin-right: auto; }
@@ -930,36 +921,20 @@ DASHBOARD_PAGE = """
             text-align: center; 
             cursor: pointer; 
             transition: all 0.4s ease; 
-            box-shadow: 0 12px 30px rgba(0,0,0,0.8), inset 0 2px 6px rgba(255,255,255,0.1); 
+            box-shadow: 0 12px 30px rgba(0,0,0,0.8); 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             justify-content: center; 
             text-decoration: none; 
             aspect-ratio: 1; 
-            transform: perspective(1000px) rotateX(4deg);
         }
         .icon-card:hover { 
             border-color: #ffd700; 
-            transform: perspective(1000px) rotateX(0deg) translateY(-8px) scale(1.03); 
-            box-shadow: 0 20px 40px rgba(255,215,0,0.4), inset 0 2px 10px rgba(255,215,0,0.2); 
+            transform: translateY(-8px) scale(1.03); 
         }
-        .icon-logo { 
-            font-size: 70px; 
-            margin-bottom: 15px; 
-            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.7));
-            transition: transform 0.3s ease;
-        }
-        .icon-card:hover .icon-logo {
-            transform: scale(1.12) translateZ(20px);
-        }
-        .icon-title { 
-            color: #ffd700; 
-            font-size: 21px; 
-            font-weight: 900; 
-            text-shadow: 0 2px 5px rgba(0,0,0,0.9);
-            letter-spacing: 0.5px;
-        }
+        .icon-logo { font-size: 70px; margin-bottom: 15px; }
+        .icon-title { color: #ffd700; font-size: 21px; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -997,12 +972,6 @@ DASHBOARD_PAGE = """
     </div>
 
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error', err));
-            });
-        }
-
         setInterval(() => {
             fetch('/api/sync_balance')
                 .then(res => res.json())
@@ -1015,26 +984,8 @@ DASHBOARD_PAGE = """
                 .catch(err => {});
         }, 2000);
 
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-        });
-
         function installApp() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    deferredPrompt = null;
-                });
-            } else {
-                const ua = navigator.userAgent.toLowerCase();
-                if (/iphone|ipad|ipod/.test(ua)) {
-                    alert("لتثبيت التطبيق على آيفون:\n1. اضغط على زر المشاركة (Share) في متصفح سفاري.\n2. اختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
-                } else {
-                    alert("لتثبيت التطبيق على أندرويد:\n1. اضغط على قائمة المتصفح (الثلاث نقاط).\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق' (Install App).");
-                }
-            }
+            alert("لتثبيت التطبيق على جهازك، اختر 'إضافة إلى الشاشة الرئيسية' من قائمة المتصفح.");
         }
     </script>
 </body>
@@ -1096,7 +1047,6 @@ GAME_NUMBERS_EMPIRE_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🏛️ إمبراطورية الأرقام</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1134,16 +1084,12 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         </div>
     </div>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
                 if(badge && badge.innerText !== data.balance + " USDD") badge.innerText = data.balance + " USDD";
             }).catch(err => {});
         }, 2000);
-        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1158,7 +1104,6 @@ GAME_ROULETTE_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 20px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-layout { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; align-items: center; }
         .wheel-screen { background: #18181b; border: 4px solid #ffd700; padding: 20px; border-radius: 18px; text-align: center; width: 100%; max-width: 450px; }
         .roulette-ball-box { font-size: 50px; font-weight: bold; background: radial-gradient(circle, #2d2300 0%, #000 100%); border: 3px solid #ffd700; border-radius: 50%; width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; margin: 10px auto; color: #ffd700; }
@@ -1181,7 +1126,6 @@ GAME_ROULETTE_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎰 روليت الحظ</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 16px;">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1229,9 +1173,6 @@ GAME_ROULETTE_PAGE = """
         </form>
     </div>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1310,8 +1251,6 @@ GAME_ROULETTE_PAGE = """
             for (let k in activeBets) { betsArray.push(activeBets[k]); }
             document.getElementById('betsDataInput').value = JSON.stringify(betsArray);
         }
-
-        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1326,16 +1265,15 @@ GAME_NUMBER_WHEEL_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; text-align: center; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .game-box { background: linear-gradient(135deg, #1f1a0f, #0d0d0d); border: 4px solid #ffd700; padding: 30px; border-radius: 24px; max-width: 600px; margin: 20px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); }
-        .wheel-circle { width: 150px; height: 150px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 6px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: #ffd700; box-shadow: 0 0 25px rgba(255,215,0,0.5); transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
+        .wheel-circle { width: 150px; height: 150px; background: radial-gradient(circle, #3d2c00 0%, #1a1200 100%); border: 6px solid #ffd700; border-radius: 50%; margin: 15px auto; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: #ffd700; transition: transform 2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
         .wheel-circle.lose { background: #dc2626 !important; border-color: #991b1b !important; color: #000000 !important; }
         .wheel-circle.win { background: radial-gradient(circle, #ffd700 0%, #b8860b 100%) !important; border-color: #fff !important; color: #000 !important; }
         .win-label { font-size: 14px; color: #ffffff !important; font-weight: bold; margin-top: -2px; }
         .numbers-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
         .num-cell { background: #252525; border: 2px solid #555; border-radius: 10px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #fff; cursor: pointer; transition: 0.2s; }
         .num-cell.selected { background: #22c55e; border-color: #ffd700; color: #000; transform: scale(1.05); }
-        .spin-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 12px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(255,215,0,0.4); }
+        .spin-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 12px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; }
         .spin-action-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
     </style>
@@ -1344,7 +1282,6 @@ GAME_NUMBER_WHEEL_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🎡 عجلة الأرقام الكبرى</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1375,9 +1312,6 @@ GAME_NUMBER_WHEEL_PAGE = """
         </form>
     </div>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1422,8 +1356,6 @@ GAME_NUMBER_WHEEL_PAGE = """
                 document.getElementById('wheelForm').submit();
             }, 2000); 
         }
-
-        function installApp() { alert("لتثبيت التطبيق:\n1. اضغط على قائمة المتصفح (الثلاث نقاط) أو زر المشاركة.\n2. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'."); }
     </script>
 </body>
 </html>
@@ -1445,7 +1377,7 @@ GAME_REVEAL_AND_WIN_PAGE = """
         .boxes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
         .box-card { background: linear-gradient(145deg, #b8860b, #daa520); border: 3px solid #fff; border-radius: 12px; height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; color: #000; cursor: pointer; transition: 0.2s; }
         .box-card.selected { background: linear-gradient(145deg, #22c55e, #15803d) !important; color: #fff !important; transform: scale(1.05); }
-        .play-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 14px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; box-shadow: 0 4px 20px rgba(255,215,0,0.4); }
+        .play-action-btn { background: linear-gradient(135deg, #ffd700, #b8860b); color: #000; font-size: 18px; font-weight: bold; padding: 14px 30px; border: none; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; }
         .play-action-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
         .reset-btn { background: #3b82f6; color: white; font-size: 16px; font-weight: bold; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; }
     </style>
@@ -1485,9 +1417,6 @@ GAME_REVEAL_AND_WIN_PAGE = """
     </div>
 
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1639,9 +1568,6 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
     {% endif %}
 
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1670,7 +1596,6 @@ GAME_GOLDEN_BOXES_NEW_PAGE = """
                 });
         }
         setInterval(checkGameRealtime, 1000);
-        function installApp() { window.location.href = '/download'; }
     </script>
 </body>
 </html>
@@ -1685,7 +1610,6 @@ GAME_GOLDEN_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border-bottom: 2px solid #ffd700; flex-wrap: wrap; gap: 10px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .user-stats-box { background: #18181b; border: 2px dashed #b8860b; padding: 15px; border-radius: 14px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .board-container { background: linear-gradient(135deg, #110d06, #000000); border: 5px solid #b8860b; padding: 25px; border-radius: 18px; margin-top: 20px; text-align: center; }
         .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 20px; }
@@ -1704,7 +1628,6 @@ GAME_GOLDEN_PAGE = """
     <div class="header">
         <h2 style="color: #ffd700; margin: 0;">🏆 الرقم الحنون</h2>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
             <div style="color: #34d399; font-weight: bold; font-size: 18px;">الرصيد: <span id="liveBalance">{{ balance }} USDD</span></div>
             <a href="/dashboard" class="back-btn">⬅️ لوحة التحكم</a>
         </div>
@@ -1757,9 +1680,6 @@ GAME_GOLDEN_PAGE = """
         {% endif %}
     </div>
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(e => {}); });
-        }
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -1790,7 +1710,6 @@ GAME_GOLDEN_PAGE = """
                 });
         }
         setInterval(checkGameRealtime, 1000);
-        function installApp() { window.location.href = '/download'; }
     </script>
 </body>
 </html>
@@ -1805,7 +1724,6 @@ ADMIN_CUSTOMERS_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 16px; text-align: center; margin-bottom: 25px; }
         .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         @media(max-width: 900px) { .panel-grid { grid-template-columns: 1fr; } }
@@ -1824,14 +1742,11 @@ ADMIN_CUSTOMERS_PAGE = """
 <body>
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم المؤسس - امبراطورية الأرقام</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
-        </div>
+        <a href="/dashboard" class="back-btn">⬅️ العودة للرئيسية</a>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="vault-box">
-        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (حصري لـ admin1)</h3>
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (الخصم الفوري لعمليات البيع)</h3>
         <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0;">{{ vault_balance }} USDD</div>
     </div>
     <div class="panel-grid">
@@ -1885,9 +1800,6 @@ ADMIN_CUSTOMERS_PAGE = """
             {% endfor %}
         </table>
     </div>
-    <script>
-        function installApp() { window.location.href = '/download'; }
-    </script>
 </body>
 </html>
 """
@@ -1901,7 +1813,6 @@ ADMIN_GAMES_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .back-btn { background: #3b82f6; color: white; text-decoration: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; }
         .games-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px; }
         @media(max-width:900px){ .games-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1914,10 +1825,7 @@ ADMIN_GAMES_PAGE = """
 <body>
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">👑 لوحة تحكم الألعاب</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
-        </div>
+        <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
     {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold;">{{ msg }}</div>{% endif %}
     <div class="games-grid">
@@ -1938,9 +1846,6 @@ ADMIN_GAMES_PAGE = """
             <a href="/game_golden_boxes_new" class="ctrl-btn" style="background: #3b82f6; margin-top: 10px;">فتح نافذة السحب</a>
         </div>
     </div>
-    <script>
-        function installApp() { window.location.href = '/download'; }
-    </script>
 </body>
 </html>
 """
@@ -1954,7 +1859,6 @@ ADMIN_ACCOUNTING_PAGE = """
     <style>
         body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
         .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; }
-        .download-btn { background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
         @media(max-width:900px){ .stats-grid { grid-template-columns: 1fr; } }
         .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 12px; text-align: center; }
@@ -1969,10 +1873,7 @@ ADMIN_ACCOUNTING_PAGE = """
 <body>
     <div class="admin-header">
         <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والشؤون المالية</h2>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <button id="installAppBtn" class="download-btn" onclick="installApp()">📥 تثبيت التطبيق</button>
-            <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
-        </div>
+        <a href="/dashboard" class="back-btn">⬅️ الرئيسية</a>
     </div>
     <div class="stats-grid">
         <div class="stat-card">
@@ -2004,9 +1905,6 @@ ADMIN_ACCOUNTING_PAGE = """
             {% endfor %}
         </table>
     </div>
-    <script>
-        function installApp() { window.location.href = '/download'; }
-    </script>
 </body>
 </html>
 """
