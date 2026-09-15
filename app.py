@@ -117,7 +117,7 @@ with app.app_context():
         db.session.add(LuxuryGoldenState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0))
     db.session.commit()
 
-# --- قاموس الترجمات الشامل لكافة شاشات وألعاب البرنامج ---
+# --- قاموس الترجمات الشامل للغات الست ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الكبرى',
@@ -203,7 +203,7 @@ def get_t():
     lang = session.get('lang', 'ar')
     return TRANSLATIONS.get(lang, TRANSLATIONS['ar'])
 
-# --- المسارات وتغيير اللغة ---
+# --- المسارات ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -295,6 +295,40 @@ def change_password():
             msg = "Updated Successfully!"
     return render_template_string(CHANGE_PASSWORD_PAGE, t=t, username=user.username, balance=user.balance, msg=msg)
 
+@app.route('/api/golden_status')
+def api_golden_status():
+    current_time = time.time()
+    draw_state = GameDrawState.query.get(1)
+    status, winning_number, remaining = 'idle', 0, 0
+    if draw_state:
+        status = draw_state.status
+        winning_number = draw_state.winning_number
+        if status == 'finished' and current_time >= draw_state.draw_end_time:
+            GoldenNumberBooking.query.delete()
+            draw_state.winning_number, draw_state.status, draw_state.draw_end_time = 0, 'idle', 0
+            db.session.commit()
+            status, winning_number = 'idle', 0
+        remaining = max(0, int(draw_state.draw_end_time - current_time)) if status == 'finished' else 0
+    bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
+    return jsonify({"status": status, "winning_number": winning_number, "remaining_seconds": remaining, "bookings": bookings})
+
+@app.route('/api/luxury_golden_status')
+def api_luxury_golden_status():
+    current_time = time.time()
+    l_state = LuxuryGoldenState.query.get(1)
+    status, winning_number = 'idle', 0
+    if l_state:
+        status, winning_number = l_state.status, l_state.winning_number
+        if status == 'finished' and current_time >= l_state.draw_end_time:
+            LuxuryGoldenBooking.query.delete()
+            l_state.winning_number, l_state.status, l_state.draw_end_time = 0, 'idle', 0
+            db.session.commit()
+            status, winning_number = 'idle', 0
+    bookings = {b.box_number: b.username for b in LuxuryGoldenBooking.query.all()}
+    return jsonify({"status": status, "winning_number": winning_number, "bookings": bookings})
+
+# --- جميع الألعاب الست بصيغة 3D الفاخرة ---
+
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -313,7 +347,7 @@ def game_golden_number():
                 db.session.add(FinancialLog(action_type='مبيع رهان لعبة', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=number, booking_date=get_local_time()))
                 db.session.commit()
-                msg = f"#{number} (2 USDD)"
+                msg = f"تم حجز الرقم {number} مقابل 2 USDD!"
         elif 'cancel_number' in request.form and draw_state.status == 'idle':
             number = int(request.form.get('number'))
             b = GoldenNumberBooking.query.filter_by(number=number, username=username).first()
@@ -322,6 +356,7 @@ def game_golden_number():
                 user.balance += 2.0
                 vault.vault_balance -= 2.0
                 db.session.commit()
+                msg = "تم التراجع واسترداد 2 USDD!"
         elif 'admin_execute_draw' in request.form and username == 'admin1':
             bookings = GoldenNumberBooking.query.all()
             booked_nums = [b.number for b in bookings]
@@ -356,7 +391,7 @@ def game_numbers_empire():
                 db.session.add(FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.add(NumbersEmpireBooking(username=username, number=num, booking_date=get_local_time()))
                 db.session.commit()
-                msg = f"#{num} (2 USDD)"
+                msg = f"تم حجز الرقم #{num} بنجاح!"
         elif 'cancel_number' in request.form:
             num = int(request.form.get('number', 0))
             b = NumbersEmpireBooking.query.filter_by(number=num, username=username).first()
@@ -365,6 +400,7 @@ def game_numbers_empire():
                 user.balance += 2.0
                 vault.vault_balance -= 2.0
                 db.session.commit()
+                msg = "تم التراجع واسترداد 2 USDD!"
     bookings = {b.number: b.username for b in NumbersEmpireBooking.query.all()}
     my_nums = [b.number for b in NumbersEmpireBooking.query.filter_by(username=username).all()]
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, username=username, balance=user.balance, bookings=bookings, my_booked_nums=my_nums, my_total_spent=len(my_nums)*2.0, msg=msg)
@@ -555,7 +591,7 @@ def admin_accounting():
     return render_template_string(ADMIN_ACCOUNTING_PAGE, t=t, vault_balance=vault.vault_balance, logs=logs, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), cards_list=RechargeCard.query.order_by(RechargeCard.id.desc()).all(), msg=msg)
 
 
-# --- قوالب HTML ---
+# --- قوالب HTML بنظام 3D الكامل ---
 
 LANG_BAR = """
 <div style="padding: 10px; background: #121212; display: flex; gap: 10px; justify-content: flex-end; border-bottom: 1px solid #333;">
@@ -574,17 +610,18 @@ LOGIN_PAGE = LANG_BAR + """
 <head>
     <meta charset="UTF-8"><title>{{ t.title }}</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background:#0b0f19; color:#fff; display:flex; justify-content:center; align-items:center; height:90vh; margin:0; }
-        .box { background:linear-gradient(145deg,#1f1f1f,#121212); padding:40px; border-radius:20px; width:340px; text-align:center; border:3px solid #ffd700; box-shadow:0 15px 35px rgba(255,215,0,0.3); transform:perspective(1000px) rotateX(3deg); }
-        input { width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid #444; background:#252525; color:#fff; box-sizing:border-box; }
-        button { width:100%; padding:12px; background:linear-gradient(135deg,#ffd700,#b8860b); color:#000; font-weight:bold; border:none; border-radius:8px; cursor:pointer; margin-top:10px; font-size:16px; box-shadow:0 4px 15px rgba(255,215,0,0.4); }
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 90vh; margin: 0; flex-direction: column; }
+        .login-box { background: linear-gradient(145deg, #1f1f1f, #121212); padding: 45px; border-radius: 20px; width: 360px; text-align: center; border: 3px solid #ffd700; box-shadow: 0 20px 40px rgba(255,215,0,0.4); transform: perspective(1000px) rotateX(5deg); }
+        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: white; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 14px; background: linear-gradient(135deg, #ffd700, #b8860b); color: black; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 18px; box-shadow: 0 6px 20px rgba(255,215,0,0.5); }
+        .error { color: #ef4444; margin-bottom: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2 style="color:#ffd700; margin-top:0;">👑 {{ t.title }}</h2>
-        <p style="color:#94a3b8; font-size:12px;">{{ t.subtitle }}</p>
-        {% if error %}<div style="color:#ef4444; margin-bottom:10px;">{{ error }}</div>{% endif %}
+    <div class="login-box">
+        <h2 style="color: #ffd700; margin-top: 0;">👑 {{ t.title }}</h2>
+        <p style="color: #94a3b8; font-size: 13px;">{{ t.subtitle }}</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
         <form method="POST">
             <input type="text" name="username" placeholder="{{ t.username }}" required>
             <input type="password" name="password" placeholder="{{ t.password }}" required>
@@ -599,21 +636,22 @@ DASHBOARD_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head>
-    <meta charset="UTF-8"><title>{{ t.dashboard }}</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.dashboard }}</title>
     <style>
-        body { font-family: Tahoma, sans-serif; background:#0b0f19; color:#fff; margin:0; padding:20px; }
-        .header { display:flex; justify-content:space-between; align-items:center; background:#121212; padding:15px 25px; border-radius:14px; border-bottom:3px solid #ffd700; flex-wrap:wrap; gap:10px; }
-        .financial-bar { display:flex; justify-content:space-between; max-width:900px; margin:25px auto; gap:20px; }
-        .fin-card { flex:1; background:linear-gradient(145deg,#182232,#0f172a); border:2px solid #38bdf8; padding:20px; border-radius:16px; text-align:center; transform:perspective(1000px) rotateX(3deg); box-shadow:0 10px 25px rgba(0,0,0,0.6); }
-        .fin-card button { background:#38bdf8; color:#0f172a; padding:10px 20px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; width:100%; margin-top:10px; font-size:16px; }
-        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:1000; }
-        .modal-content { background:#1f1f1f; padding:30px; border-radius:16px; border:2px solid #ffd700; width:400px; text-align:center; position:relative; }
-        .icons-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:25px; max-width:900px; margin:30px auto; }
-        @media (max-width:900px) { .icons-grid { grid-template-columns:repeat(2, 1fr); } }
-        .icon-card { background:linear-gradient(145deg,#1f1f1f,#111); border:3px solid #b8860b; border-radius:22px; padding:30px; text-align:center; text-decoration:none; transform:perspective(1000px) rotateX(4deg); box-shadow:0 12px 30px rgba(0,0,0,0.8); transition:0.3s; }
-        .icon-card:hover { border-color:#ffd700; transform:perspective(1000px) rotateX(0deg) translateY(-6px); }
-        .icon-logo { font-size:60px; margin-bottom:10px; }
-        .icon-title { color:#ffd700; font-size:18px; font-weight:bold; }
+        body { font-family: Tahoma, sans-serif; background: #0b0f19; color: #fff; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 14px; border-bottom: 3px solid #ffd700; flex-wrap: wrap; gap: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
+        .financial-bar { display: flex; justify-content: space-between; max-width: 900px; margin: 25px auto; gap: 20px; }
+        .fin-card { flex: 1; background: linear-gradient(145deg,#182232,#0f172a); border: 3px solid #38bdf8; padding: 20px; border-radius: 18px; text-align: center; transform: perspective(1000px) rotateX(4deg); box-shadow: 0 15px 35px rgba(0,0,0,0.8); }
+        .fin-card button { background: linear-gradient(135deg, #38bdf8, #0284c7); color: #0f172a; padding: 12px 20px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; font-size: 16px; width: 100%; box-shadow: 0 5px 15px rgba(56,189,248,0.4); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #1f1f1f; padding: 30px; border-radius: 18px; border: 3px solid #ffd700; width: 420px; text-align: center; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.9); }
+        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; max-width: 900px; margin: 30px auto; }
+        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
+        .icon-card { background: linear-gradient(145deg,#1f1f1f,#111); border: 4px solid #b8860b; border-radius: 25px; padding: 30px; text-align: center; text-decoration: none; transform: perspective(1000px) rotateX(6deg) translateZ(10px); box-shadow: 0 15px 35px rgba(0,0,0,0.9); transition: 0.3s; }
+        .icon-card:hover { border-color:#ffd700; transform: perspective(1000px) rotateX(0deg) translateY(-8px) scale(1.03); box-shadow: 0 25px 50px rgba(255,215,0,0.4); }
+        .icon-logo { font-size: 70px; margin-bottom: 12px; filter: drop-shadow(0 8px 15px rgba(0,0,0,0.8)); }
+        .icon-title { color:#ffd700; font-size: 20px; font-weight: 900; text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
     </style>
 </head>
 <body>
@@ -621,7 +659,7 @@ DASHBOARD_PAGE = LANG_BAR + """
         <div style="display:flex; gap:15px; align-items:center;">
             <h2 style="color:#ffd700; margin:0;">👑 {{ t.title }}</h2>
             <div style="background:#1f1f1f; padding:6px 12px; border-radius:6px;">👤 <b>{{ username }}</b></div>
-            <div style="background:#065f46; color:#34d399; padding:6px 15px; border-radius:6px; font-weight:bold;">{{ t.balance }}: {{ balance }} USDD</div>
+            <div style="background:#065f46; color:#34d399; padding:6px 15px; border-radius:6px; font-weight:bold;">{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</div>
         </div>
         <div style="display:flex; gap:10px;">
             <a href="/change_password" style="background:#8b5cf6; color:#fff; padding:8px 12px; text-decoration:none; border-radius:6px; font-weight:bold;">{{ t.change_pass }}</a>
@@ -634,7 +672,7 @@ DASHBOARD_PAGE = LANG_BAR + """
         </div>
     </div>
 
-    {% if msg %}<div style="background:#065f46; color:#34d399; padding:15px; border-radius:10px; max-width:900px; margin:20px auto; text-align:center; font-weight:bold;">{{ msg }}</div>{% endif %}
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:15px; border-radius:10px; max-width:900px; margin:20px auto; text-align:center; font-weight:bold; box-shadow:0 5px 15px rgba(0,0,0,0.5);">{{ msg }}</div>{% endif %}
 
     <div class="financial-bar">
         <div class="fin-card">
@@ -643,43 +681,44 @@ DASHBOARD_PAGE = LANG_BAR + """
         </div>
         <div class="fin-card" style="border-color:#f59e0b;">
             <h3 style="color:#f59e0b; margin:0;">{{ t.withdraw }}</h3>
-            <button onclick="document.getElementById('withdrawM').style.display='flex'" style="background:#f59e0b; color:#000;">{{ t.withdraw }}</button>
+            <button onclick="document.getElementById('withdrawM').style.display='flex'" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#000;">{{ t.withdraw }}</button>
         </div>
     </div>
 
     <div id="rechargeM" class="modal">
         <div class="modal-content">
-            <span onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:10px; left:15px; cursor:pointer; font-size:20px;">&times;</span>
+            <span onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:10px; left:15px; cursor:pointer; font-size:22px;">&times;</span>
             <h3 style="color:#38bdf8;">{{ t.recharge }}</h3>
             <div style="display:flex; gap:10px; margin:20px 0;">
-                <button onclick="alert('{{ t.success_msg }}')" style="flex:1; background:#25d366; color:#fff; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Wish Money</button>
-                <button onclick="alert('{{ t.success_msg }}')" style="flex:1; background:#3b82f6; color:#fff; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Visa</button>
+                <button onclick="alert('{{ t.success_msg }}')" style="flex:1; background:#25d366; color:#fff; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Wish Money</button>
+                <button onclick="alert('{{ t.success_msg }}')" style="flex:1; background:#3b82f6; color:#fff; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Visa</button>
             </div>
             <form method="POST">
                 <input type="hidden" name="action" value="redeem_card">
-                <input type="text" name="card_code" placeholder="Card Code (EMP-..)" required style="width:100%; padding:10px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; margin-bottom:10px;">
-                <button type="submit" style="width:100%; background:#ffd700; color:#000; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">تفعيل الكود</button>
+                <input type="text" name="card_code" placeholder="Card Code (EMP-..)" required style="width:100%; padding:12px; background:#252525; color:#fff; border:1px solid #555; border-radius:8px; box-sizing:border-box; margin-bottom:12px;">
+                <button type="submit" style="width:100%; background:linear-gradient(135deg,#ffd700,#b8860b); color:#000; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">تفعيل الكود</button>
             </form>
         </div>
     </div>
 
     <div id="withdrawM" class="modal">
-        <div class="modal-content" style="width:420px;">
-            <span onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:10px; left:15px; cursor:pointer; font-size:20px;">&times;</span>
+        <div class="modal-content" style="width: 450px;">
+            <span onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:10px; left:15px; cursor:pointer; font-size:22px;">&times;</span>
             <h3 style="color:#f59e0b;">{{ t.withdraw }}</h3>
-            <p style="color:#ef4444; font-size:12px; font-weight:bold; background:rgba(239,68,68,0.1); padding:8px; border-radius:6px;">{{ t.withdraw_warning }}</p>
-            <form method="POST" style="display:flex; flex-direction:column; gap:10px;">
-                <button type="submit" name="action" value="withdraw_wish" onclick="window.open('https://wa.me/96176030208?text=Withdraw Wish: {{ username }}', '_blank'); alert('{{ t.success_msg }}');" style="background:#25d366; color:#fff; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">{{ t.wish_withdraw }}</button>
-                <button type="submit" name="action" value="withdraw_visa" onclick="alert('{{ t.success_msg }}')" style="background:#3b82f6; color:#fff; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">{{ t.visa_withdraw }}</button>
-                <div style="background:#252525; padding:10px; border-radius:6px; text-align:{{ 'right' if t.dir=='rtl' else 'left' }};">
+            <p style="color:#ef4444; font-size:12px; font-weight:bold; background:rgba(239,68,68,0.15); padding:10px; border-radius:8px; border:1px solid #ef4444;">{{ t.withdraw_warning }}</p>
+            <form method="POST" style="display:flex; flex-direction:column; gap:12px;">
+                <button type="submit" name="action" value="withdraw_wish" onclick="window.open('https://wa.me/96176030208?text=Withdraw Wish: {{ username }}', '_blank'); alert('{{ t.success_msg }}');" style="background:#25d366; color:#fff; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">{{ t.wish_withdraw }}</button>
+                <button type="submit" name="action" value="withdraw_visa" onclick="alert('{{ t.success_msg }}')" style="background:#3b82f6; color:#fff; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">{{ t.visa_withdraw }}</button>
+                <div style="background:#252525; padding:12px; border-radius:8px; text-align:right;">
                     <label style="font-size:12px; color:#ffd700;">USDT Address:</label>
-                    <input type="text" name="usdt_acc" placeholder="Address..." style="width:100%; padding:8px; background:#121212; color:#fff; border:1px solid #444; border-radius:6px; box-sizing:border-box; margin:5px 0;">
-                    <button type="submit" name="action" value="withdraw_usdt" onclick="alert('{{ t.success_msg }}')" style="width:100%; background:#f59e0b; color:#000; padding:8px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">{{ t.usdt_withdraw }}</button>
+                    <input type="text" name="usdt_acc" placeholder="Address..." style="width:100%; padding:10px; background:#121212; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box; margin:6px 0;">
+                    <button type="submit" name="action" value="withdraw_usdt" onclick="alert('{{ t.success_msg }}')" style="width:100%; background:#f59e0b; color:#000; padding:10px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">{{ t.usdt_withdraw }}</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- شبكة الألعاب بصيغة 3D الفاخرة -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
@@ -688,6 +727,15 @@ DASHBOARD_PAGE = LANG_BAR + """
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
         <a href="/game_golden_boxes_new" class="icon-card"><div class="icon-logo">🎁</div><div class="icon-title">{{ t.game6 }}</div></a>
     </div>
+
+    <script>
+        setInterval(() => {
+            fetch('/api/sync_balance').then(res => res.json()).then(data => {
+                let badge = document.getElementById('liveBalance');
+                if(badge && badge.innerText !== data.balance) badge.innerText = data.balance;
+            }).catch(err => {});
+        }, 2000);
+    </script>
 </body>
 </html>
 """
@@ -697,22 +745,22 @@ CHANGE_PASSWORD_PAGE = LANG_BAR + """
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head><meta charset="UTF-8"><title>{{ t.change_pass }}</title></head>
 <body style="font-family:Tahoma; background:#0b0f19; color:#fff; display:flex; justify-content:center; align-items:center; height:80vh; margin:0;">
-    <div style="background:#1f1f1f; padding:35px; border-radius:16px; border:2px solid #8b5cf6; width:340px; text-align:center;">
+    <div style="background:#1f1f1f; padding:40px; border-radius:20px; border:3px solid #8b5cf6; width:360px; text-align:center; box-shadow:0 15px 40px rgba(0,0,0,0.9); transform:perspective(1000px) rotateX(4deg);">
         <h3 style="color:#ffd700; margin-top:0;">{{ t.change_pass }}</h3>
-        {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
+        {% if msg %}<p style="color:#34d399; font-weight:bold;">{{ msg }}</p>{% endif %}
         <form method="POST">
-            <input type="password" name="old_password" placeholder="Old Password" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:6px; box-sizing:border-box;">
-            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:6px; box-sizing:border-box;">
-            <input type="password" name="confirm_password" placeholder="Confirm Password" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:6px; box-sizing:border-box;">
-            <button type="submit" style="width:100%; padding:10px; background:#8b5cf6; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Update</button>
+            <input type="password" name="old_password" placeholder="Old Password" required style="width:100%; padding:12px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box;">
+            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; padding:12px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box;">
+            <input type="password" name="confirm_password" placeholder="Confirm Password" required style="width:100%; padding:12px; margin:8px 0; background:#252525; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box;">
+            <button type="submit" style="width:100%; padding:12px; background:#8b5cf6; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer; margin-top:10px;">Update</button>
         </form>
-        <a href="/dashboard" style="color:#38bdf8; display:inline-block; margin-top:15px; text-decoration:none;">{{ t.back_dash }}</a>
+        <a href="/dashboard" style="color:#38bdf8; display:inline-block; margin-top:15px; text-decoration:none; font-weight:bold;">{{ t.back_dash }}</a>
     </div>
 </body>
 </html>
 """
 
-# --- قوالب الألعاب الست بصيغة 2.5D ---
+# --- قوالب الألعاب الست بصيغة 3D الفاخرة ---
 
 GAME_GOLDEN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -721,22 +769,23 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
     <meta charset="UTF-8"><title>{{ t.game1 }}</title>
     <style>
         body { font-family:Tahoma; background:#0b0f19; color:#fff; margin:0; padding:20px; }
-        .card-25d { background:linear-gradient(135deg, #1f1a0f, #0d0d0d); border:4px solid #ffd700; padding:20px; border-radius:20px; max-width:850px; margin:20px auto; box-shadow:0 15px 35px rgba(0,0,0,0.8); }
-        .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:8px; margin-top:15px; }
-        .cell { background:linear-gradient(145deg, #4d2e1a, #26170d); border:2px solid #b8860b; border-radius:10px; height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; cursor:pointer; transform:perspective(800px) rotateX(4deg); box-shadow:0 5px 10px rgba(0,0,0,0.5); }
-        .cell:hover { transform:perspective(800px) translateY(-4px); border-color:#ffd700; }
-        .cell.booked { background:#7f1d1d !important; border-color:#ef4444 !important; cursor:not-allowed; }
-        .cell.my { background:#1e3a8a !important; border-color:#3b82f6 !important; }
+        .card-3d { background:linear-gradient(135deg, #1f1a0f, #0d0d0d); border:5px solid #ffd700; padding:30px; border-radius:25px; max-width:850px; margin:20px auto; box-shadow:0 25px 60px rgba(0,0,0,0.9); transform:perspective(1200px) rotateX(3deg); }
+        .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:10px; margin-top:20px; }
+        @media(max-width: 768px) { .grid { grid-template-columns:repeat(5, 1fr); } }
+        .cell { background:linear-gradient(145deg, #5d381a, #26170d); border:3px solid #b8860b; border-radius:14px; height:70px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:bold; cursor:pointer; transform:perspective(900px) rotateX(10deg) translateZ(10px); box-shadow:0 8px 20px rgba(0,0,0,0.8); transition:0.3s; color:#fff; }
+        .cell:hover { transform:perspective(900px) rotateX(0deg) translateY(-6px) translateZ(25px); border-color:#ffd700; box-shadow:0 15px 30px rgba(255,215,0,0.4); }
+        .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color:#ef4444 !important; cursor:not-allowed; }
+        .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color:#3b82f6 !important; }
     </style>
 </head>
 <body>
     <div style="display:flex; justify-content:space-between; align-items:center; max-width:850px; margin:0 auto;">
-        <h2 style="color:#ffd700;">🏆 {{ t.game1 }} (2.5D)</h2>
+        <h2 style="color:#ffd700;">🏆 {{ t.game1 }} (3D)</h2>
         <div><b>{{ t.balance }}: {{ balance }} USDD</b> | <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a></div>
     </div>
-    {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:6px; max-width:850px; margin:10px auto; text-align:center;">{{ msg }}</div>{% endif %}
-    <div class="card-25d">
-        <p style="text-align:center; color:#cbd5e1;">{{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD</p>
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; max-width:850px; margin:10px auto; text-align:center; font-weight:bold;">{{ msg }}</div>{% endif %}
+    <div class="card-3d">
+        <p style="text-align:center; color:#ffd700; font-size:16px;">{{ t.cost }}: 2 USDD | {{ t.prize }}: 75 USDD</p>
         <div class="grid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
@@ -746,13 +795,13 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
                         <div class="cell booked">{{ i }}<br><small>{{ t.booked }}</small></div>
                     {% endif %}
                 {% else %}
-                    <form method="POST" style="margin:0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="cell" style="width:100%; color:#fff;">{{ i }}</button></form>
+                    <form method="POST" style="margin:0;"><input type="hidden" name="number" value="{{ i }}"><button type="submit" name="book_number" class="cell" style="width:100%;">{{ i }}</button></form>
                 {% endif %}
             {% endfor %}
         </div>
         {% if username == 'admin1' %}
-            <form method="POST" style="margin-top:20px; text-align:center;">
-                <button type="submit" name="admin_execute_draw" style="background:#22c55e; color:#fff; font-weight:bold; padding:10px 25px; border:none; border-radius:8px; cursor:pointer;">⚡ {{ t.draw_now }}</button>
+            <form method="POST" style="margin-top:25px; text-align:center;">
+                <button type="submit" name="admin_execute_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:bold; padding:14px 30px; border:none; border-radius:10px; cursor:pointer; font-size:18px; box-shadow:0 8px 25px rgba(34,197,94,0.4);">⚡ {{ t.draw_now }}</button>
             </form>
         {% endif %}
     </div>
@@ -763,18 +812,32 @@ GAME_GOLDEN_PAGE = LANG_BAR + """
 GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game3 }}</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🏛️ {{ t.game3 }}</h2>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game3 }}</title>
+    <style>
+        body { font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px; }
+        .card-3d { background:linear-gradient(145deg,#1f1f1f,#111); border:4px solid #ffd700; padding:40px; border-radius:25px; max-width:550px; margin:30px auto; transform:perspective(1200px) rotateX(5deg); box-shadow:0 25px 60px rgba(0,0,0,0.9); }
+        .cell-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin:20px 0; }
+        .num-btn { background:linear-gradient(145deg,#3d2314,#1a0d07); border:2px solid #b8860b; border-radius:10px; height:55px; color:#fff; font-size:18px; font-weight:bold; cursor:pointer; transform:perspective(600px) rotateX(4deg); box-shadow:0 5px 12px rgba(0,0,0,0.7); }
+        .num-btn:hover { border-color:#ffd700; transform:perspective(600px) translateY(-3px); }
+    </style>
+</head>
+<body>
+    <h2 style="color:#ffd700;">🏛️ {{ t.game3 }} (3D)</h2>
     <p>{{ t.balance }}: {{ balance }} USDD</p>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:#1f1f1f; border:3px solid #ffd700; padding:30px; border-radius:16px; max-width:500px; margin:20px auto; transform:perspective(1000px) rotateX(3deg); box-shadow:0 12px 30px rgba(0,0,0,0.8);">
-        <form method="POST">
-            <input type="number" name="number" min="1" max="50" placeholder="1 - 50" required style="padding:10px; width:60%; background:#252525; color:#fff; border:1px solid #555; border-radius:6px;">
-            <button type="submit" name="book_number" style="padding:10px 20px; background:#ffd700; color:#000; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">{{ t.book }} (2 USDD)</button>
-        </form>
+    {% if msg %}<p style="color:#34d399; font-weight:bold;">{{ msg }}</p>{% endif %}
+    <div class="card-3d">
+        <p style="color:#cbd5e1;">اختر رقم حظك الفاخر (تكلفة التذكرة 2 USDD):</p>
+        <div class="cell-grid">
+            {% for i in range(1, 16) %}
+                <form method="POST" style="margin:0;">
+                    <input type="hidden" name="number" value="{{ i }}">
+                    <button type="submit" name="book_number" class="num-btn" style="width:100%;">{{ i }}</button>
+                </form>
+            {% endfor %}
+        </div>
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+    <a href="/dashboard" style="color:#38bdf8; font-weight:bold;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
@@ -782,19 +845,26 @@ GAME_NUMBERS_EMPIRE_PAGE = LANG_BAR + """
 GAME_ROULETTE_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game2 }}</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🎰 {{ t.game2 }} (2.5D)</h2>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game2 }}</title>
+    <style>
+        body { font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px; }
+        .roulette-3d { background:linear-gradient(145deg,#064e3b,#022c22); border:5px solid #b8860b; padding:40px; border-radius:25px; max-width:650px; margin:30px auto; transform:perspective(1200px) rotateX(4deg); box-shadow:0 25px 60px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <h2 style="color:#ffd700;">🎰 {{ t.game2 }} (3D)</h2>
     <p>{{ t.balance }}: {{ balance }} USDD</p>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:#064e3b; border:4px solid #b8860b; padding:30px; border-radius:20px; max-width:500px; margin:20px auto; transform:perspective(1000px) rotateX(4deg); box-shadow:0 15px 35px rgba(0,0,0,0.8);">
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; max-width:650px; margin:10px auto; font-weight:bold;">{{ msg }}</div>{% endif %}
+    <div class="roulette-3d">
+        <div style="font-size:60px; margin-bottom:20px; filter:drop-shadow(0 8px 15px rgba(0,0,0,0.9));">🎯</div>
         <form method="POST">
             <input type="hidden" name="bets_data" value='[{"type": "straight", "value": 7, "amount": 5}]'>
             <input type="hidden" name="total_bet_amount" value="5">
-            <button type="submit" style="padding:14px 28px; background:linear-gradient(135deg,#ffd700,#b8860b); color:#000; font-weight:bold; border:none; border-radius:10px; cursor:pointer; font-size:16px;">🎡 {{ t.spin }} (5 USDD #7)</button>
+            <button type="submit" style="padding:16px 35px; background:linear-gradient(135deg,#ffd700,#b8860b); color:#000; font-weight:bold; font-size:18px; border:none; border-radius:12px; cursor:pointer; box-shadow:0 8px 25px rgba(255,215,0,0.5);">🎡 {{ t.spin }} (5 USDD)</button>
         </form>
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+    <a href="/dashboard" style="color:#38bdf8; font-weight:bold;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
@@ -802,18 +872,25 @@ GAME_ROULETTE_PAGE = LANG_BAR + """
 GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game4 }}</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🎡 {{ t.game4 }}</h2>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game4 }}</title>
+    <style>
+        body { font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px; }
+        .wheel-3d { background:linear-gradient(145deg,#1f1a0f,#0d0d0d); border:5px solid #ffd700; padding:40px; border-radius:25px; max-width:550px; margin:30px auto; transform:perspective(1200px) rotateX(4deg); box-shadow:0 25px 60px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <h2 style="color:#ffd700;">🎡 {{ t.game4 }} (3D)</h2>
     <p>{{ t.balance }}: {{ balance }} USDD</p>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:#1f1a0f; border:4px solid #ffd700; padding:30px; border-radius:20px; max-width:450px; margin:20px auto; transform:perspective(1000px) rotateX(4deg); box-shadow:0 12px 30px rgba(0,0,0,0.8);">
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; max-width:550px; margin:10px auto; font-weight:bold;">{{ msg }}</div>{% endif %}
+    <div class="wheel-3d">
+        <div style="width:140px; height:140px; background:radial-gradient(circle,#ffd700,#b8860b); border-radius:50%; margin:20px auto; display:flex; align-items:center; justify-content:center; font-size:50px; box-shadow:0 0 30px rgba(255,215,0,0.6); transform:translateZ(20px);">🎡</div>
         <form method="POST">
             <input type="hidden" name="selected_numbers" value="[3, 8, 14]">
-            <button type="submit" style="padding:14px 28px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:10px; cursor:pointer; font-size:16px;">🎯 {{ t.spin }} (3 USDD [3, 8, 14])</button>
+            <button type="submit" style="padding:16px 35px; background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; font-weight:bold; font-size:18px; border:none; border-radius:12px; cursor:pointer; box-shadow:0 8px 25px rgba(34,197,94,0.4);">🎯 {{ t.spin }} (3 USDD)</button>
         </form>
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+    <a href="/dashboard" style="color:#38bdf8; font-weight:bold;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
@@ -821,17 +898,24 @@ GAME_NUMBER_WHEEL_PAGE = LANG_BAR + """
 GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game5 }}</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🎟️ {{ t.game5 }}</h2>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game5 }}</title>
+    <style>
+        body { font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px; }
+        .reveal-3d { background:linear-gradient(145deg,#1f1f1f,#111); border:5px solid #ffd700; padding:40px; border-radius:25px; max-width:550px; margin:30px auto; transform:perspective(1200px) rotateX(4deg); box-shadow:0 25px 60px rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <h2 style="color:#ffd700;">🎟️ {{ t.game5 }} (3D)</h2>
     <p>{{ t.balance }}: {{ balance }} USDD</p>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:#1f1f1f; border:3px solid #ffd700; padding:30px; border-radius:16px; max-width:450px; margin:20px auto; transform:perspective(1000px) rotateX(4deg); box-shadow:0 12px 30px rgba(0,0,0,0.8);">
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; max-width:550px; margin:10px auto; font-weight:bold;">{{ msg }}</div>{% endif %}
+    <div class="reveal-3d">
+        <div style="font-size:70px; margin-bottom:15px; filter:drop-shadow(0 8px 15px rgba(0,0,0,0.9));">🎟️</div>
         <form method="POST">
-            <button type="submit" style="padding:14px 28px; background:#ffd700; color:#000; font-weight:bold; border:none; border-radius:10px; cursor:pointer; font-size:16px;">📦 {{ t.reveal }} (1 USDD)</button>
+            <button type="submit" style="padding:16px 35px; background:linear-gradient(135deg,#ffd700,#b8860b); color:#000; font-weight:bold; font-size:18px; border:none; border-radius:12px; cursor:pointer; box-shadow:0 8px 25px rgba(255,215,0,0.5);">🎟️ {{ t.reveal }} (1 USDD)</button>
         </form>
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+    <a href="/dashboard" style="color:#38bdf8; font-weight:bold;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
@@ -839,31 +923,39 @@ GAME_REVEAL_AND_WIN_PAGE = LANG_BAR + """
 GAME_GOLDEN_BOXES_NEW_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game6 }}</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🎁 {{ t.game6 }} (2.5D)</h2>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game6 }}</title>
+    <style>
+        body { font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px; }
+        .boxes-3d { background:linear-gradient(135deg,#110d06,#000); border:5px solid #b8860b; padding:40px; border-radius:25px; max-width:650px; margin:30px auto; transform:perspective(1200px) rotateX(4deg); box-shadow:0 25px 60px rgba(0,0,0,0.9); }
+        .box-3d { width:85px; height:85px; background:linear-gradient(145deg,#5d381a,#26170d); border:3px solid #ffd700; border-radius:16px; color:#fff; font-size:22px; font-weight:bold; cursor:pointer; transform:perspective(800px) rotateX(8deg) translateZ(15px); box-shadow:0 10px 20px rgba(0,0,0,0.8); transition:0.3s; }
+        .box-3d:hover { transform:perspective(800px) rotateX(0deg) translateY(-6px) translateZ(30px); box-shadow:0 15px 30px rgba(255,215,0,0.5); }
+    </style>
+</head>
+<body>
+    <h2 style="color:#ffd700;">🎁 {{ t.game6 }} (3D)</h2>
     <p>{{ t.balance }}: {{ balance }} USDD</p>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:linear-gradient(135deg, #110d06, #000); border:4px solid #b8860b; padding:30px; border-radius:20px; max-width:600px; margin:20px auto; box-shadow:0 15px 35px rgba(0,0,0,0.8); transform:perspective(1000px) rotateX(3deg);">
-        <p>{{ t.cost }}: 50 USDD | {{ t.prize }}: 200 USDD</p>
-        <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; max-width:650px; margin:10px auto; font-weight:bold;">{{ msg }}</div>{% endif %}
+    <div class="boxes-3d">
+        <p style="color:#ffd700; font-size:16px;">{{ t.cost }}: 50 USDD | {{ t.prize }}: 200 USDD</p>
+        <div style="display:flex; justify-content:center; gap:15px; margin:25px 0;">
             {% for b in range(1, 6) %}
                 <form method="POST" style="margin:0;">
                     <input type="hidden" name="box_number" value="{{ b }}">
-                    <button type="submit" name="book_box" style="width:75px; height:75px; background:linear-gradient(145deg,#3d2314,#1a0d07); border:2px solid #8b5a2b; border-radius:12px; color:#fff; font-weight:bold; cursor:pointer; transform:perspective(600px) rotateX(5deg); box-shadow:0 6px 12px rgba(0,0,0,0.6);">📦 {{ b }}</button>
+                    <button type="submit" name="book_box" class="box-3d">📦 {{ b }}</button>
                 </form>
             {% endfor %}
         </div>
         {% if username == 'admin1' %}
-            <form method="POST"><button type="submit" name="admin_execute_luxury_draw" style="background:#22c55e; color:#fff; padding:10px 25px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">⚡ {{ t.draw_now }}</button></form>
+            <form method="POST"><button type="submit" name="admin_execute_luxury_draw" style="background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; padding:12px 30px; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:16px; box-shadow:0 8px 20px rgba(34,197,94,0.4);">⚡ {{ t.draw_now }}</button></form>
         {% endif %}
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
+    <a href="/dashboard" style="color:#38bdf8; font-weight:bold;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
 
-# --- صفحات الإدارة والمحاسبة ---
+# --- لوحات التحكم والإدارة ---
 
 ADMIN_CUSTOMERS_PAGE = LANG_BAR + """
 <!DOCTYPE html>
@@ -875,22 +967,22 @@ ADMIN_CUSTOMERS_PAGE = LANG_BAR + """
         <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:6px; font-weight:bold;">{{ t.back_dash }}</a>
     </div>
     {% if msg %}<p style="color:#34d399; text-align:center;">{{ msg }}</p>{% endif %}
-    <div style="background:#1f1f1f; padding:20px; border-radius:12px; max-width:400px; margin:20px auto; border:1px solid #444;">
+    <div style="background:#1f1f1f; padding:25px; border-radius:16px; max-width:450px; margin:20px auto; border:2px solid #ffd700; box-shadow:0 15px 35px rgba(0,0,0,0.8);">
         <h3 style="color:#3b82f6; margin-top:0;">خلق حساب جديد</h3>
         <form method="POST">
             <input type="hidden" name="action" value="create_user">
-            <input type="text" name="new_username" placeholder="Username" required style="width:100%; padding:8px; margin:6px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
-            <input type="password" name="new_password" placeholder="Password" required style="width:100%; padding:8px; margin:6px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
-            <input type="text" name="new_owner" placeholder="Owner Name" required style="width:100%; padding:8px; margin:6px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
-            <button type="submit" style="width:100%; padding:10px; background:#3b82f6; color:#fff; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">إنشاء</button>
+            <input type="text" name="new_username" placeholder="Username" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
+            <input type="password" name="new_password" placeholder="Password" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
+            <input type="text" name="new_owner" placeholder="Owner Name" required style="width:100%; padding:10px; margin:8px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box;">
+            <button type="submit" style="width:100%; padding:12px; background:#3b82f6; color:#fff; font-weight:bold; border:none; border-radius:8px; cursor:pointer; margin-top:10px;">إنشاء</button>
         </form>
     </div>
-    <div style="background:#1f1f1f; padding:20px; border-radius:12px; max-width:900px; margin:20px auto;">
+    <div style="background:#1f1f1f; padding:25px; border-radius:16px; max-width:900px; margin:20px auto; box-shadow:0 15px 35px rgba(0,0,0,0.8);">
         <h3 style="color:#ffd700; margin-top:0;">سجل الحسابات</h3>
         <table style="width:100%; border-collapse:collapse;">
             <tr style="background:#252525; color:#ffd700;"><th style="padding:10px; border:1px solid #444;">User</th><th style="padding:10px; border:1px solid #444;">Pass</th><th style="padding:10px; border:1px solid #444;">Owner</th><th style="padding:10px; border:1px solid #444;">Balance</th></tr>
             {% for u in users_list %}
-            <tr style="text-align:center;"><td style="padding:8px; border:1px solid #444;"><a href="/admin_customer_detail/{{ u.username }}" style="color:#38bdf8;">📂 {{ u.username }}</a></td><td style="padding:8px; border:1px solid #444;">{{ u.password }}</td><td style="padding:8px; border:1px solid #444;">{{ u.owner_name }}</td><td style="padding:8px; border:1px solid #444; color:#34d399;">{{ u.balance }} USDD</td></tr>
+            <tr style="text-align:center;"><td style="padding:10px; border:1px solid #444;"><a href="/admin_customer_detail/{{ u.username }}" style="color:#38bdf8; font-weight:bold;">📂 {{ u.username }}</a></td><td style="padding:10px; border:1px solid #444;">{{ u.password }}</td><td style="padding:10px; border:1px solid #444;">{{ u.owner_name }}</td><td style="padding:10px; border:1px solid #444; color:#34d399; font-weight:bold;">{{ u.balance }} USDD</td></tr>
             {% endfor %}
         </table>
     </div>
@@ -907,11 +999,11 @@ ADMIN_CUSTOMER_DETAIL_PAGE = LANG_BAR + """
         <h2 style="color:#ffd700; margin:0;">📂 ذاكرة وتفاصيل: {{ user.username }} ({{ user.owner_name }})</h2>
         <a href="/admin_customers" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:6px; font-weight:bold;">الرجوع للزبائن</a>
     </div>
-    <div style="background:#1f1f1f; padding:20px; border-radius:12px; margin:20px auto; max-width:900px;">
+    <div style="background:#1f1f1f; padding:25px; border-radius:16px; margin:20px auto; max-width:900px; box-shadow:0 15px 35px rgba(0,0,0,0.8);">
         <h3>سجل العمليات (توقيت بيروت)</h3>
         <table style="width:100%; border-collapse:collapse;">
-            <tr style="background:#252525; color:#ffd700;"><th style="padding:8px; border:1px solid #444;">Action</th><th style="padding:8px; border:1px solid #444;">Amount</th><th style="padding:8px; border:1px solid #444;">Time</th></tr>
-            {% for l in logs %}<tr style="text-align:center;"><td style="padding:8px; border:1px solid #444;">{{ l.action_type }}</td><td style="padding:8px; border:1px solid #444; color:#34d399;">{{ l.amount }} USDD</td><td style="padding:8px; border:1px solid #444;">{{ l.log_time }}</td></tr>{% endfor %}
+            <tr style="background:#252525; color:#ffd700;"><th style="padding:10px; border:1px solid #444;">Action</th><th style="padding:10px; border:1px solid #444;">Amount</th><th style="padding:10px; border:1px solid #444;">Time</th></tr>
+            {% for l in logs %}<tr style="text-align:center;"><td style="padding:10px; border:1px solid #444;">{{ l.action_type }}</td><td style="padding:10px; border:1px solid #444; color:#34d399; font-weight:bold;">{{ l.amount }} USDD</td><td style="padding:10px; border:1px solid #444;">{{ l.log_time }}</td></tr>{% endfor %}
         </table>
     </div>
 </body>
@@ -923,16 +1015,19 @@ ADMIN_GAMES_PAGE = LANG_BAR + """
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
 <head><meta charset="UTF-8"><title>لوحة الألعاب</title></head>
 <body style="font-family:Tahoma; background:#0b0f19; color:#fff; text-align:center; padding:30px;">
-    <h2 style="color:#ffd700;">🎮 لوحة تحكم الألعاب</h2>
-    {% if msg %}<p style="color:#34d399;">{{ msg }}</p>{% endif %}
-    <div style="background:#1f1f1f; border:2px solid #ffd700; padding:25px; border-radius:12px; max-width:400px; margin:20px auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#121212; padding:15px 25px; border-radius:12px; border:2px solid #ffd700; max-width:600px; margin:0 auto 25px auto;">
+        <h2 style="color:#ffd700; margin:0;">🎮 لوحة تحكم الألعاب</h2>
+        <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:6px; font-weight:bold;">{{ t.back_dash }}</a>
+    </div>
+    {% if msg %}<p style="color:#34d399; font-weight:bold;">{{ msg }}</p>{% endif %}
+    <div style="background:#1f1f1f; border:3px solid #ffd700; padding:30px; border-radius:18px; max-width:500px; margin:20px auto; box-shadow:0 15px 35px rgba(0,0,0,0.8);">
         <form method="POST">
-            <label>رقم فائز مسبق (الرقم الحنون):</label><br>
-            <input type="number" name="forced_winning_number" value="{{ forced_val }}" min="0" max="50" style="padding:10px; margin:10px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; width:80%;">
-            <button type="submit" style="padding:10px 20px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:6px; cursor:pointer; width:80%;">حفظ الرقم</button>
+            <label style="color:#ffd700; font-weight:bold;">رقم فائز مسبق (الرقم الحنون):</label><br>
+            <input type="number" name="forced_winning_number" value="{{ forced_val }}" min="0" max="50" style="padding:12px; margin:12px 0; background:#252525; color:#fff; border:1px solid #555; border-radius:8px; width:80%; text-align:center; font-size:18px;">
+            <br>
+            <button type="submit" style="padding:12px 25px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:8px; cursor:pointer; width:80%;">حفظ الرقم</button>
         </form>
     </div>
-    <a href="/dashboard" style="color:#38bdf8;">{{ t.back_dash }}</a>
 </body>
 </html>
 """
@@ -940,55 +1035,134 @@ ADMIN_GAMES_PAGE = LANG_BAR + """
 ADMIN_ACCOUNTING_PAGE = LANG_BAR + """
 <!DOCTYPE html>
 <html lang="{{ t.dir }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>المحاسبة والخزنة</title></head>
-<body style="font-family:Tahoma; background:#0b0f19; color:#fff; padding:20px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; background:#121212; padding:15px 25px; border-radius:12px; border:2px solid #ffd700;">
-        <h2 style="color:#ffd700; margin:0;">📊 المحاسبة والخزنة المركزية</h2>
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامج المحاسبة</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #0b0f19; color: #f8fafc; padding: 20px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 15px 25px; border-radius: 12px; border: 2px solid #ffd700; margin-bottom: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.6); }
+        .vault-box { background: linear-gradient(135deg, #065f46, #047857); border: 3px solid #34d399; padding: 25px; border-radius: 18px; text-align: center; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+        .stat-card { background: #1f1f1f; border: 1px solid #444; padding: 20px; border-radius: 14px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
+        .stat-val { font-size: 26px; font-weight: bold; color: #34d399; margin-top: 8px; }
+        .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
+        .panel-box { background: #1f1f1f; padding: 20px; border-radius: 14px; border: 1px solid #444; box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; background: #252525; color: white; border: 1px solid #555; box-sizing: border-box; }
+        button { padding: 12px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-sell { background: #22c55e; color: black; }
+        .btn-buy { background: #ef4444; color: white; }
+        .btn-card { background: #ffd700; color: black; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: block; overflow-x: auto; }
+        th, td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
+        th { background: #252525; color: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h2 style="color: #ffd700; margin: 0;">📊 برنامج المحاسبة والخزنة المركزية</h2>
         <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 15px; text-decoration:none; border-radius:6px; font-weight:bold;">{{ t.back_dash }}</a>
     </div>
-    {% if msg %}<p style="color:#34d399; text-align:center;">{{ msg }}</p>{% endif %}
-    <div style="background:linear-gradient(135deg,#065f46,#047857); border:3px solid #34d399; padding:20px; border-radius:16px; text-align:center; max-width:900px; margin:20px auto;">
-        <h3 style="margin:0; color:#a7f3d0;">🏦 رصيد الخزنة الأساسية: {{ vault_balance }} USDD</h3>
+    
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:8px; margin-bottom:20px; text-align:center; font-weight:bold;">{{ msg }}</div>{% endif %}
+
+    <div class="vault-box">
+        <h3 style="margin: 0; color: #a7f3d0; font-size: 18px;">🏦 خزنة الشركة الأساسية (رصيد المليون USDD)</h3>
+        <div style="font-size: 45px; font-weight: bold; color: #fff; margin: 10px 0;">{{ vault_balance }} USDD</div>
     </div>
-    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; max-width:900px; margin:20px auto;">
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; text-align:center; border:1px solid #38bdf8;">نقاط مباعة<br><b style="color:#38bdf8;">{{ total_points_sold }} USDD</b></div>
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; text-align:center; border:1px solid #22c55e;">رهانات ألعاب<br><b style="color:#22c55e;">{{ total_game_bets }} USDD</b></div>
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; text-align:center; border:1px solid #ef4444;">جوائز مصروفة<br><b style="color:#ef4444;">{{ total_payouts }} USDD</b></div>
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; text-align:center; border:2px solid #ffd700;">صافي الأرباح<br><b style="color:#ffd700;">{{ net_game_result }} USDD</b></div>
+
+    <div class="stats-grid">
+        <div class="stat-card" style="border: 2px solid #38bdf8;">
+            <div style="color: #38bdf8; font-weight: bold;">صندوق النقاط المباعة</div>
+            <div class="stat-val" style="color: #38bdf8;">{{ total_points_sold }} USDD</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: #94a3b8;">صندوق رهانات الألعاب</div>
+            <div class="stat-val" style="color: #22c55e;">{{ total_game_bets }} USDD</div>
+        </div>
+        <div class="stat-card">
+            <div style="color: #94a3b8;">صندوق الجوائز المدفوعة</div>
+            <div class="stat-val" style="color: #ef4444;">{{ total_payouts }} USDD</div>
+        </div>
+        <div class="stat-card" style="border: 2px solid #ffd700; background: linear-gradient(135deg, #252010, #161616);">
+            <div style="color: #ffd700; font-weight: bold;">أرباح / خسارة الشركة</div>
+            <div class="stat-val" style="color: {% if net_game_result >= 0 %}#34d399{% else %}#ef4444{% endif %};">
+                {% if net_game_result > 0 %}+{{ net_game_result }}{% else %}{{ net_game_result }}{% endif %} USDD
+            </div>
+        </div>
     </div>
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:15px; max-width:900px; margin:20px auto;">
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; border:2px dashed #ffd700;">
-            <h4 style="color:#ffd700; margin-top:0;">توليد كود بطاقة</h4>
+
+    <div class="panel-grid">
+        <div class="panel-box" style="border: 2px dashed #ffd700;">
+            <h3 style="color: #ffd700; margin-top: 0;">🎟️ خلق كودات بطاقات الشحن</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="generate_card">
-                <select name="card_amount" style="width:100%; padding:8px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; margin-bottom:8px;">
+                <label>فئة البطاقة:</label>
+                <select name="card_amount" required>
                     <option value="10">10 USDD</option><option value="20">20 USDD</option><option value="50">50 USDD</option><option value="100">100 USDD</option>
                 </select>
-                <button type="submit" style="width:100%; padding:8px; background:#ffd700; color:#000; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">توليد كود</button>
+                <button type="submit" class="btn-card">توليد كود بطاقة جديد</button>
             </form>
         </div>
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; border:1px solid #22c55e;">
-            <h4 style="color:#22c55e; margin-top:0;">بيع مباشر للزبون</h4>
+
+        <div class="panel-box">
+            <h3 style="color: #22c55e; margin-top: 0;">⚡ بيع عملات مباشر للزبون</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="sell_currency">
-                <select name="target_user" style="width:100%; padding:6px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; margin-bottom:6px;">
-                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} ({{ u.balance }}$)</option>{% endfor %}
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }} USDD)</option>{% endfor %}
                 </select>
-                <input type="number" name="amount" placeholder="Amount" required style="width:100%; padding:6px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; margin-bottom:6px;">
-                <button type="submit" style="width:100%; padding:8px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">إتمام الشحن</button>
+                <label>المبلغ (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" class="btn-sell">إتمام البيع من الخزنة</button>
             </form>
         </div>
-        <div style="background:#1f1f1f; padding:15px; border-radius:10px; border:1px solid #ef4444;">
-            <h4 style="color:#ef4444; margin-top:0;">استرجاع من الزبون</h4>
+
+        <div class="panel-box" style="border: 2px solid #ef4444;">
+            <h3 style="color: #ef4444; margin-top: 0;">💸 استرجاع العملات من الزبون</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="buy_back_currency">
-                <select name="target_user" style="width:100%; padding:6px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; margin-bottom:6px;">
-                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} ({{ u.balance }}$)</option>{% endfor %}
+                <label>اختر الزبون:</label>
+                <select name="target_user" required>
+                    <option value="">اختر الحساب</option>
+                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }} USDD)</option>{% endfor %}
                 </select>
-                <input type="number" name="amount" placeholder="Amount" required style="width:100%; padding:6px; background:#252525; color:#fff; border:1px solid #555; border-radius:6px; box-sizing:border-box; margin-bottom:6px;">
-                <button type="submit" style="width:100%; padding:8px; background:#ef4444; color:#fff; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">استرجاع للخزنة</button>
+                <label>المبلغ المراد استرجاعه (USDD):</label><input type="number" name="amount" placeholder="المبلغ" min="1" required>
+                <button type="submit" class="btn-buy">استرجاع الرصيد للخزنة</button>
             </form>
         </div>
+    </div>
+
+    <div class="panel-box" style="margin-bottom: 25px;">
+        <h3 style="color: #38bdf8; margin-top: 0;">🎟️ سجل بطاقات الشحن والأكواد المُولدة</h3>
+        <table>
+            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>مستخدم من قِبل</th><th>تاريخ الإنشاء</th></tr>
+            {% for card in cards_list %}
+            <tr>
+                <td><code style="color: #ffd700; font-size: 15px;">{{ card.code }}</code></td>
+                <td style="font-weight: bold;">{{ card.amount }} USDD</td>
+                <td>
+                    {% if card.is_used %}<span style="color: #ef4444; font-weight: bold;">مستخدمة ❌</span>
+                    {% else %}<span style="color: #34d399; font-weight: bold;">متاحة للبيع ✅</span>{% endif %}
+                </td>
+                <td>{{ card.used_by if card.used_by else '---' }}</td>
+                <td>{{ card.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="panel-box">
+        <h3 style="color: #ffd700; margin-top: 0;">📋 سجل العمليات المالية</h3>
+        <table>
+            <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ (USDD)</th><th>التوقيت المحلي</th></tr>
+            {% for log in logs %}
+            <tr>
+                <td><b>{{ log[0] }}</b></td><td style="color: #ffd700;">{{ log[1] }}</td><td>{{ log[2] }}</td>
+                <td style="color: #34d399; font-weight: bold;">{{ log[3] }} USDD</td><td>{{ log[4] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
     </div>
 </body>
 </html>
