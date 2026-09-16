@@ -107,9 +107,8 @@ TRANSLATIONS = {
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
         'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
         'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام',
-        'game4': 'عجلة الأرقام', 'game5': 'اكشف واربح', 'game6': 'لعبة 70 USDD',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
-        'spin': 'تدوير العجلة', 'reveal': 'اكشف الصناديق', 'draw_now': 'اسحب الآن'
+        'spin': 'تدوير العجلة', 'draw_now': 'اسحب الآن'
     },
     'en': {
         'dir': 'ltr', 'title': 'Empire of Numbers', 'subtitle': 'Super Interactive 12D Gaming Platform',
@@ -118,9 +117,8 @@ TRANSLATIONS = {
         'dashboard': 'Dashboard', 'back_dash': '🏠 Home', 'customers': 'Customers', 'accounting': 'Vault & Accounting',
         'game_control': '🎮 Game Control', 'chat': '💬 Live Chat',
         'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers',
-        'game4': 'Number Wheel', 'game5': 'Reveal & Win', 'game6': '70 USDD Game',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
-        'spin': 'Spin Wheel', 'reveal': 'Reveal Boxes', 'draw_now': 'Draw Now'
+        'spin': 'Spin Wheel', 'draw_now': 'Draw Now'
     },
     'fr': {
         'dir': 'ltr', 'title': 'Empire des Nombres', 'subtitle': 'Plateforme de Jeux Super Interactive 12D',
@@ -129,9 +127,8 @@ TRANSLATIONS = {
         'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
         'game_control': '🎮 Contrôle des Jeux', 'chat': '💬 Chat en Direct',
         'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres',
-        'game4': 'Roue des Nombres', 'game5': 'Révéler et Gagner', 'game6': 'Jeu 70 USDD',
         'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
-        'spin': 'Tourner', 'reveal': 'Révéler', 'draw_now': 'Tirer'
+        'spin': 'Tourner', 'draw_now': 'Tirer'
     },
     'de': {
         'dir': 'ltr', 'title': 'Imperium der Zahlen', 'subtitle': 'Super Interaktive 12D Gaming Plattform',
@@ -140,9 +137,8 @@ TRANSLATIONS = {
         'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung',
         'game_control': '🎮 Spielkontrolle', 'chat': '💬 Live-Chat',
         'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen',
-        'game4': 'Zahlenrad', 'game5': 'Aufdecken & Gewinnen', 'game6': '70 USDD Spiel',
         'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
-        'spin': 'Drehen', 'reveal': 'Aufdecken', 'draw_now': 'Ziehen'
+        'spin': 'Drehen', 'draw_now': 'Ziehen'
     },
     'es': {
         'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma de Juegos Super Interactiva 12D',
@@ -150,10 +146,9 @@ TRANSLATIONS = {
         'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
         'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
-        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Imperio de los Números',
-        'game4': 'Rueda Numérica', 'game5': 'Revelar y Ganar', 'game6': 'Juego 70 USDD',
+        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers',
         'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
-        'spin': 'Girar', 'reveal': 'Revelar', 'draw_now': 'Sorteo'
+        'spin': 'Girar', 'draw_now': 'Sorteo'
     },
     'fa': {
         'dir': 'rtl', 'title': 'امپراتوری اعداد', 'subtitle': 'پلتفرم بازی‌های تعاملی فوق‌العاده 12D',
@@ -162,9 +157,8 @@ TRANSLATIONS = {
         'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
         'game_control': '🎮 کنترل بازی‌ها', 'chat': '💬 پشتیبانی و چت',
         'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد',
-        'game4': 'گردونه اعداد', 'game5': 'کشف کن و برنده شو', 'game6': 'بازی 70 USDD',
         'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
-        'spin': 'چرخش', 'reveal': 'کشف', 'draw_now': 'قرعه‌کشی'
+        'spin': 'چرخش', 'draw_now': 'قرعه‌کشی'
     }
 }
 
@@ -211,10 +205,6 @@ def get_lang_bar():
     }}, 2000);
 </script>
 """
-
-@app.route('/sw.js')
-def service_worker():
-    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
 def get_next_winning_number(game_name, default_min, default_max):
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
@@ -266,7 +256,7 @@ DASHBOARD_PAGE = """
         .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; }
         .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 1000px; margin: 30px auto; }
-        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(1, 1fr); } }
         .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 35px 20px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-8px); }
         .icon-logo { font-size: 75px; margin-bottom: 15px; }
@@ -332,13 +322,11 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <div class="icons-grid">
+    <!-- الألعاب الأساسية: الرقم الحنون، روليت الحظ، وإمبراطورية الأرقام الملكية -->
+    <div class="icons-grid" style="max-width: 900px; margin: 30px auto;">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
         <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
-        <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
-        <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
-        <a href="/game_20_numbers" class="icon-card"><div class="icon-logo">💎</div><div class="icon-title">{{ t.game6 }}</div></a>
     </div>
 
     <script>
@@ -368,7 +356,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون المحدث والمدعوم بالبيانات المعالجة في بايثون ---
+# --- قالب لعبة الرقم الحنون الدقيق ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -396,19 +384,16 @@ GAME_GOLDEN_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <!-- القائمة العليا للعبة التعريف -->
         <div class="header-box">
             <h2 style="color: #ffd700; margin: 0 0 10px 0; font-size: 24px;">احجز رقم ب 20 usdd واربح 700 usdd فورا</h2>
             <p style="color: #f8fafc; margin: 0; font-size: 18px; font-weight: bold;">السحب يوميا الساعة 22:00 بتوقيت مدينة بيروت</p>
         </div>
 
-        <!-- الجزء الثاني: مربع يمر بداخله ارقام عشوائية عند السحب ويتوقف عند الرقم الفائز والرسالة تحته -->
         <div class="draw-screen-box">
             <div id="slotScreen" class="slot-screen">--</div>
         </div>
         <div id="winnerAnnouncement" class="winner-msg"></div>
 
-        <!-- لوحة رصيد غير كافي -->
         <div id="insufficientBalanceModal">
             <div style="background:#1a1c29; padding:35px; border-radius:22px; border:3px solid #ef4444; width:400px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.9);">
                 <h3 style="color:#ef4444; font-size:24px; margin-top:0;">⚠️ تنبيه الرصيد</h3>
@@ -417,7 +402,6 @@ GAME_GOLDEN_PAGE = """
             </div>
         </div>
 
-        <!-- اللعبة 50 رقم من 1 إلى 50 باشكال مربعات متساوية فاخرة -->
         <div class="grid" id="numbersGrid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
@@ -432,7 +416,6 @@ GAME_GOLDEN_PAGE = """
             {% endfor %}
         </div>
 
-        <!-- اضافة خانة خاصة للاعب يكتب فيها ارقامه التي حجزها والقيمة التي خصمت من حسابه -->
         <div class="player-info-box">
             <h4 style="color: #34d399; margin-top: 0;">📋 لوحة حجوزاتي والخصم المالي</h4>
             <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">{{ my_nums_str }}</span></p>
@@ -771,55 +754,77 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- باقي قوالب الألعاب والإدارة ---
-GAME_EMPIRE_PAGE = """
+# --- قالب لعبة إمبراطورية الأرقام (5 أرقام ملكية) ---
+GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game3 }}</title>
-<style>body{background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;}</style>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game3 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
+        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 800px; margin: 20px auto; }
+        .boxes { display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }
+        .box { width: 120px; height: 130px; background: #7c3aed; border: 3px solid #ffd700; border-radius: 20px; color: #fff; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .box.booked { background: #7f1d1d; cursor: not-allowed; }
+        .box.my { background: #1e3a8a; }
+        .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; min-width: 150px; }
+    </style>
 </head>
 <body>
     {{ lang_bar | safe }}
-    <div style="max-width:600px;margin:30px auto;background:#1e2336;padding:30px;border-radius:20px;border:3px solid #ffd700;">
-        <h2 style="color:#ffd700;">🏛️ {{ t.game3 }}</h2>
+    <div class="card">
+        <h2 style="color:#ffd700;">🏛️ إمبراطورية الأرقام الملكية (5 أرقام)</h2>
+        <p style="font-size:18px; color:#ffd700;">سعر الحجز: 500 USDD | الجائزة الكبرى: 2000 USDD</p>
+
+        <div style="background:#000; padding:20px; border-radius:20px; border:3px solid #38bdf8; margin:20px 0;">
+            <div id="empireSlot" class="slot-box">--</div>
+            <div id="empireAnnouncement" style="font-size:18px; color:#34d399; margin-top:10px; font-weight:900;">في انتظار السحب الفاخر...</div>
+        </div>
+
+        {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px 0;">{{ msg }}</div>{% endif %}
+
+        <div class="boxes">
+            {% for i in range(1, 6) %}
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <button onclick="empAction('cancel', {{ i }})" class="box my"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px;">تراجع</span></button>
+                    {% else %}
+                        <div class="box booked"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px;">{{ bookings[i] }}</span></div>
+                    {% endif %}
+                {% else %}
+                    <button onclick="empAction('book', {{ i }})" class="box"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px;">500$</span></button>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        {% if username == 'admin1' %}
+            <div style="margin-top:25px;">
+                <button onclick="empAction('admin_draw', 0)" style="background:#22c55e; color:#fff; padding:15px 35px; font-weight:bold; border:none; border-radius:12px; cursor:pointer; font-size:18px;">⚡ بدء السحب الملكي</button>
+            </div>
+        {% endif %}
     </div>
+    <script>
+        function empAction(type, box) {
+            let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
+            fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+                if(d.winning_number) {
+                    let screen = document.getElementById('empireSlot');
+                    let ann = document.getElementById('empireAnnouncement');
+                    screen.innerText = '#' + d.winning_number;
+                    ann.innerText = d.msg;
+                    setTimeout(() => { location.reload(); }, 5000);
+                } else {
+                    if(d.msg) alert(d.msg);
+                    location.reload();
+                }
+            });
+        }
+    </script>
 </body>
 </html>
 """
 
-GAME_WHEEL_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game4 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>🎡 {{ t.game4 }}</h2>
-</body>
-</html>
-"""
-
-GAME_REVEAL_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game5 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>🎟️ {{ t.game5 }}</h2>
-</body>
-</html>
-"""
-
-GAME_20_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game6 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>💎 {{ t.game6 }}</h2>
-</body>
-</html>
-"""
-
+# --- بقية الصفحات والإدارة لضمان اكتمال المنصة ---
 ADMIN_CUSTOMERS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -959,9 +964,6 @@ ADMIN_GAME_CONTROL_PAGE = """
                 <option value="golden">الرقم الحنون (1-50)</option>
                 <option value="roulette">روليت الحظ (0-36)</option>
                 <option value="empire">إمبراطورية الأرقام (1-5)</option>
-                <option value="wheel">عجلة الأرقام (1-20)</option>
-                <option value="reveal">اكشف واربح (1-3)</option>
-                <option value="game20">لعبة 70 USDD (1-20)</option>
             </select>
             <label>رقم الجولة القادمة (من 1 إلى 50):</label>
             <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
@@ -1071,7 +1073,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك والتوجيه ---
+# --- مسارات الفلاسك وتوجيه التطبيق ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1262,6 +1264,7 @@ def game_numbers_empire():
         if action == 'book' and user.balance >= 500.0 and not NumbersEmpireBooking.query.filter_by(number=box).first():
             user.balance -= 500.0
             vault.vault_balance += 500.0
+            db.session.add(FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
             db.session.add(NumbersEmpireBooking(username=username, number=box, booking_date=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "msg": f"تم حجز المربع #{box}"})
@@ -1271,6 +1274,7 @@ def game_numbers_empire():
                 db.session.delete(b)
                 user.balance += 500.0
                 vault.vault_balance -= 500.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم التراجع واسترداد 500 USDD"})
         elif action == 'admin_draw' and username == 'admin1':
@@ -1281,84 +1285,13 @@ def game_numbers_empire():
                 if winner_u:
                     winner_u.balance += 2000.0
                     vault.vault_balance -= 2000.0
+                    db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
+            msg = f"انتهى السحب الفاخر! الرقم الفائز الملكي: #{winning_num}"
             NumbersEmpireBooking.query.delete()
             db.session.commit()
-            return jsonify({"success": True, "msg": f"انتهى السحب الفاخر! الرقم الفائز: #{winning_num}"})
+            return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
     bookings = {b.number: b.username for b in NumbersEmpireBooking.query.all()}
-    return render_template_string(GAME_EMPIRE_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings)
-
-@app.route('/game_number_wheel', methods=['GET', 'POST'])
-def game_number_wheel():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    vault = SystemVault.query.get(1)
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    if request.method == 'POST':
-        nums = json.loads(request.form.get('selected_numbers', '[]'))
-        cost = float(len(nums) * 2.0)
-        if nums and user.balance >= cost:
-            user.balance -= cost
-            vault.vault_balance += cost
-            winning_num = get_next_winning_number('wheel', 1, 20)
-            if winning_num in nums:
-                user.balance += 20.0
-                vault.vault_balance -= 20.0
-                msg = f"مبروك فزت بـ 20 USDD (الرقم #{winning_num})"
-            else:
-                msg = f"توقفت العجلة عند #{winning_num}"
-            db.session.commit()
-            return jsonify({"success": True, "msg": msg})
-    return render_template_string(GAME_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_reveal_and_win', methods=['GET', 'POST'])
-def game_reveal_and_win():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    vault = SystemVault.query.get(1)
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    if request.method == 'POST':
-        if user.balance >= 1.0:
-            user.balance -= 1.0
-            vault.vault_balance += 1.0
-            winning_num = get_next_winning_number('reveal', 1, 3)
-            payout = 0.50 if winning_num == 1 else 0.0
-            if payout > 0:
-                user.balance += payout
-                vault.vault_balance -= payout
-                msg = f"مبروك فزت بـ {payout} USDD!"
-            else:
-                msg = "حظ أوفر في المحاولة القادمة."
-            db.session.commit()
-            return jsonify({"success": True, "msg": msg})
-        else:
-            return jsonify({"success": False, "msg": "رصيد غير كافي!"})
-    return render_template_string(GAME_REVEAL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_20_numbers', methods=['GET', 'POST'])
-def game_20_numbers():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    vault = SystemVault.query.get(1)
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    if request.method == 'POST':
-        nums = json.loads(request.form.get('selected_numbers', '[]'))
-        cost = float(len(nums) * 5.0)
-        if nums and user.balance >= cost:
-            user.balance -= cost
-            vault.vault_balance += cost
-            winning_num = get_next_winning_number('game20', 1, 20)
-            if winning_num in nums:
-                user.balance += 70.0
-                vault.vault_balance -= 70.0
-                msg = f"مبروك 70 USDD (الرقم الفائز #{winning_num})"
-            else:
-                msg = f"الرقم الفائز #{winning_num} (حظ أوفر)"
-            db.session.commit()
-            return jsonify({"success": True, "msg": msg})
-    return render_template_string(GAME_20_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+    return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings)
 
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
