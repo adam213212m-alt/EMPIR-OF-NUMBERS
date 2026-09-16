@@ -65,6 +65,13 @@ class GameFutureDraw(db.Model):
     round_index = db.Column(db.Integer, nullable=False)
     winning_number = db.Column(db.Integer, nullable=False)
 
+# حالة لعبة الرقم الحنون (لتتبع السحب والرقم الفائز الحالي)
+class GoldenGameState(db.Model):
+    __tablename__ = 'golden_game_state'
+    id = db.Column(db.Integer, primary_key=True)
+    winning_number = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='idle') # idle, drawing, finished
+
 # نظام الدردشة الفورية والسرية
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -96,6 +103,8 @@ with app.app_context():
         db.session.add(SystemVault(id=1, vault_balance=1000000.0))
     if not User.query.filter_by(username='admin1').first():
         db.session.add(User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام'))
+    if not GoldenGameState.query.get(1):
+        db.session.add(GoldenGameState(id=1, winning_number=0, status='idle'))
     db.session.commit()
 
 # --- قاموس الترجمات (6 لغات) ---
@@ -188,10 +197,21 @@ def get_lang_bar():
         </select>
     </div>
     <div style="display:flex; gap:15px; align-items:center;">
+        <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:6px 14px; border-radius:8px; font-weight:900; font-size:14px;">الرصيد: <span id="globalLiveBalance">...</span> USDD</div>
         <a href="/chat" style="color:#38bdf8; text-decoration:none; font-weight:bold; font-size:14px;">💬 الدعم والدردشة</a>
         <a href="/dashboard" style="color:#ffd700; text-decoration:none; font-weight:bold; font-size:14px;">🏠 الرئيسية</a>
     </div>
 </div>
+<script>
+    setInterval(() => {
+        fetch('/api/sync_balance').then(res => res.json()).then(data => {
+            let b1 = document.getElementById('liveBalance');
+            let b2 = document.getElementById('globalLiveBalance');
+            if(b1 && b1.innerText !== String(data.balance)) b1.innerText = data.balance;
+            if(b2 && b2.innerText !== String(data.balance)) b2.innerText = data.balance;
+        }).catch(err => {});
+    }, 2000);
+</script>
 """
 
 def get_next_winning_number(game_name, default_min, default_max):
@@ -341,60 +361,135 @@ DASHBOARD_PAGE = """
             alert("تم إرسال طلب السحب بنجاح!");
             closeUsdtModal();
         }
-        setInterval(() => {
-            fetch('/api/sync_balance').then(res => res.json()).then(data => {
-                let badge = document.getElementById('liveBalance');
-                if(badge && badge.innerText !== String(data.balance)) badge.innerText = data.balance;
-            }).catch(err => {});
-        }, 2000);
     </script>
 </body>
 </html>
 """
 
-# --- قوالب الألعاب ---
+# --- قالب لعبة الرقم الحنون المعدل حرفياً حسب طلبك ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game1 }}</title>
-<style>
-    body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-    .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 900px; margin: 20px auto; }
-    .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 20px; }
-    .cell { background: #7c3aed; border: 2px solid #ffd700; border-radius: 12px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; color: #fff; }
-    .cell.booked { background: #7f1d1d !important; cursor: not-allowed; }
-    .cell.my { background: #1e3a8a !important; }
-</style>
+<head>
+    <meta charset="UTF-8"><title>{{ t.game1 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; margin: 0; }
+        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 950px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
+        .header-box { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); border: 2px solid #38bdf8; padding: 20px; border-radius: 18px; margin-bottom: 25px; }
+        .draw-screen-box { background: #000; border: 4px solid #ffd700; padding: 20px; border-radius: 20px; margin-bottom: 20px; display: inline-block; min-width: 250px; }
+        .slot-screen { font-size: 55px; font-weight: 900; color: #ffd700; letter-spacing: 5px; }
+        .winner-msg { font-size: 18px; font-weight: 900; color: #34d399; margin-top: 10px; min-height: 25px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 25px; }
+        @media(max-width:768px){ .grid { grid-template-columns: repeat(5, 1fr); } }
+        .cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #a78bfa; border-radius: 16px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; color: #fff; font-size: 20px; transition: 0.2s; }
+        .cell:hover { border-color: #ffd700; transform: scale(1.05); }
+        .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; cursor: not-allowed; }
+        .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #3b82f6 !important; }
+        .cell.winner-glow { background: #fbbf24 !important; border: 4px solid #fff !important; box-shadow: 0 0 35px #ffd700; color: #000 !important; transform: scale(1.12); animation: pulse 0.8s infinite alternate; }
+        @keyframes pulse { 0% { transform: scale(1.08); } 100% { transform: scale(1.15); } }
+        .player-info-box { background: rgba(15,20,32,0.9); border: 2px solid #34d399; padding: 15px; border-radius: 15px; margin-top: 25px; text-align: right; }
+    </style>
 </head>
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700;">🏆 {{ t.game1 }}</h2>
-        <p><b>{{ t.balance }}: <span id="bal">{{ balance }}</span> USDD</b> (التكلفة: 20 USDD | الجائزة: 750 USDD)</p>
-        {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px 0;">{{ msg }}</div>{% endif %}
-        <div class="grid">
+        <!-- القائمة العليا للعبة التعريف -->
+        <div class="header-box">
+            <h2 style="color: #ffd700; margin: 0 0 10px 0; font-size: 24px;">احجز رقم ب 20 usdd واربح 700 usdd فورا</h2>
+            <p style="color: #f8fafc; margin: 0; font-size: 18px; font-weight: bold;">السحب يوميا الساعة 22:00 بتوقيت مدينة بيروت</p>
+        </div>
+
+        <!-- الجزء الثاني: مربع يمر بداخله أرقام عشوائية والرسالة ظاهرة تحته -->
+        <div class="draw-screen-box">
+            <div id="slotScreen" class="slot-screen">--</div>
+        </div>
+        <div id="winnerAnnouncement" class="winner-msg"></div>
+
+        {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:12px; border-radius:12px; margin:15px 0; font-weight:900;">{{ msg }}</div>{% endif %}
+
+        <!-- لوحة مربعات اللعبة 50 رقم متساوية فاخرة -->
+        <div class="grid" id="numbersGrid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
                     {% if bookings[i] == username %}
-                        <button onclick="actionGame('cancel', {{ i }})" class="cell my">{{ i }}<br><span style="font-size:10px;">{{ t.cancel }}</span></button>
+                        <button type="button" onclick="handleAction('cancel', {{ i }})" class="cell my" id="cell_{{ i }}">{{ i }}<br><span style="font-size:11px; color:#93c5fd;">تراجع</span></button>
                     {% else %}
-                        <div class="cell booked">{{ i }}<br><span style="font-size:10px;">{{ bookings[i] }}</span></div>
+                        <div class="cell booked" id="cell_{{ i }}">{{ i }}<br><span style="font-size:11px; color:#fca5a5;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
-                    <button onclick="actionGame('book', {{ i }})" class="cell">{{ i }}</button>
+                    <button type="button" onclick="handleAction('book', {{ i }})" class="cell" id="cell_{{ i }}">{{ i }}</button>
                 {% endif %}
             {% endfor %}
         </div>
+
+        <!-- خانة خاصة للاعب يكتب فيها أرقامه التي حجزها والقيمة التي خصمت من حسابه -->
+        <div class="player-info-box">
+            <h4 style="color: #34d399; margin-top: 0;">📋 لوحة حجوزاتي والخصم المالي</h4>
+            <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span id="myBookedList" style="color: #ffd700;">
+                {% set my_nums = [] %}
+                {% for num, usr in bookings.items() %}
+                    {% if usr == username %}{% set _ = my_nums.append(num|string) %}{% endif %}
+                % endfor %}
+                {{ my_nums | join(', ') if my_nums else 'لا يوجد حجوزات حالياً' }}
+            </span></p>
+            <p style="margin: 5px 0; font-size: 16px;"><b>إجمالي المبلغ المخصوم من حسابك:</b> <span id="myDeductedAmount" style="color: #38bdf8;">{{ my_nums | length * 20 }} USDD</span></p>
+        </div>
+
         {% if username == 'admin1' %}
-            <button onclick="actionGame('admin_draw', 0)" style="margin-top:25px; background:#22c55e; color:#fff; padding:15px 35px; font-weight:900; border:none; border-radius:12px; cursor:pointer;">⚡ {{ t.draw_now }}</button>
+            <div style="margin-top: 30px; text-align: center;">
+                <button type="button" onclick="triggerDraw()" style="background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; font-weight: 900; padding: 16px 40px; border: none; border-radius: 14px; cursor: pointer; font-size: 20px;">⚡ اسحب الآن (للآدمن)</button>
+            </div>
         {% endif %}
     </div>
+
     <script>
-        function actionGame(type, num) {
-            let fd = new FormData(); fd.append('action_type', type); fd.append('number', num);
-            fetch('/game_golden_number', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                if(d.msg) alert(d.msg); location.reload();
+        function handleAction(actionType, numberVal) {
+            let fd = new FormData();
+            fd.append('action_type', actionType);
+            fd.append('number', numberVal);
+            fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+                if(data.msg) alert(data.msg);
+                location.reload();
             });
+        }
+
+        function triggerDraw() {
+            let fd = new FormData();
+            fd.append('action_type', 'admin_draw');
+            fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+                if(data.winning_number) {
+                    runDrawAnimation(data.winning_number);
+                } else if(data.msg) {
+                    alert(data.msg);
+                }
+            });
+        }
+
+        function runDrawAnimation(winningNum) {
+            let screen = document.getElementById('slotScreen');
+            let ann = document.getElementById('winnerAnnouncement');
+            let counter = 0;
+            let interval = setInterval(() => {
+                screen.innerText = '#' + Math.floor(Math.random() * 50 + 1);
+                counter++;
+                if(counter > 20) {
+                    clearInterval(interval);
+                    screen.innerText = '#' + winningNum;
+                    ann.innerText = `مبروك ربحت 700 usdd للرقم ${winningNum}`;
+                    
+                    // إضاءة الرقم الرابح على اللوحة مع كلمة مبروك بداخله
+                    let winCell = document.getElementById('cell_' + winningNum);
+                    if(winCell) {
+                        winCell.className = "cell winner-glow";
+                        winCell.innerHTML = `${winningNum}<br><span style="font-size:12px; font-weight:900;">مبروك</span>`;
+                    }
+
+                    // بعد 5 ثوانٍ تعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
+                    setTimeout(() => {
+                        location.reload();
+                    }, 5000);
+                }
+            }, 100);
         }
     </script>
 </body>
@@ -417,7 +512,6 @@ GAME_ROULETTE_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700;">🎰 {{ t.game2 }}</h2>
-        <p><b>{{ t.balance }}: <span id="bal">{{ balance }}</span> USDD</b></p>
         <div class="grid">
             {% for n in range(0, 37) %}
             <button onclick="toggle({{ n }})" id="r_{{ n }}" class="btn">{{ n }}</button>
@@ -461,7 +555,6 @@ GAME_EMPIRE_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700;">🏛️ {{ t.game3 }}</h2>
-        <p><b>{{ t.balance }}: {{ balance }} USDD</b> (السعر: 500 USDD | الجائزة: 2000 USDD)</p>
         <div class="boxes">
             {% for i in range(1, 6) %}
                 {% if i in bookings %}
@@ -507,7 +600,6 @@ GAME_WHEEL_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700;">🎡 {{ t.game4 }}</h2>
-        <p><b>{{ t.balance }}: <span id="bal">{{ balance }}</span> USDD</b></p>
         <div class="grid">
             {% for n in range(1, 21) %}
             <button onclick="toggleW({{ n }})" id="w_{{ n }}" class="btn">{{ n }}</button>
@@ -547,7 +639,6 @@ GAME_REVEAL_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700;">🎟️ {{ t.game5 }}</h2>
-        <p><b>{{ t.balance }}: <span id="bal">{{ balance }}</span> USDD</b> (تكلفة المحاولة: 1 USDD)</p>
         <button onclick="playReveal()" style="padding:16px 40px; background:#ffd700; color:#000; font-weight:900; border:none; border-radius:15px; cursor:pointer; font-size:18px;">{{ t.reveal }}</button>
     </div>
     <script>
@@ -577,7 +668,6 @@ GAME_20_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700;">💎 {{ t.game6 }}</h2>
-        <p><b>{{ t.balance }}: <span id="bal">{{ balance }}</span> USDD</b></p>
         <div class="grid">
             {% for n in range(1, 21) %}
             <button onclick="toggle20({{ n }})" id="g20_{{ n }}" class="btn">{{ n }}</button>
@@ -604,7 +694,6 @@ GAME_20_PAGE = """
 </html>
 """
 
-# --- إدارة الزبائن والمحاسبة والغرف ---
 ADMIN_CUSTOMERS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -671,7 +760,6 @@ ADMIN_ACCOUNTING_TEMPLATE = """
         <div class="stat-card" style="border-color: #34d399;"><h4 style="color:#34d399; margin:0;">📈 صافي الأرباح</h4><div style="font-size:24px; font-weight:bold; margin-top:10px; color:#34d399;">{{ net_game_result }} USDD</div></div>
     </div>
     <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-        <!-- 1. بيع عملات مباشر -->
         <div class="panel-box">
             <h3 style="color: #22c55e; text-align:center;">⚡ بيع عملات مباشر</h3>
             <form method="POST">
@@ -682,7 +770,6 @@ ADMIN_ACCOUNTING_TEMPLATE = """
                 <button type="submit" style="background:#22c55e; color:#000; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إتمام البيع</button>
             </form>
         </div>
-        <!-- 2. سحب رصيد من الزبون -->
         <div class="panel-box" style="border-color: #ef4444;">
             <h3 style="color: #ef4444; text-align:center;">💸 سحب رصيد من الزبون</h3>
             <form method="POST">
@@ -693,7 +780,6 @@ ADMIN_ACCOUNTING_TEMPLATE = """
                 <button type="submit" style="background:#ef4444; color:#fff; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">سحب للخزنة</button>
             </form>
         </div>
-        <!-- 3. توليد كودات الشحن للفئات (100، 200، 300، 500، 1000) -->
         <div class="panel-box" style="border-color: #ffd700;">
             <h3 style="color: #ffd700; text-align:center;">🎟️ توليد كودات الشحن</h3>
             <form method="POST">
@@ -859,7 +945,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك والتوجيه ---
+# --- مسارات الفلاسك وتوجيه التطبيق ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -934,7 +1020,11 @@ def game_golden_number():
         action = request.form.get('action_type')
         if action == 'book':
             num = int(request.form.get('number', 0))
-            if user.balance >= 20.0 and not GoldenNumberBooking.query.filter_by(number=num).first():
+            # التأكد أن الرقم غير محجوز مسبقاً من أي حساب
+            existing_booking = GoldenNumberBooking.query.filter_by(number=num).first()
+            if existing_booking:
+                return jsonify({"success": False, "msg": "هذا الرقم محجوز مسبقاً!"})
+            if user.balance >= 20.0:
                 user.balance -= 20.0
                 vault.vault_balance += 20.0
                 db.session.add(FinancialLog(action_type='مبيع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
@@ -942,28 +1032,35 @@ def game_golden_number():
                 db.session.commit()
                 return jsonify({"success": True, "msg": f"تم حجز الرقم {num} بنجاح!"})
             else:
-                return jsonify({"success": False, "msg": "رصيد غير كافي أو محجوز!"})
+                return jsonify({"success": False, "msg": "رصيد غير كافي!"})
         elif action == 'cancel':
             num = int(request.form.get('number', 0))
+            # لا يمكن لأحد إلغاء حجز حساب آخر، فقط صاحب الحساب هو من يقوم بالتراجع
             b = GoldenNumberBooking.query.filter_by(number=num, username=username).first()
             if b:
                 db.session.delete(b)
                 user.balance += 20.0
                 vault.vault_balance -= 20.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
                 db.session.commit()
-                return jsonify({"success": True, "msg": "تم التراجع واسترداد 20 USDD"})
+                return jsonify({"success": True, "msg": "تم التراجع عن الحجز واسترداد 20 USDD"})
+            else:
+                return jsonify({"success": False, "msg": "لا يمكنك إلغاء حجز لا يخصك!"})
         elif action == 'admin_draw' and username == 'admin1':
             winning_num = get_next_winning_number('golden', 1, 50)
             winner_b = GoldenNumberBooking.query.filter_by(number=winning_num).first()
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
                 if winner_u:
-                    winner_u.balance += 750.0
-                    vault.vault_balance -= 750.0
-                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=750.0, log_time=get_local_time()))
+                    winner_u.balance += 700.0
+                    vault.vault_balance -= 700.0
+                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=700.0, log_time=get_local_time()))
+            
+            # مسح الحجوزات بعد انتهاء السحب لتعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
             GoldenNumberBooking.query.delete()
             db.session.commit()
-            return jsonify({"success": True, "msg": f"تم السحب! الرقم الفائز: #{winning_num}"})
+            return jsonify({"success": True, "winning_number": winning_num})
+            
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, msg=msg)
 
