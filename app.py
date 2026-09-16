@@ -364,7 +364,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون المحدث بدقة ---
+# --- قالب لعبة الرقم الحنون المحدث والمدعوم بالبيانات المعالجة في بايثون ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -431,14 +431,8 @@ GAME_GOLDEN_PAGE = """
         <!-- اضافة خانة خاصة للاعب يكتب فيها ارقامه التي حجزها والقيمة التي خصمت من حسابه -->
         <div class="player-info-box">
             <h4 style="color: #34d399; margin-top: 0;">📋 لوحة حجوزاتي والخصم المالي</h4>
-            <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">
-                {% set my_nums = [] %}
-                {% for num, usr in bookings.items() %}
-                    {% if usr == username %}{% set _ = my_nums.append(num|string) %}{% endif %}
-                % endfor %}
-                {{ my_nums | join(', ') if my_nums else 'لا يوجد حجوزات حالياً' }}
-            </span></p>
-            <p style="margin: 5px 0; font-size: 16px;"><b>القيمة المخصومة من حسابك:</b> <span style="color: #38bdf8;">{{ my_nums | length * 20 }} USDD</span></p>
+            <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">{{ my_nums_str }}</span></p>
+            <p style="margin: 5px 0; font-size: 16px;"><b>القيمة المخصومة من حسابك:</b> <span style="color: #38bdf8;">{{ my_total_cost }} USDD</span></p>
         </div>
 
         {% if username == 'admin1' %}
@@ -511,7 +505,7 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ بطاولة المربعات العالمية المتعارف عليها ---
+# --- قالب لعبة روليت الحظ بطاولة المربعات العالمية ---
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -523,7 +517,6 @@ GAME_ROULETTE_PAGE = """
         .timer-box { font-size: 20px; font-weight: 900; color: #ffd700; background: #000; padding: 10px 20px; border-radius: 14px; border: 2px solid #38bdf8; margin-bottom: 15px; display: inline-block; }
         .spin-screen { font-size: 40px; font-weight: 900; color: #ffd700; background: #000; padding: 12px 25px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; margin-bottom: 15px; letter-spacing: 3px; }
         
-        /* طاولة الروليت العالمية القياسية (شبكة مربعات) */
         .roulette-table {
             display: grid;
             grid-template-columns: 70px repeat(12, 1fr);
@@ -577,18 +570,15 @@ GAME_ROULETTE_PAGE = """
         <h2 style="color:#ffd700; margin-top:0;">🎰 طاولة روليت الحظ العالمية</h2>
         <p><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b> (الرهان: 1 USDD | الربح: 20 USDD لكل مضاعف - حد أقصى 21 رقماً)</p>
 
-        <!-- عداد لبدء الجولة 15 ثانية -->
         <div>
             <div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div>
         </div>
 
-        <!-- مربع صغير فوق الروليت يمرر الأرقام بسرعة -->
         <div>
             <div id="spinScreen" class="spin-screen">--</div>
         </div>
         <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:10px; min-height:22px;">اختر أرقامك من الطاولة أدناه</div>
 
-        <!-- أزرار المساعدة السريعة -->
         <div class="controls-grid">
             <button class="btn-ctrl btn-red" onclick="selectRed()">حجز كل الحمر</button>
             <button class="btn-ctrl btn-black" onclick="selectBlack()">حجز كل السود</button>
@@ -597,22 +587,17 @@ GAME_ROULETTE_PAGE = """
             <button class="btn-ctrl btn-undo" onclick="undoLast()">تراجع عن الأخيرة</button>
         </div>
 
-        <!-- جدول الطاولة العالمي المتعارف عليه (0 على اليسار، و3 صفوف لكل من 1-36) -->
         <div class="roulette-table" id="rouletteTable">
-            <!-- خانة الصفر (0) -->
             <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0">
                 <span>0</span>
                 <span id="r_mult_0" style="font-size:11px; color:#ffd700;">0$</span>
             </div>
 
-            <!-- صفوف الأرقام 1 إلى 36 بالترتيب القياسي العالمي للروليت -->
             {% set row1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] %}
             {% set row2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] %}
             {% set row3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] %}
-            
             {% set red_list = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
 
-            <!-- صف 1 -->
             {% for n in row1 %}
                 {% set is_red = n in red_list %}
                 <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
@@ -621,7 +606,6 @@ GAME_ROULETTE_PAGE = """
                 </div>
             {% endfor %}
 
-            <!-- صف 2 -->
             {% for n in row2 %}
                 {% set is_red = n in red_list %}
                 <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
@@ -630,7 +614,6 @@ GAME_ROULETTE_PAGE = """
                 </div>
             {% endfor %}
 
-            <!-- صف 3 -->
             {% for n in row3 %}
                 {% set is_red = n in red_list %}
                 <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
@@ -1084,7 +1067,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك والتوجيه ---
+# --- مسارات الفلاسك وتوجيه التطبيق ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1198,7 +1181,11 @@ def game_golden_number():
             return jsonify({"success": True, "winning_number": winning_num})
             
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
-    return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, msg=msg)
+    my_bookings_list = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
+    my_nums_str = ', '.join(map(str, my_bookings_list)) if my_bookings_list else 'لا يوجد حجوزات حالياً'
+    my_total_cost = len(my_bookings_list) * 20.0
+
+    return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, my_nums_str=my_nums_str, my_total_cost=my_total_cost, msg=msg)
 
 @app.route('/game_roulette_bet', methods=['POST'])
 def game_roulette_bet():
