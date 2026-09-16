@@ -65,13 +65,6 @@ class GameFutureDraw(db.Model):
     round_index = db.Column(db.Integer, nullable=False)
     winning_number = db.Column(db.Integer, nullable=False)
 
-# حالة لعبة الرقم الحنون (لتتبع السحب والرقم الفائز الحالي)
-class GoldenGameState(db.Model):
-    __tablename__ = 'golden_game_state'
-    id = db.Column(db.Integer, primary_key=True)
-    winning_number = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(20), default='idle') # idle, drawing, finished
-
 # نظام الدردشة الفورية والسرية
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -103,8 +96,6 @@ with app.app_context():
         db.session.add(SystemVault(id=1, vault_balance=1000000.0))
     if not User.query.filter_by(username='admin1').first():
         db.session.add(User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام'))
-    if not GoldenGameState.query.get(1):
-        db.session.add(GoldenGameState(id=1, winning_number=0, status='idle'))
     db.session.commit()
 
 # --- قاموس الترجمات (6 لغات) ---
@@ -366,7 +357,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون المعدل حرفياً حسب طلبك ---
+# --- قالب لعبة الرقم الحنون المطابق حرفياً لطلباتكم ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -376,10 +367,10 @@ GAME_GOLDEN_PAGE = """
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; margin: 0; }
         .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 950px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
         .header-box { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); border: 2px solid #38bdf8; padding: 20px; border-radius: 18px; margin-bottom: 25px; }
-        .draw-screen-box { background: #000; border: 4px solid #ffd700; padding: 20px; border-radius: 20px; margin-bottom: 20px; display: inline-block; min-width: 250px; }
+        .draw-screen-box { background: #000; border: 4px solid #ffd700; padding: 20px; border-radius: 20px; margin-bottom: 10px; display: inline-block; min-width: 250px; }
         .slot-screen { font-size: 55px; font-weight: 900; color: #ffd700; letter-spacing: 5px; }
-        .winner-msg { font-size: 18px; font-weight: 900; color: #34d399; margin-top: 10px; min-height: 25px; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 25px; }
+        .winner-msg { font-size: 19px; font-weight: 900; color: #34d399; margin-bottom: 20px; min-height: 25px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; margin-top: 15px; }
         @media(max-width:768px){ .grid { grid-template-columns: repeat(5, 1fr); } }
         .cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #a78bfa; border-radius: 16px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; color: #fff; font-size: 20px; transition: 0.2s; }
         .cell:hover { border-color: #ffd700; transform: scale(1.05); }
@@ -399,7 +390,7 @@ GAME_GOLDEN_PAGE = """
             <p style="color: #f8fafc; margin: 0; font-size: 18px; font-weight: bold;">السحب يوميا الساعة 22:00 بتوقيت مدينة بيروت</p>
         </div>
 
-        <!-- الجزء الثاني: مربع يمر بداخله أرقام عشوائية والرسالة ظاهرة تحته -->
+        <!-- الجزء الثاني: مربع يمر بداخله ارقام عشوائية عند السحب ويتوقف عند الرقم الفائز والرسالة تحته -->
         <div class="draw-screen-box">
             <div id="slotScreen" class="slot-screen">--</div>
         </div>
@@ -407,7 +398,7 @@ GAME_GOLDEN_PAGE = """
 
         {% if msg %}<div style="background:rgba(6,95,70,0.9); color:#34d399; padding:12px; border-radius:12px; margin:15px 0; font-weight:900;">{{ msg }}</div>{% endif %}
 
-        <!-- لوحة مربعات اللعبة 50 رقم متساوية فاخرة -->
+        <!-- اللعبة 50 رقم من 1 إلى 50 باشكال مربعات متساوية فاخرة -->
         <div class="grid" id="numbersGrid">
             {% for i in range(1, 51) %}
                 {% if i in bookings %}
@@ -422,17 +413,17 @@ GAME_GOLDEN_PAGE = """
             {% endfor %}
         </div>
 
-        <!-- خانة خاصة للاعب يكتب فيها أرقامه التي حجزها والقيمة التي خصمت من حسابه -->
+        <!-- اضافة خانة خاصة للاعب يكتب فيها ارقامه التي حجزها والقيمة التي خصمت من حسابه -->
         <div class="player-info-box">
             <h4 style="color: #34d399; margin-top: 0;">📋 لوحة حجوزاتي والخصم المالي</h4>
-            <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span id="myBookedList" style="color: #ffd700;">
+            <p style="margin: 5px 0; font-size: 16px;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">
                 {% set my_nums = [] %}
                 {% for num, usr in bookings.items() %}
                     {% if usr == username %}{% set _ = my_nums.append(num|string) %}{% endif %}
                 % endfor %}
                 {{ my_nums | join(', ') if my_nums else 'لا يوجد حجوزات حالياً' }}
             </span></p>
-            <p style="margin: 5px 0; font-size: 16px;"><b>إجمالي المبلغ المخصوم من حسابك:</b> <span id="myDeductedAmount" style="color: #38bdf8;">{{ my_nums | length * 20 }} USDD</span></p>
+            <p style="margin: 5px 0; font-size: 16px;"><b>القيمة المخصومة من حسابك:</b> <span style="color: #38bdf8;">{{ my_nums | length * 20 }} USDD</span></p>
         </div>
 
         {% if username == 'admin1' %}
@@ -472,30 +463,32 @@ GAME_GOLDEN_PAGE = """
             let interval = setInterval(() => {
                 screen.innerText = '#' + Math.floor(Math.random() * 50 + 1);
                 counter++;
-                if(counter > 20) {
+                if(counter > 22) {
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
+                    # عند اعلان الرقم الرابح تظهر رسالة تحت خانة المربع مكتوب فيها مبروك ربحت 700 usdd للرقم x
                     ann.innerText = `مبروك ربحت 700 usdd للرقم ${winningNum}`;
                     
-                    // إضاءة الرقم الرابح على اللوحة مع كلمة مبروك بداخله
+                    # عند انتهاء السحب يضيئ الرقم الرابح على اللوحة مع كلمة مبروك بداخله
                     let winCell = document.getElementById('cell_' + winningNum);
                     if(winCell) {
                         winCell.className = "cell winner-glow";
                         winCell.innerHTML = `${winningNum}<br><span style="font-size:12px; font-weight:900;">مبروك</span>`;
                     }
 
-                    // بعد 5 ثوانٍ تعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
+                    # ومن ثم تعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
                     setTimeout(() => {
                         location.reload();
                     }, 5000);
                 }
-            }, 100);
+            }, 90);
         }
     </script>
 </body>
 </html>
 """
 
+# باقي قوالب الألعاب والإدارة لضمان تكامل المنصة بالكامل:
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -884,7 +877,7 @@ CHAT_PAGE = """
     </div>
     <script>
         let area = document.getElementById('msgArea');
-        if(area) area.scrollTop = area.scrollHeight;
+        area.scrollTop = area.scrollHeight;
     </script>
 </body>
 </html>
@@ -945,7 +938,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك وتوجيه التطبيق ---
+# --- مسارات الفلاسك والتوجيه ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1020,7 +1013,6 @@ def game_golden_number():
         action = request.form.get('action_type')
         if action == 'book':
             num = int(request.form.get('number', 0))
-            # التأكد أن الرقم غير محجوز مسبقاً من أي حساب
             existing_booking = GoldenNumberBooking.query.filter_by(number=num).first()
             if existing_booking:
                 return jsonify({"success": False, "msg": "هذا الرقم محجوز مسبقاً!"})
@@ -1035,7 +1027,6 @@ def game_golden_number():
                 return jsonify({"success": False, "msg": "رصيد غير كافي!"})
         elif action == 'cancel':
             num = int(request.form.get('number', 0))
-            # لا يمكن لأحد إلغاء حجز حساب آخر، فقط صاحب الحساب هو من يقوم بالتراجع
             b = GoldenNumberBooking.query.filter_by(number=num, username=username).first()
             if b:
                 db.session.delete(b)
@@ -1056,7 +1047,6 @@ def game_golden_number():
                     vault.vault_balance -= 700.0
                     db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=700.0, log_time=get_local_time()))
             
-            # مسح الحجوزات بعد انتهاء السحب لتعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
             GoldenNumberBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num})
