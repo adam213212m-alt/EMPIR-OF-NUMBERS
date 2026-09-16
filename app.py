@@ -175,16 +175,23 @@ def get_t():
 
 def get_lang_bar():
     curr = session.get('lang', 'ar')
+    ar_sel = 'selected' if curr == 'ar' else ''
+    en_sel = 'selected' if curr == 'en' else ''
+    fr_sel = 'selected' if curr == 'fr' else ''
+    de_sel = 'selected' if curr == 'de' else ''
+    es_sel = 'selected' if curr == 'es' else ''
+    fa_sel = 'selected' if curr == 'fa' else ''
+
     return f"""
 <div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2);">
     <div>
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
-            <option value="ar" {'selected' if curr=='ar' else ''}>العربية 🇸🇦</option>
-            <option value="en" {'selected' if curr=='en' else ''}>English 🇬🇧</option>
-            <option value="fr" {'selected' if curr=='fr' else ''}>Français 🇫🇷</option>
-            <option value="de" {'selected' if curr=='de' else ''}>Deutsch 🇩🇪</option>
-            <option value="es" {'selected' if curr=='es' else ''}>Español 🇪🇸</option>
-            <option value="fa" {'selected' if curr=='fa' else ''}>فارسی 🇮🇷</option>
+            <option value="ar" {ar_sel}>العربية 🇸🇦</option>
+            <option value="en" {en_sel}>English 🇬🇧</option>
+            <option value="fr" {fr_sel}>Français 🇫🇷</option>
+            <option value="de" {de_sel}>Deutsch 🇩🇪</option>
+            <option value="es" {es_sel}>Español 🇪🇸</option>
+            <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
         </select>
     </div>
     <div style="display:flex; gap:15px; align-items:center;">
@@ -194,14 +201,14 @@ def get_lang_bar():
     </div>
 </div>
 <script>
-    setInterval(() => {
-        fetch('/api/sync_balance').then(res => res.json()).then(data => {
+    setInterval(() => {{
+        fetch('/api/sync_balance').then(res => res.json()).then(data => {{
             let b1 = document.getElementById('liveBalance');
             let b2 = document.getElementById('globalLiveBalance');
             if(b1 && b1.innerText !== String(data.balance)) b1.innerText = data.balance;
             if(b2 && b2.innerText !== String(data.balance)) b2.innerText = data.balance;
-        }).catch(err => {});
-    }, 2000);
+        }}).catch(err => {{}});
+    }}, 2000);
 </script>
 """
 
@@ -420,7 +427,7 @@ GAME_GOLDEN_PAGE = """
                 {% set my_nums = [] %}
                 {% for num, usr in bookings.items() %}
                     {% if usr == username %}{% set _ = my_nums.append(num|string) %}{% endif %}
-                % endfor %}
+                {% endfor %}
                 {{ my_nums | join(', ') if my_nums else 'لا يوجد حجوزات حالياً' }}
             </span></p>
             <p style="margin: 5px 0; font-size: 16px;"><b>القيمة المخصومة من حسابك:</b> <span style="color: #38bdf8;">{{ my_nums | length * 20 }} USDD</span></p>
@@ -466,17 +473,14 @@ GAME_GOLDEN_PAGE = """
                 if(counter > 22) {
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
-                    # عند اعلان الرقم الرابح تظهر رسالة تحت خانة المربع مكتوب فيها مبروك ربحت 700 usdd للرقم x
                     ann.innerText = `مبروك ربحت 700 usdd للرقم ${winningNum}`;
                     
-                    # عند انتهاء السحب يضيئ الرقم الرابح على اللوحة مع كلمة مبروك بداخله
                     let winCell = document.getElementById('cell_' + winningNum);
                     if(winCell) {
                         winCell.className = "cell winner-glow";
                         winCell.innerHTML = `${winningNum}<br><span style="font-size:12px; font-weight:900;">مبروك</span>`;
                     }
 
-                    # ومن ثم تعود اللوحة كاملة إلى لونها الطبيعي جاهزة للحجز
                     setTimeout(() => {
                         location.reload();
                     }, 5000);
@@ -488,7 +492,7 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-# باقي قوالب الألعاب والإدارة لضمان تكامل المنصة بالكامل:
+# --- باقي الألعاب والإدارة ---
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -938,7 +942,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك والتوجيه ---
+# --- مسارات الفلاسك وتوجيه التطبيق ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
