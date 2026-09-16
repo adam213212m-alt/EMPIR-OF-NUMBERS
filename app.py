@@ -23,7 +23,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- نماذج قاعدة البيانات ---
-
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -91,7 +90,6 @@ class NumbersEmpireBooking(db.Model):
     number = db.Column(db.Integer)
     booking_date = db.Column(db.String(50))
 
-# --- تهيئة الجداول ---
 with app.app_context():
     db.create_all()
     vault = SystemVault.query.get(1)
@@ -103,7 +101,6 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -239,7 +236,6 @@ def get_lang_bar():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-# --- محرك المعادلة الرياضية الموحدة (30% للبرنامج / 70% للجوائز) ---
 def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
     if future:
@@ -266,7 +262,6 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- قوالب HTML ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -407,7 +402,6 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لعبة الرقم الحنون ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -498,11 +492,9 @@ GAME_GOLDEN_PAGE = """
                 }
             });
         }
-
         function closeInsufficientModal() {
             document.getElementById('insufficientBalanceModal').style.display = 'none';
         }
-
         function triggerDraw() {
             let fd = new FormData();
             fd.append('action_type', 'admin_draw');
@@ -514,7 +506,6 @@ GAME_GOLDEN_PAGE = """
                 }
             });
         }
-
         function runDrawAnimation(winningNum) {
             let screen = document.getElementById('slotScreen');
             let ann = document.getElementById('winnerAnnouncement');
@@ -526,16 +517,12 @@ GAME_GOLDEN_PAGE = """
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
                     ann.innerText = `مبروك ربحت 700 usdd للرقم ${winningNum}`;
-                    
                     let winCell = document.getElementById('cell_' + winningNum);
                     if(winCell) {
                         winCell.className = "cell winner-glow";
                         winCell.innerHTML = `${winningNum}<br><span style="font-size:10px; font-weight:900;">مبروك</span>`;
                     }
-
-                    setTimeout(() => {
-                        location.reload();
-                    }, 5000);
+                    setTimeout(() => { location.reload(); }, 5000);
                 }
             }, 90);
         }
@@ -544,7 +531,6 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ (المحدث حسب طلبك بالكامل) ---
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -556,52 +542,16 @@ GAME_ROULETTE_PAGE = """
         .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 20px; border-radius: 30px; max-width: 900px; margin: 10px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
         .timer-box { font-size: 18px; font-weight: 900; color: #ffd700; background: #000; padding: 8px 15px; border-radius: 14px; border: 2px solid #38bdf8; margin-bottom: 12px; display: inline-block; }
         .spin-screen { font-size: 35px; font-weight: 900; color: #ffd700; background: #000; padding: 10px 20px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; margin-bottom: 12px; letter-spacing: 2px; }
-        
-        .roulette-table {
-            display: grid;
-            grid-template-columns: 50px repeat(12, 1fr);
-            grid-template-rows: repeat(3, 50px);
-            gap: 4px;
-            max-width: 100%;
-            overflow-x: auto;
-            margin: 15px auto;
-            background: #065f46;
-            padding: 10px;
-            border-radius: 16px;
-            border: 4px solid #b8860b;
-            box-sizing: border-box;
-        }
-        @media(max-width: 768px) {
-            .roulette-table { grid-template-columns: 35px repeat(12, minmax(28px, 1fr)); grid-template-rows: repeat(3, 42px); padding: 5px; gap: 2px; }
-        }
-        .r-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            color: #fff;
-            font-size: 15px;
-            transition: 0.15s;
-            user-select: none;
-            border: 1px solid rgba(255,255,255,0.2);
-            box-sizing: border-box;
-        }
+        .roulette-table { display: grid; grid-template-columns: 50px repeat(12, 1fr); grid-template-rows: repeat(3, 50px); gap: 4px; max-width: 100%; overflow-x: auto; margin: 15px auto; background: #065f46; padding: 10px; border-radius: 16px; border: 4px solid #b8860b; box-sizing: border-box; }
+        @media(max-width: 768px) { .roulette-table { grid-template-columns: 35px repeat(12, minmax(28px, 1fr)); grid-template-rows: repeat(3, 42px); padding: 5px; gap: 2px; } }
+        .r-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; border-radius: 6px; cursor: pointer; color: #fff; font-size: 15px; transition: 0.15s; user-select: none; border: 1px solid rgba(255,255,255,0.2); box-sizing: border-box; }
         @media(max-width: 768px) { .r-cell { font-size: 12px; } }
-        .r-cell.zero {
-            grid-row: span 3;
-            background: #047857;
-            border-color: #ffd700;
-            font-size: 20px;
-        }
+        .r-cell.zero { grid-row: span 3; background: #047857; border-color: #ffd700; font-size: 20px; }
         .r-cell.red { background: #dc2626; }
         .r-cell.black { background: #111827; }
         .r-cell:hover { transform: scale(1.04); border-color: #ffd700; }
         .r-cell.selected { border: 2px solid #ffd700 !important; box-shadow: 0 0 10px #ffd700; }
         .r-cell.winner-highlight { background: #fbbf24 !important; color: #000 !important; font-size: 18px; border: 3px solid #fff !important; box-shadow: 0 0 25px #ffd700; }
-
         .controls-grid { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; box-sizing: border-box; }
         .btn-ctrl { padding: 8px 12px; font-weight: 900; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
         .btn-red { background: #dc2626; color: #fff; }
@@ -609,7 +559,6 @@ GAME_ROULETTE_PAGE = """
         .btn-rand { background: #d97706; color: #000; }
         .btn-undo { background: #4b5563; color: #fff; }
         .btn-double { background: #3b82f6; color: #fff; }
-        .btn-repeat { background: #8b5cf6; color: #fff; }
     </style>
 </head>
 <body>
@@ -617,232 +566,90 @@ GAME_ROULETTE_PAGE = """
     <div class="card">
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎰 طاولة روليت الحظ العالمية</h2>
         <p style="font-size: 14px;"><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b> (الرهان: 1 USDD | الربح: 20 USDD لكل مضاعف - حد أقصى 21 رقماً)</p>
-
-        <!-- خانة عرض إجمالي قيمة الرهان الحالي في الجولة -->
-        <div style="background: rgba(15,20,32,0.9); padding: 10px 18px; border-radius: 12px; display: inline-block; margin-bottom: 10px; border: 2px solid #38bdf8;">
-            💰 إجمالي قيمة رهانك الحالي: <span id="currentRoundBetTotal" style="color: #34d399; font-weight: 900; font-size: 16px;">0</span> USDD
-        </div>
-
-        <div>
-            <div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div>
-        </div>
-
-        <div>
-            <div id="spinScreen" class="spin-screen">--</div>
-        </div>
+        <div><div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div></div>
+        <div><div id="spinScreen" class="spin-screen">--</div></div>
         <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:10px; min-height:20px; font-size: 14px;">اختر أرقامك من الطاولة أدناه</div>
-
         <div class="controls-grid">
             <button class="btn-ctrl btn-red" onclick="selectRed()">حجز كل الحمر</button>
             <button class="btn-ctrl btn-black" onclick="selectBlack()">حجز كل السود</button>
             <button class="btn-ctrl btn-rand" onclick="selectRandom10()">حجز 10 عشوائي</button>
             <button class="btn-ctrl btn-double" onclick="doubleBets()">دوبلت الرهانات (x2)</button>
-            <button class="btn-ctrl btn-repeat" onclick="repeatPreviousBet()">🔁 تكرار الرهان السابق</button>
             <button class="btn-ctrl btn-undo" onclick="undoLast()">تراجع عن الأخيرة</button>
         </div>
-
         <div class="roulette-table" id="rouletteTable">
-            <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0">
-                <span>0</span>
-                <span id="r_mult_0" style="font-size:9px; color:#ffd700;">0$</span>
-            </div>
-
+            <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0"><span>0</span><span id="r_mult_0" style="font-size:9px; color:#ffd700;">0$</span></div>
             {% set row1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] %}
             {% set row2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] %}
             {% set row3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] %}
             {% set red_list = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
-
-            {% for n in row1 %}
-                {% set is_red = n in red_list %}
-                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
-                    <span>{{ n }}</span>
-                    <span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span>
-                </div>
-            {% endfor %}
-
-            {% for n in row2 %}
-                {% set is_red = n in red_list %}
-                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
-                    <span>{{ n }}</span>
-                    <span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span>
-                </div>
-            {% endfor %}
-
-            {% for n in row3 %}
-                {% set is_red = n in red_list %}
-                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
-                    <span>{{ n }}</span>
-                    <span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span>
-                </div>
-            {% endfor %}
+            {% for n in row1 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span></div>{% endfor %}
+            {% for n in row2 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span></div>{% endfor %}
+            {% for n in row3 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:9px; color:#ffd700;">0$</span></div>{% endfor %}
         </div>
     </div>
-
     <script>
-        let bets = {};
-        let previousRoundBets = {}; // متغير لحفظ رهانات الجولة السابقة
-        let actionHistory = [];
+        let bets = {}; let actionHistory = [];
         let redNums = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
         let blackNums = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
-        let timeLeft = 15;
-        let timerInterval = null;
-        let gameActive = true;
-
+        let timeLeft = 15; let timerInterval = null; let gameActive = true;
         function startTimer() {
             timerInterval = setInterval(() => {
                 timeLeft--;
                 let tBox = document.getElementById('timerBox');
                 if(tBox) tBox.innerText = `⏳ وقت الرهان المتبقي: ${timeLeft} ث`;
-                if(timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    gameActive = false;
-                    if(tBox) tBox.innerText = `🛑 انتهى وقت الرهان، بدء السحب...`;
-                    setTimeout(executeDraw, 2000);
-                }
+                if(timeLeft <= 0) { clearInterval(timerInterval); gameActive = false; if(tBox) tBox.innerText = `🛑 انتهى وقت الرهان، بدء السحب...`; setTimeout(executeDraw, 2000); }
             }, 1000);
         }
         startTimer();
-
-        function getTotalBetsCount() {
-            let count = 0;
-            for(let k in bets) count += bets[k];
-            return count;
-        }
-
+        function getTotalBetsCount() { let count = 0; for(let k in bets) count += bets[k]; return count; }
         function toggleNum(n) {
             if(!gameActive) { alert("انتهى وقت الرهان لهذه الجولة!"); return; }
             if(!bets[n] && getTotalBetsCount() >= 21) { alert("حد أقصى 21 رقماً في المرة الواحدة!"); return; }
-
             if(!bets[n]) bets[n] = 0;
             if(bets[n] >= 10) { alert("حد أقصى دوبلت 10 مرات للرقم الواحد!"); return; }
-
-            bets[n]++;
-            actionHistory.push(n);
-
+            bets[n]++; actionHistory.push(n);
             fetch('/game_roulette_bet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'add', number:n})})
             .then(res => res.json()).then(d => {
-                if(d.success) {
-                    document.getElementById('rouletteBal').innerText = d.balance;
-                    updateUI();
-                } else {
-                    bets[n]--;
-                    actionHistory.pop();
-                    alert(d.msg || "رصيد غير كافي!");
-                }
+                if(d.success) { document.getElementById('rouletteBal').innerText = d.balance; updateUI(); }
+                else { bets[n]--; actionHistory.pop(); alert(d.msg || "رصيد غير كافي!"); }
             });
         }
-
         function undoLast() {
             if(!gameActive) { alert("لا يمكن التراجع بعد بدء السحب!"); return; }
             if(actionHistory.length === 0) { alert("لا توجد خطوات للتراجع عنها!"); return; }
             let lastNum = actionHistory.pop();
-            if(bets[lastNum]) {
-                bets[lastNum]--;
-                if(bets[lastNum] <= 0) delete bets[lastNum];
-            }
-
+            if(bets[lastNum]) { bets[lastNum]--; if(bets[lastNum] <= 0) delete bets[lastNum]; }
             fetch('/game_roulette_bet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'remove', number:lastNum})})
-            .then(res => res.json()).then(d => {
-                if(d.success) {
-                    document.getElementById('rouletteBal').innerText = d.balance;
-                    updateUI();
-                }
-            });
+            .then(res => res.json()).then(d => { if(d.success) { document.getElementById('rouletteBal').innerText = d.balance; updateUI(); } });
         }
-
         function updateUI() {
-            let totalMoney = 0;
             for(let i=0; i<=36; i++) {
-                let cell = document.getElementById('r_cell_' + i);
-                let badge = document.getElementById('r_mult_' + i);
-                if(bets[i] && bets[i] > 0) {
-                    cell.classList.add('selected');
-                    badge.innerText = `x${bets[i]} (${bets[i]}$)`;
-                    totalMoney += bets[i]; // كل رهان بـ 1 USDD
-                } else {
-                    cell.classList.remove('selected');
-                    badge.innerText = `0$`;
-                }
+                let cell = document.getElementById('r_cell_' + i); let badge = document.getElementById('r_mult_' + i);
+                if(bets[i] && bets[i] > 0) { cell.classList.add('selected'); badge.innerText = `x${bets[i]} (${bets[i]}$)`; }
+                else { cell.classList.remove('selected'); badge.innerText = `0$`; }
             }
-            // تحديث قيمة إجمالي الرهان في الخانة المخصصة
-            document.getElementById('currentRoundBetTotal').innerText = totalMoney;
         }
-
-        function selectRed() {
-            redNums.forEach(n => { if(getTotalBetsCount() < 21) toggleNum(n); });
-        }
-        function selectBlack() {
-            blackNums.forEach(n => { if(getTotalBetsCount() < 21) toggleNum(n); });
-        }
+        function selectRed() { redNums.forEach(n => { if(getTotalBetsCount() < 21) toggleNum(n); }); }
+        function selectBlack() { blackNums.forEach(n => { if(getTotalBetsCount() < 21) toggleNum(n); }); }
         function selectRandom10() {
             let all = []; for(let i=0; i<=36; i++) all.push(i);
-            for(let i=0; i<10; i++) {
-                if(getTotalBetsCount() >= 21) break;
-                let r = all[Math.floor(Math.random()*all.length)];
-                toggleNum(r);
-            }
+            for(let i=0; i<10; i++) { if(getTotalBetsCount() >= 21) break; let r = all[Math.floor(Math.random()*all.length)]; toggleNum(r); }
         }
-        function doubleBets() {
-            for(let k in bets) {
-                if(bets[k] > 0 && bets[k] < 10) {
-                    toggleNum(parseInt(k));
-                }
-            }
-        }
-
-        // دالة تكرار رهان الجولة السابقة
-        function repeatPreviousBet() {
-            if(!gameActive) { alert("انتهى وقت الرهان لهذه الجولة!"); return; }
-            if(Object.keys(previousRoundBets).length === 0) { alert("لا يوجد رهان سابق محفوظ لتكراره!"); return; }
-
-            let prevCount = 0;
-            for(let k in previousRoundBets) prevCount += previousRoundBets[k];
-
-            if(getTotalBetsCount() + prevCount > 21) {
-                alert("لا يمكن تكرار الرهان السابق لأن إجمالي الأرقام سيتجاوز الحد الأقصى المسموح (21 رقماً)!");
-                return;
-            }
-
-            // تطبيق الرهانات السابقة واحداً تلو الآخر
-            for(let k in previousRoundBets) {
-                let num = parseInt(k);
-                let count = previousRoundBets[num];
-                for(let c = 0; c < count; c++) {
-                    toggleNum(num);
-                }
-            }
-        }
-
+        function doubleBets() { for(let k in bets) { if(bets[k] > 0 && bets[k] < 10) { toggleNum(parseInt(k)); } } }
         function executeDraw() {
-            // حفظ الرهان الحالي في رهان الجولة السابقة قبل تنفيذ السحب
-            previousRoundBets = JSON.parse(JSON.stringify(bets));
-
             fetch('/game_roulette_draw', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({bets: bets})})
-            .then(res => res.json()).then(data => {
-                if(data.success) {
-                    runSpinAnimation(data.winning_number, data.msg, data.balance);
-                }
-            });
+            .then(res => res.json()).then(data => { if(data.success) { runSpinAnimation(data.winning_number, data.msg, data.balance); } });
         }
-
         function runSpinAnimation(winningNum, finalMsg, newBal) {
-            let screen = document.getElementById('spinScreen');
-            let msgEl = document.getElementById('rouletteMsg');
+            let screen = document.getElementById('spinScreen'); let msgEl = document.getElementById('rouletteMsg');
             let counter = 0;
             let interval = setInterval(() => {
-                screen.innerText = '#' + Math.floor(Math.random() * 37);
-                counter++;
+                screen.innerText = '#' + Math.floor(Math.random() * 37); counter++;
                 if(counter > 25) {
-                    clearInterval(interval);
-                    screen.innerText = '#' + winningNum;
-                    msgEl.innerText = finalMsg;
+                    clearInterval(interval); screen.innerText = '#' + winningNum; msgEl.innerText = finalMsg;
                     document.getElementById('rouletteBal').innerText = newBal;
-
                     let winCell = document.getElementById('r_cell_' + winningNum);
-                    if(winCell) {
-                        winCell.className = "r-cell winner-highlight";
-                    }
-
+                    if(winCell) { winCell.className = "r-cell winner-highlight"; }
                     setTimeout(() => { location.reload(); }, 6000);
                 }
             }, 80);
@@ -852,7 +659,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- باقي ألعاب وباقي القوالب والمسارات ---
+# --- لعبة إمبراطورية الأرقام الملكية (المحدثة خصيصاً بالأنيميشن والإضاءة والمودال المطلوب) ---
 GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -863,10 +670,14 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; }
         .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 25px; border-radius: 30px; max-width: 800px; margin: 15px auto; box-sizing: border-box; width: 100%; }
         .boxes { display: flex; justify-content: center; gap: 15px; margin: 25px 0; flex-wrap: wrap; box-sizing: border-box; }
-        .box { width: 100px; height: 110px; background: #7c3aed; border: 3px solid #ffd700; border-radius: 20px; color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+        .box { width: 100px; height: 110px; background: #7c3aed; border: 3px solid #ffd700; border-radius: 20px; color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; transition: 0.3s; }
         .box.booked { background: #7f1d1d; cursor: not-allowed; }
         .box.my { background: #1e3a8a; }
+        .box.winner-glow { background: #fbbf24 !important; border: 4px solid #fff !important; box-shadow: 0 0 35px #ffd700; color: #000 !important; transform: scale(1.15); animation: pulseGlow 0.6s infinite alternate; }
+        @keyframes pulseGlow { 0% { transform: scale(1.1); } 100% { transform: scale(1.2); } }
         .slot-box { font-size: 40px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; max-width: 100%; box-sizing: border-box; }
+        .modal-popup { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:300; box-sizing: border-box; padding: 15px; }
+        .modal-box { background:#1a1c29; padding:35px; border-radius:25px; border:4px solid #ffd700; width:100%; max-width:420px; text-align:center; box-shadow:0 15px 40px rgba(0,0,0,0.9); box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -886,12 +697,12 @@ GAME_NUMBERS_EMPIRE_PAGE = """
             {% for i in range(1, 6) %}
                 {% if i in bookings %}
                     {% if bookings[i] == username %}
-                        <button onclick="empAction('cancel', {{ i }})" class="box my"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">تراجع</span></button>
+                        <button onclick="empAction('cancel', {{ i }})" class="box my" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">تراجع</span></button>
                     {% else %}
-                        <div class="box booked"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">{{ bookings[i] }}</span></div>
+                        <div class="box booked" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
-                    <button onclick="empAction('book', {{ i }})" class="box"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">500$</span></button>
+                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">500$</span></button>
                 {% endif %}
             {% endfor %}
         </div>
@@ -902,21 +713,60 @@ GAME_NUMBERS_EMPIRE_PAGE = """
             </div>
         {% endif %}
     </div>
+
+    <!-- نافذة منبثقة كبيرة للتهنئة بالفوز الملكي -->
+    <div id="empireResultModal" class="modal-popup">
+        <div class="modal-box">
+            <h2 style="color: #ffd700; margin-top:0; font-size:30px;">👑 تهانينا الملكية</h2>
+            <p id="empireModalText" style="font-size: 20px; color: #34d399; font-weight: 900; margin: 20px 0;"></p>
+            <button onclick="closeEmpireModal()" style="background:#ffd700; color:#000; padding:12px 35px; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:16px;">حسناً</button>
+        </div>
+    </div>
+
     <script>
         function empAction(type, box) {
             let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
             fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
                 if(d.winning_number) {
-                    let screen = document.getElementById('empireSlot');
-                    let ann = document.getElementById('empireAnnouncement');
-                    screen.innerText = '#' + d.winning_number;
-                    ann.innerText = d.msg;
-                    setTimeout(() => { location.reload(); }, 5000);
+                    runEmpireAnimation(d.winning_number, d.msg);
                 } else {
                     if(d.msg) alert(d.msg);
                     location.reload();
                 }
             });
+        }
+
+        function runEmpireAnimation(winningNum, finalMsg) {
+            let screen = document.getElementById('empireSlot');
+            let ann = document.getElementById('empireAnnouncement');
+            let counter = 0;
+            
+            // حركة سريعة للأرقام داخل المربع الأسود
+            let interval = setInterval(() => {
+                let randNum = Math.floor(Math.random() * 5) + 1;
+                screen.innerText = '#' + randNum;
+                counter++;
+                if(counter > 25) {
+                    clearInterval(interval);
+                    screen.innerText = '#' + winningNum;
+                    ann.innerText = finalMsg;
+
+                    // إضاءة وتوهج المربع الفائز باللون الذهبي
+                    let winBox = document.getElementById('emp_box_' + winningNum);
+                    if(winBox) {
+                        winBox.classList.add('winner-glow');
+                    }
+
+                    // إظهار نافذة التهنئة الكبيرة المطلوبة
+                    document.getElementById('empireModalText').innerText = `مبروك للرقم ${winningNum} فاز بـ 2000 USDD`;
+                    document.getElementById('empireResultModal').style.display = 'flex';
+                }
+            }, 75);
+        }
+
+        function closeEmpireModal() {
+            document.getElementById('empireResultModal').style.display = 'none';
+            location.reload();
         }
     </script>
 </body>
@@ -946,81 +796,55 @@ GAME_NUMBER_WHEEL_PAGE = """
     <div class="card">
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎡 عجلة الحظ (20 رقم)</h2>
         <p style="font-size:16px; color:#ffd700;">سعر الحجز للرقم: 1 USDD | الجائزة: 20 USDD (حد أقصى 10 أرقام)</p>
-
-        <div>
-            <div id="wheelSlot" class="spin-screen">--</div>
-        </div>
+        <div><div id="wheelSlot" class="spin-screen">--</div></div>
         <div id="wheelMsg" style="font-size:16px; font-weight:900; color:#34d399; margin:8px 0;">اختر من 1 إلى 10 أرقام وابدأ السحب</div>
-
         <div class="wheel-grid">
             {% for n in range(1, 21) %}
                 <button type="button" id="w_num_{{ n }}" onclick="toggleWheelNum({{ n }})" class="wheel-btn">{{ n }}</button>
             {% endfor %}
         </div>
-
         <div class="selection-box">
             <h4 style="color: #38bdf8; margin-top:0; font-size: 15px;">📋 أرقامك المختارة وقيمة الرهان</h4>
             <p style="margin: 4px 0; font-size: 14px;"><b>الأرقام المحددة:</b> <span id="selectedListText" style="color: #ffd700;">لا توجد أرقام مختارة</span></p>
             <p style="margin: 4px 0; font-size: 14px;"><b>إجمالي قيمة الرهان:</b> <span id="totalCostText" style="color: #34d399;">0 USDD</span></p>
         </div>
-
         <button type="button" onclick="spinWheel()" style="padding: 15px 40px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 18px; border: none; border-radius: 16px; cursor: pointer; margin-top: 20px;">ابدأ السحب 🎡</button>
     </div>
-
     <script>
         let wheelSelected = [];
-
         function toggleWheelNum(n) {
             let idx = wheelSelected.indexOf(n);
-            if(idx > -1) {
-                wheelSelected.splice(idx, 1);
-                document.getElementById('w_num_' + n).classList.remove('selected');
-            } else {
+            if(idx > -1) { wheelSelected.splice(idx, 1); document.getElementById('w_num_' + n).classList.remove('selected'); }
+            else {
                 if(wheelSelected.length >= 10) { alert("لا يمكن اختيار أكثر من 10 أرقام في المحاولة الواحدة!"); return; }
-                wheelSelected.push(n);
-                document.getElementById('w_num_' + n).classList.add('selected');
+                wheelSelected.push(n); document.getElementById('w_num_' + n).classList.add('selected');
             }
             updateSelectionBox();
         }
-
         function updateSelectionBox() {
             let txt = wheelSelected.length > 0 ? wheelSelected.join(', ') : 'لا توجد أرقام مختارة';
             let cost = wheelSelected.length * 1.0;
             document.getElementById('selectedListText').innerText = txt;
             document.getElementById('totalCostText').innerText = cost + ' USDD';
         }
-
         function spinWheel() {
             if(wheelSelected.length === 0) { alert("يرجى اختيار رقم واحد على الأقل قبل بدء السحب!"); return; }
-            let fd = new FormData();
-            fd.append('selected_numbers', JSON.stringify(wheelSelected));
+            let fd = new FormData(); fd.append('selected_numbers', JSON.stringify(wheelSelected));
             fetch('/game_number_wheel', {method: 'POST', body: fd}).then(res => res.json()).then(d => {
-                if(d.success) {
-                    runWheelAnimation(d.winning_num, d.msg, d.balance);
-                } else {
-                    alert(d.msg || "حدث خطأ أو رصيد غير كافي!");
-                }
+                if(d.success) { runWheelAnimation(d.winning_num, d.msg, d.balance); }
+                else { alert(d.msg || "حدث خطأ أو رصيد غير كافي!"); }
             });
         }
-
         function runWheelAnimation(winningNum, finalMsg, newBal) {
-            let screen = document.getElementById('wheelSlot');
-            let msgEl = document.getElementById('wheelMsg');
+            let screen = document.getElementById('wheelSlot'); let msgEl = document.getElementById('wheelMsg');
             let counter = 0;
             let interval = setInterval(() => {
-                screen.innerText = '#' + Math.floor(Math.random() * 20 + 1);
-                counter++;
+                screen.innerText = '#' + Math.floor(Math.random() * 20 + 1); counter++;
                 if(counter > 20) {
-                    clearInterval(interval);
-                    screen.innerText = '#' + winningNum;
-                    msgEl.innerText = finalMsg;
+                    clearInterval(interval); screen.innerText = '#' + winningNum; msgEl.innerText = finalMsg;
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = newBal : null;
-
                     let winBtn = document.getElementById('w_num_' + winningNum);
-                    if(winBtn) {
-                        winBtn.className = "wheel-btn winner-glow";
-                    }
-
+                    if(winBtn) { winBtn.className = "wheel-btn winner-glow"; }
                     setTimeout(() => { location.reload(); }, 5000);
                 }
             }, 90);
@@ -1052,56 +876,35 @@ GAME_REVEAL_PAGE = """
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎟️ لعبة اكشف واربح</h2>
         <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 2 USDD | الجائزة الكبرى: 100 USDD (تطابق 3 أسود)</p>
         <p style="font-size:14px; color:#38bdf8;">تطابق وجهين أسد يعيد لك 1 USDD من قيمة المراهنة!</p>
-
         <div id="revealMsg" style="font-size: 17px; font-weight: 900; color: #34d399; margin: 15px 0;">اضغط على "ابدأ المحاولة الجديدة" ثم اختر 3 صناديق لكشفها</div>
-
         <div class="boxes-grid">
             {% for i in range(1, 6) %}
                 <div class="box-cell" id="b_{{ i }}" onclick="clickBox({{ i }})">📦</div>
             {% endfor %}
         </div>
-
         <button type="button" id="startBtn" onclick="startReveal()" style="padding: 15px 40px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 18px; border: none; border-radius: 16px; cursor: pointer; margin-top: 10px;">ابدأ المحاولة الجديدة (2 USDD) 🎟️</button>
     </div>
-
     <script>
-        let sessionRevealed = [];
-        let clicksCount = 0;
-        let gameActive = false;
-
+        let sessionRevealed = []; let clicksCount = 0; let gameActive = false;
         function startReveal() {
             fetch('/game_reveal_and_win', {method: 'POST'})
             .then(res => res.json())
             .then(d => {
                 if(d.success) {
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = d.balance : null;
-                    sessionRevealed = d.revealed;
-                    clicksCount = 0;
-                    gameActive = true;
+                    sessionRevealed = d.revealed; clicksCount = 0; gameActive = true;
                     document.getElementById('revealMsg').innerText = "تم خصم 2 USDD! اختر 3 صناديق من الصناديق لكشف محتواها الآن.";
                     document.getElementById('startBtn').style.display = 'none';
-
-                    for(let i=1; i<=5; i++) {
-                        let cell = document.getElementById('b_' + i);
-                        cell.innerText = "📦";
-                        cell.classList.remove('revealed');
-                    }
-                } else {
-                    alert(d.msg || "رصيد غير كافي!");
-                }
+                    for(let i=1; i<=5; i++) { let cell = document.getElementById('b_' + i); cell.innerText = "📦"; cell.classList.remove('revealed'); }
+                } else { alert(d.msg || "رصيد غير كافي!"); }
             });
         }
-
         function clickBox(boxIdx) {
             if(!gameActive) { alert("يرجى الضغط على زر 'ابدأ المحاولة الجديدة' أولاً!"); return; }
             let cell = document.getElementById('b_' + boxIdx);
             if(cell.classList.contains('revealed')) return;
-
             if(clicksCount < sessionRevealed.length) {
-                cell.innerText = sessionRevealed[clicksCount];
-                cell.classList.add('revealed');
-                clicksCount++;
-
+                cell.innerText = sessionRevealed[clicksCount]; cell.classList.add('revealed'); clicksCount++;
                 if(clicksCount === sessionRevealed.length) {
                     gameActive = false;
                     setTimeout(() => {
@@ -1141,16 +944,10 @@ GAME_ARROW_WHEEL_PAGE = """
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎯 لعبة رمي السهم المتحركة (12 هدف)</h2>
         <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 5 USDD | الهدف 1000 و 500 يظهران على العجلة للاختبار ولكن لا يمكن إصابتهما!</p>
         <p style="font-size:14px; color:#38bdf8;">الهدف الذي يُصاب يعود ربحه فوراً إلى صندوق اللاعب!</p>
-
-        <div class="wheel-container">
-            <div id="arrowScreen" class="arrow-screen">🎯 جاهز للرمي</div>
-        </div>
-
+        <div class="wheel-container"><div id="arrowScreen" class="arrow-screen">🎯 جاهز للرمي</div></div>
         <div id="arrowMsg" style="font-size: 16px; font-weight: 900; color: #34d399; margin: 12px 0;">اضغط على "ارم السهم" لبدء الرمية</div>
-
         <button type="button" onclick="throwArrow()" style="padding: 16px 40px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 20px; border: none; border-radius: 16px; cursor: pointer; margin-top: 10px; box-shadow: 0 10px 25px rgba(34,197,94,0.4);">🎯 ارم السهم (5 USDD per try)</button>
     </div>
-
     <div id="resultModal" class="modal-popup">
         <div class="modal-box">
             <h2 style="color: #ffd700; margin-top:0; font-size:26px;">🎉 النتيجة</h2>
@@ -1158,7 +955,6 @@ GAME_ARROW_WHEEL_PAGE = """
             <button onclick="closeModal()" style="background:#ffd700; color:#000; padding:10px 30px; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:16px;">حسناً</button>
         </div>
     </div>
-
     <script>
         function throwArrow() {
             fetch('/game_arrow_wheel', {method: 'POST'})
@@ -1167,35 +963,23 @@ GAME_ARROW_WHEEL_PAGE = """
                 if(d.success) {
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = d.balance : null;
                     runArrowAnimation(d.hit_target, d.msg, d.balance);
-                } else {
-                    alert(d.msg || "رصيد غير كافي!");
-                }
+                } else { alert(d.msg || "رصيد غير كافي!"); }
             });
         }
-
         function runArrowAnimation(hitTarget, finalMsg, newBal) {
-            let screen = document.getElementById('arrowScreen');
-            let counter = 0;
+            let screen = document.getElementById('arrowScreen'); let counter = 0;
             let targetsPoolAnim = ['1 USDD', '2 USDD', '1000 USDD', '3 USDD', '500 USDD', '4 USDD', '5 USDD', '1000 USDD', 'حظ أوفر', '500 USDD', '1 USDD', '1000 USDD'];
-            
             let interval = setInterval(() => {
                 let randT = targetsPoolAnim[Math.floor(Math.random() * targetsPoolAnim.length)];
-                screen.innerText = randT;
-                counter++;
+                screen.innerText = randT; counter++;
                 if(counter > 22) {
-                    clearInterval(interval);
-                    screen.innerText = hitTarget;
-                    
+                    clearInterval(interval); screen.innerText = hitTarget;
                     document.getElementById('modalResultText').innerText = finalMsg;
                     document.getElementById('resultModal').style.display = 'flex';
                 }
             }, 80);
         }
-
-        function closeModal() {
-            document.getElementById('resultModal').style.display = 'none';
-            location.reload();
-        }
+        function closeModal() { document.getElementById('resultModal').style.display = 'none'; location.reload(); }
     </script>
 </body>
 </html>
@@ -1331,9 +1115,7 @@ ADMIN_GAME_CONTROL_PAGE = """
     {{ lang_bar | safe }}
     <h2>🎮 غرفة تحكم الألعاب - إعدادات لكل لعبة بشكل منفرد</h2>
     <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
-    
     {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px auto; max-width:500px; font-weight:bold;">{{ msg }}</div>{% endif %}
-
     <div class="panel" style="border-color: #ffd700;">
         <h3 style="color: #ffd700; margin-top:0;">🏆 الرقم الحنون (1-50)</h3>
         <form method="POST">
@@ -1345,7 +1127,6 @@ ADMIN_GAME_CONTROL_PAGE = """
             <button type="submit" style="background:#ffd700; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات الرقم الحنون</button>
         </form>
     </div>
-
     <div class="panel" style="border-color: #38bdf8;">
         <h3 style="color: #38bdf8; margin-top:0;">🎰 روليت الحظ (0-36)</h3>
         <form method="POST">
@@ -1357,7 +1138,6 @@ ADMIN_GAME_CONTROL_PAGE = """
             <button type="submit" style="background:#38bdf8; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات روليت الحظ</button>
         </form>
     </div>
-
     <div class="panel" style="border-color: #a78bfa;">
         <h3 style="color: #a78bfa; margin-top:0;">🏛️ إمبراطورية الأرقام (1-5)</h3>
         <form method="POST">
@@ -1369,7 +1149,6 @@ ADMIN_GAME_CONTROL_PAGE = """
             <button type="submit" style="background:#a78bfa; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات إمبراطورية الأرقام</button>
         </form>
     </div>
-
     <div class="panel" style="border-color: #34d399;">
         <h3 style="color: #34d399; margin-top:0;">🎡 عجلة الحظ (1-20)</h3>
         <form method="POST">
@@ -1381,7 +1160,6 @@ ADMIN_GAME_CONTROL_PAGE = """
             <button type="submit" style="background:#34d399; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات عجلة الحظ</button>
         </form>
     </div>
-
     <div class="panel" style="border-color: #f59e0b;">
         <h3 style="color: #f59e0b; margin-top:0;">🎯 رمي السهم المتحركة</h3>
         <form method="POST">
@@ -1431,10 +1209,7 @@ CHAT_PAGE = """
             <button type="submit" style="background:#22c55e; color:#000; font-weight:900; cursor:pointer;">إرسال</button>
         </form>
     </div>
-    <script>
-        let area = document.getElementById('msgArea');
-        area.scrollTop = area.scrollHeight;
-    </script>
+    <script>let area = document.getElementById('msgArea'); area.scrollTop = area.scrollHeight;</script>
 </body>
 </html>
 """
@@ -1493,8 +1268,6 @@ ADMIN_CHATS_PAGE = """
 </body>
 </html>
 """
-
-# --- مسارات الفلاسك ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1602,16 +1375,13 @@ def game_golden_number():
                     winner_u.balance += 700.0
                     vault.vault_balance -= 700.0
                     db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=700.0, log_time=get_local_time()))
-            
             GoldenNumberBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num})
-            
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     my_bookings_list = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
     my_nums_str = ', '.join(map(str, my_bookings_list)) if my_bookings_list else 'لا يوجد حجوزات حالياً'
     my_total_cost = len(my_bookings_list) * 20.0
-
     return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, my_nums_str=my_nums_str, my_total_cost=my_total_cost, msg=msg)
 
 @app.route('/game_roulette_bet', methods=['POST'])
@@ -1621,7 +1391,6 @@ def game_roulette_bet():
     vault = SystemVault.query.get(1)
     data = request.get_json() or {}
     action = data.get('action')
-    
     if action == 'add':
         if user.balance >= 1.0:
             user.balance -= 1.0
@@ -1646,9 +1415,7 @@ def game_roulette_draw():
     data = request.get_json() or {}
     bets = data.get('bets', {})
     player_choices = [int(k) for k in bets.keys()]
-
     winning_num = get_unified_math_outcome('roulette', player_choices, 0, 36)
-    
     total_payout = 0.0
     str_winning = str(winning_num)
     if str_winning in bets:
@@ -1661,7 +1428,6 @@ def game_roulette_draw():
         msg = f"🎉 مبروك! ظهر الرقم الفائز #{winning_num} وفزت بـ {total_payout} USDD!"
     else:
         msg = f"❌ حظ أوفر! الرقم الفائز كان #{winning_num}"
-
     return jsonify({"success": True, "winning_number": winning_num, "msg": msg, "balance": user.balance})
 
 @app.route('/game_roulette', methods=['GET'])
@@ -1708,7 +1474,7 @@ def game_numbers_empire():
                     winner_u.balance += 2000.0
                     vault.vault_balance -= 2000.0
                     db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
-            msg = f"انتهى السحب الفاخر! الرقم الفائز الملكي: #{winning_num}"
+            msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
             NumbersEmpireBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
@@ -1730,7 +1496,6 @@ def game_number_wheel():
             user.balance -= cost
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان عجلة الحظ', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
-            
             winning_num = get_unified_math_outcome('wheel', nums, 1, 20)
             if winning_num in nums:
                 user.balance += 20.0
@@ -1739,7 +1504,6 @@ def game_number_wheel():
                 msg = f"مبروك ربحت 20 usdd للرقم {winning_num}"
             else:
                 msg = "حظ اوفر"
-
             db.session.commit()
             return jsonify({"success": True, "winning_num": winning_num, "balance": user.balance, "msg": msg})
         else:
@@ -1754,17 +1518,14 @@ def game_arrow_wheel():
     vault = SystemVault.query.get(1)
     t = get_t()
     lang_key = session.get('lang', 'ar')
-
     if request.method == 'POST':
         cost = 5.0
         if user.balance >= cost:
             user.balance -= cost
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان رمي السهم المتحركة', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
-
             valid_targets_vals = [1, 2, 3, 4, 5, 0]
             chosen_val = get_unified_math_outcome('arrow_wheel', valid_targets_vals, 0, 5)
-            
             if chosen_val > 0:
                 chosen_label, prize = f'{chosen_val} USDD', float(chosen_val)
                 user.balance += prize
@@ -1774,12 +1535,10 @@ def game_arrow_wheel():
             else:
                 chosen_label, prize = 'حظ أوفر', 0.0
                 msg = f"حظ اوفر"
-
             db.session.commit()
             return jsonify({"success": True, "hit_target": chosen_label, "msg": msg, "balance": user.balance})
         else:
             return jsonify({"success": False, "msg": "رصيد غير كافي! ثمن الرمية 5 USDD"})
-
     return render_template_string(GAME_ARROW_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
@@ -1789,22 +1548,18 @@ def game_reveal_and_win():
     vault = SystemVault.query.get(1)
     t = get_t()
     lang_key = session.get('lang', 'ar')
-    
     state = RevealAndWinGlobalState.query.get(1)
     if not state:
         state = RevealAndWinGlobalState(id=1, total_spins=0)
         db.session.add(state)
         db.session.commit()
-
     if request.method == 'POST':
         if user.balance >= 2.0:
             user.balance -= 2.0
             vault.vault_balance += 2.0
-            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=2.0, log_time=get_local_time()))
-            
+            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
             state.total_spins += 1
             mod_val = state.total_spins % 100
-            
             future = GameFutureDraw.query.filter_by(game_name='reveal').order_by(GameFutureDraw.round_index.asc()).first()
             if future:
                 win_val = future.winning_number
@@ -1812,26 +1567,17 @@ def game_reveal_and_win():
                 db.session.commit()
                 outcome = 'win_3' if win_val == 100 else ('win_2' if win_val == 1 else 'loss')
             else:
-                if mod_val == 0:
-                    outcome = 'win_3'
-                elif mod_val <= 50:
-                    outcome = 'win_2'
-                else:
-                    outcome = 'loss'
-
+                if mod_val == 0: outcome = 'win_3'
+                elif mod_val <= 50: outcome = 'win_2'
+                else: outcome = 'loss'
             session['reveal_outcome'] = outcome
-            if outcome == 'win_3':
-                revealed = ['🦁', '🦁', '🦁']
-            elif outcome == 'win_2':
-                revealed = ['🦁', '🦁', random.choice(['7', '3'])]
-            else:
-                revealed = ['🦁', '7', '3']
-
+            if outcome == 'win_3': revealed = ['🦁', '🦁', '🦁']
+            elif outcome == 'win_2': revealed = ['🦁', '🦁', random.choice(['7', '3'])]
+            else: revealed = ['🦁', '7', '3']
             db.session.commit()
             return jsonify({"success": True, "balance": user.balance, "revealed": revealed})
         else:
             return jsonify({"success": False, "msg": "رصيد غير كافي! تكلفة المحاولة 2 USDD"})
-
     return render_template_string(GAME_REVEAL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/game_reveal_result_check', methods=['POST'])
@@ -1840,7 +1586,6 @@ def game_reveal_result_check():
     user = User.query.filter_by(username=session['username']).first()
     vault = SystemVault.query.get(1)
     outcome = session.get('reveal_outcome', 'loss')
-    
     if outcome == 'win_3':
         payout = 100.0
         user.balance += payout
@@ -1855,7 +1600,6 @@ def game_reveal_result_check():
         msg = "نجحت في تطابق وجهين أسد واسترددت 1 USDD!"
     else:
         msg = "حظ أوفر في المحاولة القادمة"
-
     db.session.commit()
     return jsonify({"success": True, "msg": msg, "balance": user.balance})
 
