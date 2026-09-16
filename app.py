@@ -57,6 +57,23 @@ class RechargeCard(db.Model):
     used_by = db.Column(db.String(80), nullable=True)
     created_at = db.Column(db.String(50))
 
+# جدول تخزين الأرقام الفائزة لـ 50 جولة قادمة لكل لعبة
+class GameFutureDraw(db.Model):
+    __tablename__ = 'game_future_draws'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    game_name = db.Column(db.String(50), nullable=False) # 'golden', 'roulette', 'empire', 'wheel', 'game20'
+    round_index = db.Column(db.Integer, nullable=False) # من 1 إلى 50
+    winning_number = db.Column(db.Integer, nullable=False)
+
+# جدول الدردشة الفورية والسرية بين اللاعبين والإدارة
+class ChatMessage(db.Model):
+    __tablename__ = 'chat_messages'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    sender = db.Column(db.String(80), nullable=False)   # اسم المرسل (لاعب أو admin1)
+    recipient = db.Column(db.String(80), nullable=False) # اسم المستلم (admin1 أو اسم اللاعب)
+    message = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.String(50))
+
 class GoldenNumberBooking(db.Model):
     __tablename__ = 'golden_number_bookings'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -71,22 +88,6 @@ class NumbersEmpireBooking(db.Model):
     number = db.Column(db.Integer)
     booking_date = db.Column(db.String(50))
 
-class NumbersEmpireState(db.Model):
-    __tablename__ = 'numbers_empire_state'
-    id = db.Column(db.Integer, primary_key=True)
-    winning_number = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(20), default='idle')
-    draw_end_time = db.Column(db.Float, default=0)
-    forced_winning_number = db.Column(db.Integer, default=0)
-
-class GameDrawState(db.Model):
-    __tablename__ = 'game_draw_state'
-    id = db.Column(db.Integer, primary_key=True)
-    winning_number = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(20), default='idle')
-    draw_end_time = db.Column(db.Float, default=0)
-    forced_winning_number = db.Column(db.Integer, default=0)
-
 # --- تهيئة الجداول ---
 with app.app_context():
     db.create_all()
@@ -95,19 +96,16 @@ with app.app_context():
         db.session.add(SystemVault(id=1, vault_balance=1000000.0))
     if not User.query.filter_by(username='admin1').first():
         db.session.add(User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام'))
-    if not GameDrawState.query.get(1):
-        db.session.add(GameDrawState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0))
-    if not NumbersEmpireState.query.get(1):
-        db.session.add(NumbersEmpireState(id=1, winning_number=0, status='idle', draw_end_time=0, forced_winning_number=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات) ---
+# --- قاموس الترجمات الشامل ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
         'login': 'دخول للبرنامج', 'username': 'اسم المستخدم', 'password': 'كلمة المرور', 'balance': 'الرصيد',
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
+        'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية والدعم',
         'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام',
         'game4': 'عجلة الأرقام', 'game5': 'اكشف واربح', 'game6': 'لعبة 70 USDD',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
@@ -116,52 +114,13 @@ TRANSLATIONS = {
     'en': {
         'dir': 'ltr', 'title': 'Empire of Numbers', 'subtitle': 'Super Interactive 12D Gaming Platform',
         'login': 'Login', 'username': 'Username', 'password': 'Password', 'balance': 'Balance',
-        'recharge': 'Recharge Balance', 'withdraw': 'Withdraw Balance', 'change_pass': 'Change Password', 'logout': 'Logout',
+        'recharge': 'Recharge', 'withdraw': 'Withdraw', 'change_pass': 'Change Password', 'logout': 'Logout',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Home', 'customers': 'Customers', 'accounting': 'Vault & Accounting',
+        'game_control': '🎮 Game Control Room', 'chat': '💬 Live Chat & Support',
         'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers',
         'game4': 'Number Wheel', 'game5': 'Reveal & Win', 'game6': '70 USDD Game',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
         'spin': 'Spin Wheel', 'reveal': 'Reveal Boxes', 'draw_now': 'Draw Now'
-    },
-    'fr': {
-        'dir': 'ltr', 'title': 'Empire des Nombres', 'subtitle': 'Plateforme de Jeux Super Interactive 12D',
-        'login': 'Connexion', 'username': "Nom d'utilisateur", 'password': 'Mot de passe', 'balance': 'Solde',
-        'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
-        'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
-        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres',
-        'game4': 'Roue des Nombres', 'game5': 'Révéler et Gagner', 'game6': 'Jeu 70 USDD',
-        'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
-        'spin': 'Tourner la roue', 'reveal': 'Révéler les boîtes', 'draw_now': 'Tirer maintenant'
-    },
-    'de': {
-        'dir': 'ltr', 'title': 'Imperium der Zahlen', 'subtitle': 'Super Interaktive 12D Gaming Plattform',
-        'login': 'Anmelden', 'username': 'Benutzername', 'password': 'Passwort', 'balance': 'Guthaben',
-        'recharge': 'Aufladen', 'withdraw': 'Auszahlen', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
-        'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung & Tresor',
-        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen',
-        'game4': 'Zahlenrad', 'game5': 'Aufdecken & Gewinnen', 'game6': '70 USDD Spiel',
-        'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
-        'spin': 'Rad drehen', 'reveal': 'Boxen aufdecken', 'draw_now': 'Jetzt ziehen'
-    },
-    'es': {
-        'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma de Juegos Super Interactiva 12D',
-        'login': 'Iniciar Sesión', 'username': 'Nombre de usuario', 'password': 'Contraseña', 'balance': 'Saldo',
-        'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
-        'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad y Bóveda',
-        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Imperio de los Números',
-        'game4': 'Rueda Numérica', 'game5': 'Revelar y Ganar', 'game6': 'Juego 70 USDD',
-        'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
-        'spin': 'Girar Rueda', 'reveal': 'Revelar Cajas', 'draw_now': 'Sorteo'
-    },
-    'fa': {
-        'dir': 'rtl', 'title': 'امپراتوری اعداد', 'subtitle': 'پلتفرم بازی‌های تعاملی فوق‌العاده 12D',
-        'login': 'ورود به برنامه', 'username': 'نام کاربری', 'password': 'رمز عبور', 'balance': 'موجودی',
-        'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
-        'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
-        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد',
-        'game4': 'گردونه اعداد', 'game5': 'کشف کن و برنده شو', 'game6': 'بازی 70 USDD',
-        'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
-        'spin': 'چرخش گردونه', 'reveal': 'کشف جعبه‌ها', 'draw_now': 'قرعه‌کشی'
     }
 }
 
@@ -178,17 +137,25 @@ def get_lang_bar():
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
             <option value="ar" {'selected' if curr=='ar' else ''}>العربية 🇸🇦</option>
             <option value="en" {'selected' if curr=='en' else ''}>English 🇬🇧</option>
-            <option value="fr" {'selected' if curr=='fr' else ''}>Français 🇫🇷</option>
-            <option value="de" {'selected' if curr=='de' else ''}>Deutsch 🇩🇪</option>
-            <option value="es" {'selected' if curr=='es' else ''}>Español 🇪🇸</option>
-            <option value="fa" {'selected' if curr=='fa' else ''}>فارسی 🇮🇷</option>
         </select>
     </div>
-    <div>
+    <div style="display:flex; gap:15px; align-items:center;">
+        <a href="/chat" style="color:#38bdf8; text-decoration:none; font-weight:bold; font-size:14px;">💬 الدعم والدردشة</a>
         <a href="/dashboard" style="color:#ffd700; text-decoration:none; font-weight:bold; font-size:14px;">🏠 الرئيسية</a>
     </div>
 </div>
 """
+
+# دالة مساعدة لجلب أو استهلاك الرقم الفائز المبرمج للـ 50 جولة القادمة
+def get_next_winning_number(game_name, default_min, default_max):
+    # نبحث عن أول جولة متاحة (مثلاً أصغر round_index مسجل لهذه اللعبة)
+    future_draw = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
+    if future_draw:
+        winning_num = future_draw.winning_number
+        db.session.delete(future_draw) # استهلاك الرقم لهذه الجولة
+        db.session.commit()
+        return winning_num
+    return random.randint(default_min, default_max)
 
 # --- قوالب HTML ---
 
@@ -219,24 +186,12 @@ DASHBOARD_PAGE = """
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #fff; margin: 0; padding: 20px; min-height: 100vh; }
         .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20, 24, 38, 0.9); padding: 18px 30px; border-radius: 18px; border-bottom: 3px solid #ffd700; flex-wrap: wrap; gap: 15px; }
-        .action-bar { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 25px auto; max-width: 950px; flex-wrap: wrap; background: rgba(20,24,38,0.95); padding: 20px; border-radius: 20px; border: 2px solid rgba(255,215,0,0.4); }
-        .dropdown { position: relative; display: inline-block; }
-        .drop-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; padding: 12px 25px; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; font-size: 16px; }
-        .drop-btn.withdraw { background: linear-gradient(135deg, #ef4444, #991b1b); }
-        .dropdown-content { display: none; position: absolute; background: #1a1c29; min-width: 240px; box-shadow: 0px 8px 16px rgba(0,0,0,0.5); z-index: 10; border-radius: 12px; border: 1px solid #ffd700; overflow: hidden; right: 0; }
-        .dropdown-content a, .dropdown-content div { color: #fff; padding: 12px 16px; text-decoration: none; display: block; text-align: right; cursor: pointer; font-size: 14px; }
-        .dropdown-content a:hover, .dropdown-content div:hover { background: #2d3748; color: #ffd700; }
-        .dropdown:hover .dropdown-content { display: block; }
-        .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 8px 15px; border-radius: 12px; border: 1px solid #ffd700; }
-        .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; }
-        .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 1000px; margin: 30px auto; }
+        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 1000px; margin: 40px auto; }
         @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 35px 20px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-8px); }
         .icon-logo { font-size: 75px; margin-bottom: 15px; }
         .icon-title { color: #ffd700; font-size: 21px; font-weight: 900; }
-        #usdtModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:100; }
     </style>
 </head>
 <body>
@@ -249,6 +204,8 @@ DASHBOARD_PAGE = """
         </div>
         <div style="display:flex; gap:12px; flex-wrap:wrap;">
             {% if username == 'admin1' %}
+                <a href="/admin_game_control" style="background:#38bdf8; color:#000; padding:10px 16px; text-decoration:none; border-radius:10px; font-weight:900;">🎮 {{ t.game_control }}</a>
+                <a href="/admin_chats" style="background:#38bdf8; color:#000; padding:10px 16px; text-decoration:none; border-radius:10px; font-weight:900;">💬 إدارة الدردشة</a>
                 <a href="/admin_customers" style="background:#ffd700; color:#000; padding:10px 16px; text-decoration:none; border-radius:10px; font-weight:900;">👥 {{ t.customers }}</a>
                 <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:10px 16px; text-decoration:none; border-radius:10px; font-weight:900;">📊 {{ t.accounting }}</a>
             {% endif %}
@@ -256,50 +213,6 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- شريط الإجراءات والخيارات فوق الألعاب -->
-    <div class="action-bar">
-        <!-- 1. شحن رصيد -->
-        <div class="dropdown">
-            <button class="drop-btn">💳 {{ t.recharge }} ▾</button>
-            <div class="dropdown-content">
-                <a onclick="rechargeWhish()">شحن عبر Whish في لبنان</a>
-                <a onclick="rechargeGooglePlay()">شراء USDD من متجر غوغل</a>
-            </div>
-        </div>
-
-        <!-- 2. خانة ضع كود الشحن هنا في المنتصف -->
-        <div class="redeem-box">
-            <form method="POST" style="display:flex; gap:5px; margin:0;">
-                <input type="hidden" name="action" value="redeem_card">
-                <input type="text" name="card_code" placeholder="ضع كود الشحن هنا..." required>
-                <button type="submit">تفعيل</button>
-            </form>
-        </div>
-
-        <!-- 3. سحب رصيد -->
-        <div class="dropdown">
-            <button class="drop-btn withdraw">💸 {{ t.withdraw }} ▾</button>
-            <div class="dropdown-content">
-                <a onclick="withdrawWhish('{{ username }}', '{{ password }}')">سحب عبر Whish في لبنان</a>
-                <a onclick="withdrawVisa('{{ username }}', '{{ password }}')">استلام فيزا مسبقة الدفع</a>
-                <a onclick="openUsdtModal()">سحب عبر محفظة USDT</a>
-            </div>
-        </div>
-    </div>
-
-    {% if msg %}<div style="background:#065f46; color:#34d399; padding:15px; border-radius:12px; max-width:600px; margin:15px auto; text-align:center; font-weight:900;">{{ msg }}</div>{% endif %}
-
-    <!-- نافذة إدخال محفظة USDT -->
-    <div id="usdtModal">
-        <div style="background:#1a1c29; padding:30px; border-radius:20px; border:2px solid #ffd700; width:350px; text-align:center;">
-            <h3 style="color:#ffd700;">سحب عبر USDT</h3>
-            <input type="text" id="usdtWalletInput" placeholder="أدخل عنوان محفظتك (USDT)..." style="width:100%; padding:12px; margin:15px 0; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box;">
-            <button onclick="submitUsdt('{{ username }}')" style="background:#22c55e; color:#000; padding:10px 20px; font-weight:900; border:none; border-radius:8px; cursor:pointer;">إرسال طلب السحب</button>
-            <button onclick="closeUsdtModal()" style="background:#ef4444; color:#fff; padding:10px 20px; font-weight:900; border:none; border-radius:8px; cursor:pointer; margin-right:5px;">إلغاء</button>
-        </div>
-    </div>
-
-    <!-- شبكة الألعاب -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
@@ -310,33 +223,6 @@ DASHBOARD_PAGE = """
     </div>
 
     <script>
-        function rechargeWhish() {
-            let phone = "96170000000"; // رقم الدعم أو الواتساب المخصص
-            let text = encodeURIComponent("مرحباً، أريد شحن رصيد في منصة امبراطورية الأرقام عبر Whish Money.");
-            window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-        }
-        function rechargeGooglePlay() {
-            alert("سيتم توجيهك إلى صفحة الشحن عبر متجر تطبيقات غوغل قريباً.");
-        }
-        function withdrawWhish(user, pass) {
-            let phone = "96170000000";
-            let text = encodeURIComponent(`أريد سحب رصيدي عبر Whish.\nيوزر: ${user}\nباسورد: ${pass}`);
-            window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-        }
-        function withdrawVisa(user, pass) {
-            let phone = "96170000000";
-            let text = encodeURIComponent(`أريد سحب رصيدي واستلام فيزا مسبقة الدفع.\nيوزر: ${user}\nباسورد: ${pass}`);
-            window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-        }
-        function openUsdtModal() { document.getElementById('usdtModal').style.display = 'flex'; }
-        function closeUsdtModal() { document.getElementById('usdtModal').style.display = 'none'; }
-        function submitUsdt(user) {
-            let wallet = document.getElementById('usdtWalletInput').value;
-            if(!wallet) { alert("يرجى إدخال عنوان المحفظة!"); return; }
-            alert(`تم إرسال طلب السحب لمحفظة USDT: ${wallet} بنجاح!`);
-            closeUsdtModal();
-        }
-
         setInterval(() => {
             fetch('/api/sync_balance').then(res => res.json()).then(data => {
                 let badge = document.getElementById('liveBalance');
@@ -348,7 +234,163 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# باقي قوالب الألعاب والكودات تبقى متوافقة تماماً مع الترجمات والدعم الشامل...
+# --- غرفة تحكم الألعاب (تحديد الأرقام الفائزة لـ 50 جولة قادمة) ---
+ADMIN_GAME_CONTROL_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><title>غرفة تحكم الألعاب (50 جولة)</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
+        .panel { background: rgba(25,30,48,0.95); padding: 25px; border-radius: 20px; border: 2px solid #ffd700; max-width: 700px; margin: 20px auto; text-align: right; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; background: #0a0d16; color: #fff; border: 1px solid #444; border-radius: 8px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2>🎮 غرفة تحكم الألعاب - برمجة الأرقام الفائزة لـ 50 جولة قادمة</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px auto; max-width:500px; font-weight:bold;">{{ msg }}</div>{% endif %}
+
+    <div class="panel">
+        <h3 style="color:#ffd700; text-align:center;">حدد الرقم الفائز لجولة قادمة</h3>
+        <form method="POST">
+            <label>اختر اللعبة:</label>
+            <select name="game_name" required>
+                <option value="golden">الرقم الحنون (1-50)</option>
+                <option value="roulette">روليت الحظ (0-36)</option>
+                <option value="empire">إمبراطورية الأرقام (1-5)</option>
+                <option value="wheel">عجلة الأرقام (1-20)</option>
+                <option value="game20">لعبة 70 USDD (1-20)</option>
+            </select>
+            <label>رقم الجولة القادمة (من 1 إلى 50):</label>
+            <input type="number" name="round_index" min="1" max="50" required placeholder="أدخل رقم الجولة القادمة...">
+            <label>الرقم الفائز المبرمج:</label>
+            <input type="number" name="winning_number" required placeholder="أدخل الرقم الفائز...">
+            <button type="submit" style="background:#22c55e; color:#000; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:15px;">حفظ في غرفة التحكم ⚡</button>
+        </form>
+    </div>
+
+    <div style="background:rgba(25,30,48,0.9); padding:20px; border-radius:15px; max-width:800px; margin:20px auto;">
+        <h3 style="color:#ffd700;">📋 الأرقام المبرمجة حالياً للجولات القادمة</h3>
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <tr style="background:#0a0d16; color:#ffd700;"><th style="padding:10px; border:1px solid #444;">اللعبة</th><th style="padding:10px; border:1px solid #444;">رقم الجولة</th><th style="padding:10px; border:1px solid #444;">الرقم الفائز المبرمج</th></tr>
+            {% for d in future_draws %}
+            <tr><td style="padding:10px; border:1px solid #444;">{{ d.game_name }}</td><td style="padding:10px; border:1px solid #444;">جولة #{{ d.round_index }}</td><td style="padding:10px; border:1px solid #444; color:#34d399;"><b>{{ d.winning_number }}</b></td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+# --- نظام الدردشة الفورية والسرية التامة للعبّاد مع الإدارة ---
+CHAT_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><title>الدردشة الفورية والدعم الفني</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 20px; text-align: center; }
+        .chat-box { background: rgba(25,30,48,0.95); border: 2px solid #ffd700; border-radius: 20px; max-width: 650px; margin: 20px auto; padding: 25px; text-align: right; }
+        .messages-area { height: 350px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 15px; overflow-y: scroll; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 15px; border-radius: 10px; max-width: 75%; font-size: 15px; }
+        .msg.user { background: #1e3a8a; align-self: flex-start; }
+        .msg.admin { background: #065f46; align-self: flex-end; }
+        input, button { padding: 12px; border-radius: 8px; border: 1px solid #444; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2>💬 غرفة الدردشة والدعم الفني الفوري (سرية تامة)</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+
+    <div class="chat-box">
+        <div class="messages-area" id="msgArea">
+            {% for m in messages %}
+            <div class="msg {% if m.sender == username %}user{% else %}admin{% endif %}">
+                <b style="font-size:12px; color:#ffd700;">{{ m.sender }}:</b><br>
+                <span>{{ m.message }}</span>
+                <div style="font-size:10px; color:#aaa; margin-top:5px; text-align:left;">{{ m.timestamp }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <form method="POST" style="display:flex; gap:10px;">
+            <input type="text" name="message" required placeholder="اكتب استفسارك هنا بسرية تامة..." style="flex:1; background:#0a0d16; color:#fff;">
+            <button type="submit" style="background:#22c55e; color:#000; font-weight:900; cursor:pointer;">إرسال</button>
+        </form>
+    </div>
+    <script>
+        let area = document.getElementById('msgArea');
+        area.scrollTop = area.scrollHeight;
+    </script>
+</body>
+</html>
+"""
+
+# --- لوحة إدارة الدردشات للآدمن (لكل لاعب دردشة منفصلة وسرية) ---
+ADMIN_CHATS_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><title>إدارة الدردشات السرية</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 20px; text-align: center; }
+        .chat-container { display: flex; max-width: 1000px; margin: 20px auto; background: rgba(25,30,48,0.95); border-radius: 20px; border: 2px solid #ffd700; overflow: hidden; }
+        .users-list { width: 30%; background: #0a0d16; border-left: 1px solid #444; padding: 15px; text-align: right; }
+        .user-link { display: block; padding: 12px; color: #ffd700; text-decoration: none; border-bottom: 1px solid #222; font-weight: bold; border-radius: 8px; margin-bottom: 5px; background: #141824; }
+        .user-link:hover, .user-link.active { background: #3b82f6; color: #fff; }
+        .chat-window { width: 70%; padding: 20px; text-align: right; display: flex; flex-direction: column; }
+        .messages-area { height: 350px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 15px; overflow-y: scroll; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 15px; border-radius: 10px; max-width: 75%; }
+        .msg.admin { background: #1e3a8a; align-self: flex-start; }
+        .msg.user { background: #065f46; align-self: flex-end; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2>💬 لوحة إدارة ومتابعة دردشات اللاعبين (سرية تامة)</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+
+    <div class="chat-container">
+        <div class="users-list">
+            <h4 style="color:#ffd700; margin-top:0;">اللاعبون المتحدثون</h4>
+            {% for u in chatting_users %}
+            <a href="/admin_chats?user={{ u }}" class="user-link {% if active_user == u %}active{% endif %}">👤 {{ u }}</a>
+            {% endfor %}
+        </div>
+        <div class="chat-window">
+            {% if active_user %}
+            <h4 style="color:#38bdf8; margin-top:0;">محادثة مع اللاعب: {{ active_user }}</h4>
+            <div class="messages-area" id="adminMsgArea">
+                {% for m in messages %}
+                <div class="msg {% if m.sender == 'admin1' %}admin{% else %}user{% endif %}">
+                    <b style="font-size:12px; color:#ffd700;">{{ m.sender }}:</b><br>
+                    <span>{{ m.message }}</span>
+                    <div style="font-size:10px; color:#aaa; margin-top:5px; text-align:left;">{{ m.timestamp }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <form method="POST" style="display:flex; gap:10px;">
+                <input type="hidden" name="recipient" value="{{ active_user }}">
+                <input type="text" name="message" required placeholder="اكتب ردك للسبون..." style="flex:1; padding:12px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px;">
+                <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:0 20px; border:none; border-radius:8px; cursor:pointer;">إرسال الرد</button>
+            </form>
+            {% else %}
+            <p style="color:#aaa; text-align:center; margin-top:150px;">اختر لاعباً من القائمة لعرض المحادثة السرية والرد عليه.</p>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+        let area = document.getElementById('adminMsgArea');
+        if(area) area.scrollTop = area.scrollHeight;
+    </script>
+</body>
+</html>
+"""
+
+# بقية قوالب الألعاب الأساسية والمحاسبة...
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -376,258 +418,12 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-GAME_NUMBERS_EMPIRE_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game3 }}</title>
-<style>body{background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;}</style>
-</head>
-<body>
-    {{ lang_bar | safe }}
-    <div style="max-width:600px;margin:30px auto;background:#1e2336;padding:30px;border-radius:20px;border:3px solid #ffd700;">
-        <h2 style="color:#ffd700;">🏛️ {{ t.game3 }}</h2>
-        <p><b>{{ t.balance }}: {{ balance }} USDD</b></p>
-    </div>
-</body>
-</html>
-"""
-
-GAME_NUMBER_WHEEL_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game4 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>🎡 {{ t.game4 }}</h2>
-</body>
-</html>
-"""
-
-GAME_REVEAL_AND_WIN_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game5 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>🎟️ {{ t.game5 }}</h2>
-</body>
-</html>
-"""
-
-GAME_20_NUMBERS_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game6 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>💎 {{ t.game6 }}</h2>
-</body>
-</html>
-"""
-
-GAME_ROULETTE_GLOBAL_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game2 }}</title></head>
-<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
-    {{ lang_bar | safe }}
-    <h2>🎰 {{ t.game2 }}</h2>
-</body>
-</html>
-"""
-
-ADMIN_CUSTOMERS_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>إدارة الزبائن</title>
-<style>body{font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;} table{width:100%; border-collapse:collapse; margin-top:15px;} th, td{border:1px solid #444; padding:10px;} th{background:#0a0d16; color:#ffd700;} input{padding:10px; margin:5px; width:100%; box-sizing:border-box; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px;}</style>
-</head>
-<body>
-    {{ lang_bar | safe }}
-    <h2>👥 إدارة الزبائن وحسابات اللاعبين</h2>
-    
-    {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px auto; max-width:500px; font-weight:bold;">{{ msg }}</div>{% endif %}
-
-    <div style="background:rgba(25,30,48,0.9); padding:25px; border-radius:16px; max-width:550px; margin:20px auto; border:2px solid #ffd700; text-align:right;">
-        <h3 style="color:#ffd700; text-align:center; margin-top:0;">➕ إنشاء حساب لاعب جديد</h3>
-        <form method="POST">
-            <input type="hidden" name="action" value="create_player">
-            <label>اسم المستخدم (Username):</label>
-            <input type="text" name="username" required placeholder="أدخل اسم المستخدم...">
-            <label>كلمة المرور (Password):</label>
-            <input type="password" name="password" required placeholder="أدخل كلمة المرور...">
-            <label>الرصيد الابتدائي (Balance):</label>
-            <input type="number" name="balance" value="0.0" step="0.5" required>
-            <label>اسم المالك / المحل (Owner Name):</label>
-            <input type="text" name="owner_name" placeholder="مثال: مستشفى التلفونات...">
-            <button type="submit" style="background:#22c55e; color:#000; padding:12px; font-weight:900; border:none; border-radius:10px; width:100%; cursor:pointer; margin-top:15px;">إنشاء الحساب الآن</button>
-        </form>
-    </div>
-
-    <div style="background: rgba(25,30,48,0.9); padding: 25px; border-radius: 20px; max-width: 1000px; margin: 25px auto;">
-        <h3 style="color:#ffd700;">📋 قائمة الحسابات واللاعبين</h3>
-        <table>
-            <tr><th>المستخدم</th><th>المالك / المحل</th><th>الدور</th><th>الرصيد</th><th>أُنشئ بواسطة</th></tr>
-            {% for u in users_list %}
-            <tr><td><b>{{ u.username }}</b></td><td>{{ u.owner_name }}</td><td>{{ u.role }}</td><td style="color:#34d399;">{{ u.balance }} USDD</td><td>{{ u.created_by }}</td></tr>
-            {% endfor %}
-        </table>
-    </div>
-</body>
-</html>
-"""
-
-# --- صفحة المحاسبة المحدثة (وضع خانة سحب الرصيد من الزبون بين بيع التشريج/العملات وتوليد الكودات) ---
-ADMIN_ACCOUNTING_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>برنامج المحاسبة - 12D</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #151928; color: #f8fafc; padding: 25px; text-align: center; }
-        .panel-box { background: rgba(25,30,48,0.9); padding: 22px; border-radius: 16px; max-width: 400px; margin: 15px auto; border: 2px solid #ffd700; text-align: right; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; background: #0a0d16; color: white; border: 1px solid #444; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #444; padding: 10px; text-align: center; }
-        th { background: #0a0d16; color: #ffd700; }
-        .stats-grid { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin: 20px 0; }
-        .stat-card { background: rgba(24,34,50,0.9); border: 2px solid #38bdf8; padding: 20px; border-radius: 15px; flex: 1; min-width: 220px; text-align: center; }
-    </style>
-</head>
-<body>
-    {{ lang_bar | safe }}
-    <h2>📊 برنامج المحاسبة والخزنة المركزية</h2>
-    
-    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 14px; border-radius: 12px; margin: 20px auto; max-width: 500px; font-weight: 900;">{{ msg }}</div>{% endif %}
-
-    <div style="font-size: 30px; font-weight: 900; color: #34d399; margin: 15px 0;">🏦 الخزنة المركزية: {{ vault_balance }} USDD</div>
-
-    <div class="stats-grid" style="max-width: 1000px; margin: 20px auto;">
-        <div class="stat-card" style="border-color: #ffd700;">
-            <h4 style="color:#ffd700; margin:0;">💳 النقاط المباعة</h4>
-            <div style="font-size:24px; font-weight:bold; margin-top:10px; color:#fff;">{{ total_points_sold }} USDD</div>
-        </div>
-        <div class="stat-card" style="border-color: #38bdf8;">
-            <h4 style="color:#38bdf8; margin:0;">📥 الواردات (الرهانات)</h4>
-            <div style="font-size:24px; font-weight:bold; margin-top:10px; color:#fff;">{{ total_game_bets }} USDD</div>
-        </div>
-        <div class="stat-card" style="border-color: #ef4444;">
-            <h4 style="color:#ef4444; margin:0;">🎁 الجوائز</h4>
-            <div style="font-size:24px; font-weight:bold; margin-top:10px; color:#fff;">{{ total_payouts }} USDD</div>
-        </div>
-        <div class="stat-card" style="border-color: #34d399;">
-            <h4 style="color:#34d399; margin:0;">📈 صافي أرباح الشركة</h4>
-            <div style="font-size:24px; font-weight:bold; margin-top:10px; color:#34d399;">{{ net_game_result }} USDD</div>
-        </div>
-    </div>
-
-    <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-        <!-- 1. بيع عملات مباشر للزبون -->
-        <div class="panel-box">
-            <h3 style="color: #22c55e; text-align:center;">⚡ بيع عملات مباشر</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="sell_currency">
-                <label>اختر الحساب:</label>
-                <select name="target_user" required>
-                    <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }})</option>{% endfor %}
-                </select>
-                <label>المبلغ (USDD):</label><input type="number" name="amount" min="1" required>
-                <button type="submit" style="background:#22c55e; color:#000; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إتمام البيع</button>
-            </form>
-        </div>
-
-        <!-- 2. سحب الرصيد من الزبون (موضوعة بدقة بين خيارات التشريج والتوليد بناءً على طلبك) -->
-        <div class="panel-box" style="border-color: #ef4444;">
-            <h3 style="color: #ef4444; text-align:center;">💸 سحب الرصيد من الزبون</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="buy_back_currency">
-                <label>اختر الحساب:</label>
-                <select name="target_user" required>
-                    <option value="">اختر الحساب</option>
-                    {% for u in users_list %}<option value="{{ u.username }}">{{ u.username }} (رصيده: {{ u.balance }})</option>{% endfor %}
-                </select>
-                <label>المبلغ المراد سحبه:</label><input type="number" name="amount" min="1" required>
-                <button type="submit" style="background:#ef4444; color:#fff; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">سحب للخزنة</button>
-            </form>
-        </div>
-
-        <!-- 3. توليد كودات الشحن -->
-        <div class="panel-box" style="border-color: #ffd700;">
-            <h3 style="color: #ffd700; text-align:center;">🎟️ توليد كودات الشحن</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="generate_card">
-                <label>اختر فئة كود الشحن (USDD):</label>
-                <select name="card_amount" required>
-                    <option value="100">100 USDD</option>
-                    <option value="200">200 USDD</option>
-                    <option value="300">300 USDD</option>
-                    <option value="500">500 USDD</option>
-                    <option value="1000">1000 USDD</option>
-                </select>
-                <button type="submit" style="background:#ffd700; color:#000; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:25px;">توليد كود الشحن 🎫</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- جدول كودات الشحن المولدة -->
-    <div style="background: rgba(25,30,48,0.9); padding: 30px; border-radius: 20px; max-width: 900px; margin: 30px auto;">
-        <h3 style="color: #ffd700;">🎫 كودات الشحن النشطة والمستخدمة</h3>
-        <table>
-            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>استخدمه</th><th>وقت الإنشاء</th></tr>
-            {% for c in cards %}
-            <tr>
-                <td style="color:#38bdf8; font-family:monospace; font-size:16px;"><b>{{ c.code }}</b></td>
-                <td>{{ c.amount }} USDD</td>
-                <td>{{ 'مستخدم ❌' if c.is_used else 'متاح ✅' }}</td>
-                <td>{{ c.used_by if c.used_by else '---' }}</td>
-                <td>{{ c.created_at }}</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
-
-    <!-- سجل العمليات المالية -->
-    <div style="background: rgba(25,30,48,0.9); padding: 30px; border-radius: 20px; max-width: 900px; margin: 30px auto;">
-        <h3 style="color: #ffd700;">📋 سجل العمليات المالية</h3>
-        <table>
-            <tr><th>نوع العملية</th><th>المسؤول</th><th>الهدف</th><th>المبلغ</th><th>التوقيت</th></tr>
-            {% for log in logs %}
-            <tr><td><b>{{ log.action_type }}</b></td><td>{{ log.admin_name }}</td><td>{{ log.target_user }}</td><td style="color: #34d399;">{{ log.amount }} USDD</td><td>{{ log.log_time }}</td></tr>
-            {% endfor %}
-        </table>
-    </div>
-</body>
-</html>
-"""
-
-CHANGE_PASSWORD_PAGE = """
-<!DOCTYPE html>
-<html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.change_pass }}</title></head>
-<body style="font-family:Tahoma; background:#151928; color:#fff; text-align:center; padding:50px;">
-    {{ lang_bar | safe }}
-    <h3>{{ t.change_pass }}</h3>
-    <a href="/dashboard">{{ t.back_dash }}</a>
-</body>
-</html>
-"""
-
-# --- المسارات والتحكم ---
+# --- المسارات والتحكم بالفلسب ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
     if lang in TRANSLATIONS: session['lang'] = lang
     return redirect(request.referrer or url_for('dashboard'))
-
-@app.route('/manifest.json')
-def manifest():
-    return jsonify({"name": "Empire of Numbers 12D", "short_name": "Empire12D", "start_url": "/", "display": "standalone", "background_color": "#0b0f19", "theme_color": "#ffd700"})
-
-@app.route('/sw.js')
-def service_worker():
-    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
 @app.route('/api/sync_balance')
 def api_sync_balance():
@@ -658,49 +454,89 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/dashboard', methods=['GET', 'POST'])
+@app.route('/dashboard')
 def dashboard():
     if 'username' not in session: return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
-    if not user: return redirect(url_for('logout'))
     t = get_t()
     lang_key = session.get('lang', 'ar')
+    return render_template_string(DASHBOARD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, balance=user.balance)
+
+# --- مسار غرفة تحكم الألعاب (50 جولة) ---
+@app.route('/admin_game_control', methods=['GET', 'POST'])
+def admin_game_control():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
     msg = None
     if request.method == 'POST':
-        action = request.form.get('action')
-        vault = SystemVault.query.get(1)
-        if action == 'redeem_card':
-            card_code = request.form.get('card_code', '').strip()
-            card = RechargeCard.query.filter_by(code=card_code, is_used=False).first()
-            if card and vault.vault_balance >= card.amount:
-                vault.vault_balance -= card.amount
-                user.balance += card.amount
-                card.is_used = True
-                card.used_by = user.username
-                db.session.add(FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=get_local_time()))
-                db.session.commit()
-                msg = f"🎉 تم شحن {card.amount} USDD بنجاح!"
-            else:
-                msg = "⚠️ الكود غير صالح أو مستخدم مسبقاً!"
-    return render_template_string(DASHBOARD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, password=user.password, balance=user.balance, msg=msg)
+        game_name = request.form.get('game_name')
+        round_index = int(request.form.get('round_index', 1))
+        winning_number = int(request.form.get('winning_number', 0))
+        
+        # تحقق أو تحديث الجولة القادمة المسجلة مسبقاً
+        existing = GameFutureDraw.query.filter_by(game_name=game_name, round_index=round_index).first()
+        if existing:
+            existing.winning_number = winning_number
+        else:
+            db.session.add(GameFutureDraw(game_name=game_name, round_index=round_index, winning_number=winning_number))
+        db.session.commit()
+        msg = f"تمت برمجة الرقم {winning_number} للجولة #{round_index} في لعبة {game_name} بنجاح!"
+    
+    future_draws = GameFutureDraw.query.order_by(GameFutureDraw.game_name, GameFutureDraw.round_index).all()
+    return render_template_string(ADMIN_GAME_CONTROL_PAGE, lang_bar=get_lang_bar(), future_draws=future_draws, msg=msg)
 
-@app.route('/change_password', methods=['GET', 'POST'])
-def change_password():
+# --- مسار الدردشة الفورية لللاعبين (سرية تامة) ---
+@app.route('/chat', methods=['GET', 'POST'])
+def chat():
     if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(CHANGE_PASSWORD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, balance=user.balance)
+    username = session['username']
+    if request.method == 'POST':
+        message = request.form.get('message', '').strip()
+        if message:
+            db.session.add(ChatMessage(sender=username, recipient='admin1', message=message, timestamp=get_local_time()))
+            db.session.commit()
+            return redirect(url_for('chat'))
+    
+    # جلب محادثات هذا اللاعب فقط (سرية تامة بحيث لا يرى محادثات الآخرين)
+    messages = ChatMessage.query.filter(
+        ((ChatMessage.sender == username) & (ChatMessage.recipient == 'admin1')) |
+        ((ChatMessage.sender == 'admin1') & (ChatMessage.recipient == username))
+    ).order_by(ChatMessage.id.asc()).all()
+    
+    return render_template_string(CHAT_PAGE, lang_bar=get_lang_bar(), username=username, messages=messages)
 
-# --- مسارات الألعاب ---
+# --- مسار إدارة الدردشات للآدمن ---
+@app.route('/admin_chats', methods=['GET', 'POST'])
+def admin_chats():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        recipient = request.form.get('recipient')
+        message = request.form.get('message', '').strip()
+        if recipient and message:
+            db.session.add(ChatMessage(sender='admin1', recipient=recipient, message=message, timestamp=get_local_time()))
+            db.session.commit()
+            return redirect(url_for('admin_chats', user=recipient))
+            
+    active_user = request.args.get('user')
+    # استخراج قائمة اللاعبين الذين أرسلوا رسائل للإدارة
+    chatting_users = db.session.query(ChatMessage.sender).filter(ChatMessage.sender != 'admin1').distinct().all()
+    chatting_users = [u[0] for u in chatting_users]
+    
+    messages = []
+    if active_user:
+        messages = ChatMessage.query.filter(
+            ((ChatMessage.sender == active_user) & (ChatMessage.recipient == 'admin1')) |
+            ((ChatMessage.sender == 'admin1') & (ChatMessage.recipient == active_user))
+        ).order_by(ChatMessage.id.asc()).all()
+        
+    return render_template_string(ADMIN_CHATS_PAGE, lang_bar=get_lang_bar(), chatting_users=chatting_users, active_user=active_user, messages=messages)
 
+# مثال على دمج سحب الرقم في اللعبة (مثل الرقم الحنون)
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
     username = session['username']
     user = User.query.filter_by(username=username).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
     if request.method == 'POST':
         action_type = request.form.get('action_type')
         if action_type == 'book':
@@ -710,129 +546,7 @@ def game_golden_number():
                 db.session.add(GoldenNumberBooking(username=username, number=number, booking_date=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True, "msg": f"تم حجز الرقم {number}!"})
-    return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_numbers_empire', methods=['GET', 'POST'])
-def game_numbers_empire():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_number_wheel', methods=['GET', 'POST'])
-def game_number_wheel():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(GAME_NUMBER_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_reveal_and_win', methods=['GET', 'POST'])
-def game_reveal_and_win():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(GAME_REVEAL_AND_WIN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_roulette', methods=['GET', 'POST'])
-def game_roulette():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(GAME_ROULETTE_GLOBAL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-@app.route('/game_20_numbers', methods=['GET', 'POST'])
-def game_20_numbers():
-    if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    return render_template_string(GAME_20_NUMBERS_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
-
-# --- مسارات الإدارة ---
-
-@app.route('/admin_customers', methods=['GET', 'POST'])
-def admin_customers():
-    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    msg = None
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'create_player':
-            username = request.form.get('username', '').strip()
-            password = request.form.get('password', '').strip()
-            balance = float(request.form.get('balance', 0.0))
-            owner_name = request.form.get('owner_name', 'غير محدد').strip()
-            if username and password:
-                if not User.query.filter_by(username=username).first():
-                    new_user = User(
-                        username=username,
-                        password=password,
-                        balance=balance,
-                        role='user',
-                        created_by=session['username'],
-                        owner_name=owner_name
-                    )
-                    db.session.add(new_user)
-                    db.session.add(FinancialLog(action_type='إنشاء حساب لاعب جديد', admin_name=session['username'], target_user=username, amount=balance, log_time=get_local_time()))
-                    db.session.commit()
-                    msg = f"تم إنشاء حساب اللاعب {username} بنجاح!"
-                else:
-                    msg = "اسم المستخدم موجود مسبقاً!"
-            else:
-                msg = "يرجى ملء كافة الحقول الإجبارية!"
-    users_list = User.query.all()
-    return render_template_string(ADMIN_CUSTOMERS_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), users_list=users_list, msg=msg)
-
-@app.route('/admin_accounting', methods=['GET', 'POST'])
-def admin_accounting():
-    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
-    vault = SystemVault.query.get(1)
-    t = get_t()
-    lang_key = session.get('lang', 'ar')
-    msg = None
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'sell_currency':
-            target, amount = request.form.get('target_user'), float(request.form.get('amount', 0))
-            if vault.vault_balance >= amount:
-                vault.vault_balance -= amount
-                User.query.filter_by(username=target).first().balance += amount
-                db.session.add(FinancialLog(action_type='بيع عملات للزبون', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time()))
-                db.session.commit()
-                msg = "تم بيع العملات بنجاح!"
-        elif action == 'buy_back_currency':
-            target, amount = request.form.get('target_user'), float(request.form.get('amount', 0))
-            u = User.query.filter_by(username=target).first()
-            if u and u.balance >= amount:
-                u.balance -= amount
-                vault.vault_balance += amount
-                db.session.add(FinancialLog(action_type='سحب رصيد من الزبون', admin_name='admin1', target_user=target, amount=amount, log_time=get_local_time()))
-                db.session.commit()
-                msg = "تم سحب الرصيد من الزبون بنجاح!"
-        elif action == 'generate_card':
-            amount = float(request.form.get('card_amount', 100))
-            if amount in [100.0, 200.0, 300.0, 500.0, 1000.0]:
-                code_str = 'EMP-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8)) + f'-{int(amount)}'
-                new_card = RechargeCard(code=code_str, amount=amount, is_used=False, created_at=get_local_time())
-                db.session.add(new_card)
-                db.session.add(FinancialLog(action_type=f'توليد كود شحن فئة {int(amount)}', admin_name='admin1', target_user='system', amount=amount, log_time=get_local_time()))
-                db.session.commit()
-                msg = f"تم توليد كود شحن بقيمة {int(amount)} بنجاح: {code_str}"
-
-    logs = FinancialLog.query.order_by(FinancialLog.id.desc()).all()
-    cards = RechargeCard.query.order_by(RechargeCard.id.desc()).all()
-    
-    tp_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.in_(['بيع عملات للزبون', 'شحن عبر بطاقة كود'])).scalar() or 0.0
-    tg_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%مبيع رهان%')).scalar() or 0.0
-    tpayouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%جائزة%')).scalar() or 0.0
-    net = tg_bets - tpayouts
-
-    return render_template_string(ADMIN_ACCOUNTING_TEMPLATE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, logs=logs, cards=cards, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, users_list=User.query.all(), msg=msg)
+    return render_template_string(GAME_GOLDEN_PAGE, t=get_t(), lang_key=session.get('lang', 'ar'), lang_bar=get_lang_bar(), balance=user.balance)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
