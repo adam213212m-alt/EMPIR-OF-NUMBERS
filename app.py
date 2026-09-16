@@ -101,7 +101,7 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات رئيسية) ---
+# --- قاموس الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -160,7 +160,8 @@ def get_t():
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
-    if lang in TRANSLATIONS: session['lang'] = lang
+    if lang in TRANSLATIONS:
+        session['lang'] = lang
     return redirect(request.referrer or url_for('dashboard'))
 
 def get_lang_bar():
@@ -255,7 +256,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- واجهات العرض (HTML Templates) الشاملة والمتكاملة ---
+# --- صفحات الواجهات المتكاملة ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
