@@ -114,7 +114,7 @@ TRANSLATIONS = {
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
         'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
-        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ', 'game5': 'اكشف واربح',
+        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ', 'game5': 'اكشف واربح', 'game6': 'رمي السهم المتحركة',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
         'spin': 'تدوير العجلة', 'draw_now': 'اسحب الآن'
     },
@@ -124,7 +124,7 @@ TRANSLATIONS = {
         'recharge': 'Recharge', 'withdraw': 'Withdraw', 'change_pass': 'Change Password', 'logout': 'Logout',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Home', 'customers': 'Customers', 'accounting': 'Vault & Accounting',
         'game_control': '🎮 Game Control', 'chat': '💬 Live Chat',
-        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune', 'game5': 'Reveal & Win',
+        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune', 'game5': 'Reveal & Win', 'game6': 'Animated Arrow Throw',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
         'spin': 'Spin Wheel', 'draw_now': 'Draw Now'
     },
@@ -134,7 +134,7 @@ TRANSLATIONS = {
         'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
         'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
         'game_control': '🎮 Contrôle des Jeux', 'chat': '💬 Chat en Direct',
-        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune', 'game5': 'Révéler & Gagner',
+        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune', 'game5': 'Révéler & Gagner', 'game6': 'Lancer de Flèche',
         'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
         'spin': 'Tourner', 'draw_now': 'Tirer'
     },
@@ -144,7 +144,7 @@ TRANSLATIONS = {
         'recharge': 'Aufladen', 'withdraw': 'Auszahlen', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung',
         'game_control': '🎮 Spielkontrolle', 'chat': '💬 Live-Chat',
-        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad', 'game5': 'Aufdecken & Gewinnen',
+        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad', 'game5': 'Aufdecken & Gewinnen', 'game6': 'Pfeilwurf',
         'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
         'spin': 'Drehen', 'draw_now': 'Ziehen'
     },
@@ -154,7 +154,7 @@ TRANSLATIONS = {
         'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
         'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
-        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna', 'game5': 'Revelar y Ganar',
+        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna', 'game5': 'Revelar y Ganar', 'game6': 'Lanzamiento de Flecha',
         'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
         'spin': 'Girar', 'draw_now': 'Sorteo'
     },
@@ -164,7 +164,7 @@ TRANSLATIONS = {
         'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
         'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
         'game_control': '🎮 کنترل بازی‌ها', 'chat': '💬 پشتیبانی و چت',
-        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس', 'game5': 'کشف کن و برنده شو',
+        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس', 'game5': 'کشف کن و برنده شو', 'game6': 'پرتاب دارت متحرک',
         'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
         'spin': 'چرخش', 'draw_now': 'قرعه‌کشی'
     }
@@ -263,12 +263,12 @@ DASHBOARD_PAGE = """
         .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 8px 15px; border-radius: 12px; border: 1px solid #ffd700; }
         .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; }
         .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-        .icons-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; max-width: 1200px; margin: 30px auto; }
-        @media (max-width: 1000px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
+        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; max-width: 1000px; margin: 30px auto; }
+        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(1, 1fr); } }
         .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 30px 15px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-8px); }
         .icon-logo { font-size: 60px; margin-bottom: 12px; }
-        .icon-title { color: #ffd700; font-size: 18px; font-weight: 900; }
+        .icon-title { color: #ffd700; font-size: 19px; font-weight: 900; }
         #usdtModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:100; }
     </style>
 </head>
@@ -330,13 +330,14 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الألعاب الخمسة: الرقم الحنون، روليت الحظ، إمبراطورية الأرقام الملكية، عجلة الحظ، واكشف واربح -->
+    <!-- الألعاب الستة كاملة -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
         <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
+        <a href="/game_arrow_wheel" class="icon-card"><div class="icon-logo">🎯</div><div class="icon-title">{{ t.game6 }}</div></a>
     </div>
 
     <script>
@@ -834,8 +835,8 @@ GAME_NUMBERS_EMPIRE_PAGE = """
 </html>
 """
 
-# --- قالب لعبة عجلة الحظ المحدثة بالكامل حسب طلبك ---
-GAME_WHEEL_PAGE = """
+# --- قالب لعبة عجلة الحظ (20 رقم) ---
+GAME_NUMBER_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
 <head>
@@ -862,14 +863,12 @@ GAME_WHEEL_PAGE = """
         </div>
         <div id="wheelMsg" style="font-size:18px; font-weight:900; color:#34d399; margin:10px 0;">اختر من 1 إلى 10 أرقام وابدأ السحب</div>
 
-        <!-- قائمة حجز فاخرة بـ 20 رقم -->
         <div class="wheel-grid">
             {% for n in range(1, 21) %}
                 <button type="button" id="w_num_{{ n }}" onclick="toggleWheelNum({{ n }})" class="wheel-btn">{{ n }}</button>
             {% endfor %}
         </div>
 
-        <!-- خانة تكتب للاعب الأرقام المختارة وقيمتها -->
         <div class="selection-box">
             <h4 style="color: #38bdf8; margin-top:0;">📋 أرقامك المختارة وقيمة الرهان</h4>
             <p style="margin: 5px 0; font-size: 16px;"><b>الأرقام المحددة:</b> <span id="selectedListText" style="color: #ffd700;">لا توجد أرقام مختارة</span></p>
@@ -942,92 +941,83 @@ GAME_WHEEL_PAGE = """
 </html>
 """
 
-# --- قالب اللعبة الخامسة: اكشف واربح (5 صناديق، 3 نقرات، محاكاة الاحتمالات 1/100 و 50/100) ---
-GAME_REVEAL_PAGE = """
+# --- قالب اللعبة السادسة: لعبة رمي السهم المتحركة (عجلة الـ 12 هدف) ---
+GAME_ARROW_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
 <head>
-    <meta charset="UTF-8"><title>{{ t.game5 }}</title>
+    <meta charset="UTF-8"><title>{{ t.game6 }}</title>
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
         .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 750px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
-        .boxes-grid { display: flex; justify-content: center; gap: 15px; margin: 30px 0; flex-wrap: wrap; }
-        .box-cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #ffd700; border-radius: 18px; width: 110px; height: 120px; font-size: 35px; font-weight: 900; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; }
-        .box-cell:hover { transform: scale(1.05); border-color: #fff; }
-        .box-cell.revealed { background: #1e1b4b !important; border-color: #38bdf8 !important; cursor: default; }
+        .wheel-container { position: relative; width: 320px; height: 320px; margin: 20px auto; border-radius: 50%; border: 6px solid #ffd700; background: #0f172a; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 40px rgba(255,215,0,0.4); }
+        .arrow-screen { font-size: 32px; font-weight: 900; color: #ffd700; background: #000; padding: 15px 25px; border-radius: 15px; border: 3px solid #38bdf8; letter-spacing: 2px; }
+        .modal-popup { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:300; }
+        .modal-box { background:#1a1c29; padding:40px; border-radius:25px; border:4px solid #ffd700; width:420px; text-align:center; box-shadow:0 15px 40px rgba(0,0,0,0.9); }
     </style>
 </head>
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; margin-top:0;">🎟️ لعبة اكشف واربح</h2>
-        <p style="font-size:18px; color:#ffd700;">تكلفة المحاولة: 2 USDD | الجائزة الكبرى: 100 USDD (تطابق 3 أسود)</p>
-        <p style="font-size:15px; color:#38bdf8;">تطابق وجهين أسد يعيد لك 1 USDD من قيمة المراهنة!</p>
+        <h2 style="color:#ffd700; margin-top:0;">🎯 لعبة رمي السهم المتحركة (12 هدف)</h2>
+        <p style="font-size:18px; color:#ffd700;">تكلفة المحاولة: 5 USDD | الأهداف: 1، 2، 3، 4، 5، 1000 USDD وحظ أوفر</p>
+        <p style="font-size:15px; color:#38bdf8;">الهدف يعود ربحه فوراً إلى صندوق اللاعب عند الإصابة!</p>
 
-        <div id="revealMsg" style="font-size: 20px; font-weight: 900; color: #34d399; margin: 20px 0;">اضغط على "ابدأ المحاولة" ثم اختر 3 صناديق لكشفها</div>
-
-        <!-- 5 صناديق فاخرة -->
-        <div class="boxes-grid">
-            {% for i in range(1, 6) %}
-                <div class="box-cell" id="b_{{ i }}" onclick="clickBox({{ i }})">📦</div>
-            {% endfor %}
+        <div class="wheel-container">
+            <div id="arrowScreen" class="arrow-screen">🎯 جاهز</div>
         </div>
 
-        <button type="button" id="startBtn" onclick="startReveal()" style="padding: 16px 45px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 20px; border: none; border-radius: 16px; cursor: pointer; margin-top: 15px;">ابدأ المحاولة الجديدة (2 USDD) 🎟️</button>
+        <div id="arrowMsg" style="font-size: 18px; font-weight: 900; color: #34d399; margin: 15px 0;">اضغط على "ارم السهم" لبدء الرمية</div>
+
+        <button type="button" onclick="throwArrow()" style="padding: 18px 50px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 22px; border: none; border-radius: 16px; cursor: pointer; margin-top: 15px; box-shadow: 0 10px 25px rgba(34,197,94,0.4);">🎯 ارم السهم (5 USDD per try)</button>
+    </div>
+
+    <!-- نافذة منبثقة عند الإصابة -->
+    <div id="resultModal" class="modal-popup">
+        <div class="modal-box">
+            <h2 style="color: #ffd700; margin-top:0; font-size:30px;">🎉 مبروك ربحت!</h2>
+            <p id="modalResultText" style="font-size: 22px; color: #34d399; font-weight: 900; margin: 20px 0;"></p>
+            <button onclick="closeModal()" style="background:#ffd700; color:#000; padding:12px 35px; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:18px;">حسناً</button>
+        </div>
     </div>
 
     <script>
-        let sessionRevealed = [];
-        let clicksCount = 0;
-        let gameActive = false;
-
-        function startReveal() {
-            fetch('/game_reveal_and_win', {method: 'POST'})
+        function throwArrow() {
+            fetch('/game_arrow_wheel', {method: 'POST'})
             .then(res => res.json())
             .then(d => {
                 if(d.success) {
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = d.balance : null;
-                    sessionRevealed = d.revealed; // مصفوفة فيها 3 عناصر تم تحديدها خلف الكواليس
-                    clicksCount = 0;
-                    gameActive = true;
-                    document.getElementById('revealMsg').innerText = "تم خصم 2 USDD! اختر 3 صناديق من الأخشاب لكشف محتواها الآن.";
-                    document.getElementById('startBtn').style.display = 'none';
-
-                    // إعادة تعيين الصناديق
-                    for(let i=1; i<=5; i++) {
-                        let cell = document.getElementById('b_' + i);
-                        cell.innerText = "📦";
-                        cell.classList.remove('revealed');
-                    }
+                    runArrowAnimation(d.hit_target, d.msg, d.balance);
                 } else {
                     alert(d.msg || "رصيد غير كافي!");
                 }
             });
         }
 
-        function clickBox(boxIdx) {
-            if(!gameActive) { alert("يرجى الضغط على زر 'ابدأ المحاولة الجديدة' أولاً!"); return; }
-            let cell = document.getElementById('b_' + boxIdx);
-            if(cell.classList.contains('revealed')) return; // تم فتحه مسبقاً
-
-            if(clicksCount < sessionRevealed.length) {
-                cell.innerText = sessionRevealed[clicksCount];
-                cell.classList.add('revealed');
-                clicksCount++;
-
-                if(clicksCount === sessionRevealed.length) {
-                    gameActive = false;
-                    // جلب النتيجة من الخادم أو فحصها
-                    setTimeout(() => {
-                        fetch('/game_reveal_result_check', {method: 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({revealed: sessionRevealed})})
-                        .then(res => res.json()).then(resData => {
-                            document.getElementById('revealMsg').innerText = resData.msg;
-                            document.getElementById('startBtn').style.display = 'inline-block';
-                            document.getElementById('startBtn').innerText = "محاولة أخرى (2 USDD)";
-                        });
-                    }, 500);
+        function runArrowAnimation(hitTarget, finalMsg, newBal) {
+            let screen = document.getElementById('arrowScreen');
+            let counter = 0;
+            let targetsPool = ['1 USDD', '2 USDD', '3 USDD', '4 USDD', '5 USDD', 'حظ أوفر', '1 USDD', '2 USDD', 'حظ أوفر', '3 USDD', 'حظ أوفر', '1 USDD'];
+            
+            let interval = setInterval(() => {
+                let randT = targetsPool[Math.floor(Math.random() * targetsPool.length)];
+                screen.innerText = randT;
+                counter++;
+                if(counter > 22) {
+                    clearInterval(interval);
+                    screen.innerText = hitTarget;
+                    
+                    // إظهار نافذة منبثقة مكتوب فيها مبروك ربحت وتكتب الهدف الذي أصاب
+                    document.getElementById('modalResultText').innerText = finalMsg;
+                    document.getElementById('resultModal').style.display = 'flex';
                 }
-            }
+            }, 80);
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').style.display = 'none';
+            location.reload();
         }
     </script>
 </body>
@@ -1176,6 +1166,7 @@ ADMIN_GAME_CONTROL_PAGE = """
                 <option value="empire">إمبراطورية الأرقام (1-5)</option>
                 <option value="wheel">عجلة الحظ (1-20)</option>
                 <option value="reveal">اكشف واربح</option>
+                <option value="arrow_wheel">رمي السهم المتحركة</option>
             </select>
             <label>رقم الجولة القادمة (من 1 إلى 50):</label>
             <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
@@ -1534,7 +1525,70 @@ def game_number_wheel():
             return jsonify({"success": True, "winning_num": winning_num, "balance": user.balance, "msg": msg})
         else:
             return jsonify({"success": False, "msg": "رصيد غير كافي أو لم تختار أرقاماً!"})
-    return render_template_string(GAME_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+    return render_template_string(GAME_NUMBER_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+
+# --- مسار اللعبة السادسة: رمي السهم المتحركة (12 هدف) ---
+@app.route('/game_arrow_wheel', methods=['GET', 'POST'])
+def game_arrow_wheel():
+    if 'username' not in session: return redirect(url_for('login'))
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    t = get_t()
+    lang_key = session.get('lang', 'ar')
+
+    if request.method == 'POST':
+        cost = 5.0 # ثمن المحاولة 5 USDD
+        if user.balance >= cost:
+            user.balance -= cost
+            vault.vault_balance += cost
+            db.session.add(FinancialLog(action_type='مبيع رهان رمي السهم المتحركة', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
+
+            # قائمة الـ 12 هدف مع جعل هدف 1000 مستحيلاً (وزنه 0 أو غير موجود في الاختيار العشوائي)
+            # الأهداف المتاحة للإصابة: 1 USDD, 2 USDD, 3 USDD, 4 USDD, 5 USDD, وحظ أوفر
+            targets_pool = [
+                ('1 USDD', 1.0),
+                ('2 USDD', 2.0),
+                ('3 USDD', 3.0),
+                ('4 USDD', 4.0),
+                ('5 USDD', 5.0),
+                ('حظ أوفر', 0.0),
+                ('1 USDD', 1.0),
+                ('2 USDD', 2.0),
+                ('حظ أوفر', 0.0),
+                ('3 USDD', 3.0),
+                ('حظ أوفر', 0.0),
+                ('1 USDD', 1.0)
+            ]
+            
+            # فحص غرفة التحكم إذا كان هناك هدف مبرمج لهذه الجولة
+            future = GameFutureDraw.query.filter_by(game_name='arrow_wheel').order_by(GameFutureDraw.round_index.asc()).first()
+            if future:
+                win_val = future.winning_number
+                db.session.delete(future)
+                db.session.commit()
+                if win_val == 1000:
+                    # حتى لو برمجها الآدمن بـ 1000 جعلناها مستحيلة أو نعالجها بوزن صفر، لكن تلبية للطلب "اجعل من المستحيل اصابة الهدف الكبير 1000 usdd" نتجاهلها ونعطيه حظ أوفر أو هدف عادي
+                    chosen_label, prize = 'حظ أوفر', 0.0
+                else:
+                    chosen_label, prize = f'{win_val} USDD', float(win_val)
+            else:
+                chosen_label, prize = random.choice(targets_pool)
+
+            if prize > 0:
+                user.balance += prize
+                vault.vault_balance -= prize
+                db.session.add(FinancialLog(action_type='جائزة رمي السهم المتحركة', admin_name='system', target_user=username, amount=prize, log_time=get_local_time()))
+                msg = f"مبروك ربحت\nأصبت الهدف: {chosen_label}"
+            else:
+                msg = f"مبروك ربحت\nأصبت الهدف: حظ أوفر"
+
+            db.session.commit()
+            return jsonify({"success": True, "hit_target": chosen_label, "msg": msg, "balance": user.balance})
+        else:
+            return jsonify({"success": False, "msg": "رصيد غير كافي! ثمن الرمية 5 USDD"})
+
+    return render_template_string(GAME_ARROW_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
@@ -1559,7 +1613,6 @@ def game_reveal_and_win():
             state.total_spins += 1
             mod_val = state.total_spins % 100
             
-            # تطابق 3 وجوه أسد مرة واحدة في كل 100 محاولة، و50 مرة لتطابق وجهين
             if mod_val == 0:
                 revealed = ['🦁', '🦁', '🦁']
                 session['reveal_outcome'] = 'win_3'
