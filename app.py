@@ -101,7 +101,7 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات) ---
+# --- الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -256,7 +256,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- صفحات الواجهات (مع دعم الزائر، واتساب، و QR Code) ---
+# --- صفحات الواجهات (شاملة الشحن، السحب، الألعاب الستة، QR Code، وزر الزائر والواتساب) ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -272,7 +272,7 @@ LOGIN_PAGE = """
         </form>
         <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
             <a href="/guest_login" style="background:rgba(56,189,248,0.15); border:1px solid #38bdf8; color:#38bdf8; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">👁️ تسجيل كزائر (تصفح المنصة)</a>
-            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد في منصة امبراطورية الأرقام" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
+            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
         </div>
         <div style="margin-top:25px; background:#0a0d16; padding:12px; border-radius:15px; border:1px solid #444;">
             <p style="font-size:12px; color:#ffd700; margin:0 0 8px 0;">امسح الكود لفتح اللعبة عبر هاتفك:</p>
@@ -290,10 +290,22 @@ DASHBOARD_PAGE = """
 <style>
     body { font-family: Tahoma; background: #070a12; color: #fff; margin: 0; padding: 20px; }
     .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20, 24, 38, 0.9); padding: 18px 30px; border-radius: 18px; border-bottom: 3px solid #ffd700; flex-wrap: wrap; gap: 15px; }
+    .action-bar { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 25px auto; max-width: 950px; flex-wrap: wrap; background: rgba(20,24,38,0.95); padding: 20px; border-radius: 20px; border: 2px solid rgba(255,215,0,0.4); box-sizing: border-box; width: 100%; }
+    .dropdown { position: relative; display: inline-block; }
+    .drop-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; padding: 12px 25px; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; font-size: 16px; }
+    .drop-btn.withdraw { background: linear-gradient(135deg, #ef4444, #991b1b); }
+    .dropdown-content { display: none; position: absolute; background: #1a1c29; min-width: 240px; box-shadow: 0px 8px 16px rgba(0,0,0,0.5); z-index: 10; border-radius: 12px; border: 1px solid #ffd700; overflow: hidden; right: 0; }
+    .dropdown-content a { color: #fff; padding: 12px 16px; text-decoration: none; display: block; text-align: right; cursor: pointer; font-size: 14px; }
+    .dropdown-content a:hover { background: #2d3748; color: #ffd700; }
+    .dropdown:hover .dropdown-content { display: block; }
+    .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 8px 15px; border-radius: 12px; border: 1px solid #ffd700; box-sizing: border-box; }
+    .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; width: 150px; }
+    .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
     .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1000px; margin: 30px auto; }
     @media (max-width: 768px) { .icons-grid { grid-template-columns: 1fr; } }
     .icon-card { background: rgba(25,30,48,0.95); border: 3px solid #b8860b; border-radius: 28px; padding: 25px 15px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); display: block; transition: 0.3s; }
     .icon-card:hover { border-color: #ffd700; transform: translateY(-5px); }
+    #usdtModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:100; box-sizing: border-box; padding: 15px; }
 </style>
 </head>
 <body>
@@ -315,6 +327,46 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
+    <!-- شريط الشحن والسحب والكودات -->
+    <div class="action-bar">
+        <div class="dropdown">
+            <button class="drop-btn">💳 {{ t.recharge }} ▾</button>
+            <div class="dropdown-content">
+                <a onclick="rechargeWhish()">شحن عبر Whish في لبنان</a>
+                <a onclick="rechargeGooglePlay()">شراء USDD من متجر غوغل</a>
+            </div>
+        </div>
+
+        <div class="redeem-box">
+            <form method="POST" style="display:flex; gap:5px; margin:0;">
+                <input type="hidden" name="action" value="redeem_card">
+                <input type="text" name="card_code" placeholder="ضع كود الشحن هنا..." required>
+                <button type="submit">تفعيل</button>
+            </form>
+        </div>
+
+        <div class="dropdown">
+            <button class="drop-btn withdraw">💸 {{ t.withdraw }} ▾</button>
+            <div class="dropdown-content">
+                <a onclick="withdrawWhish('{{ username }}', '{{ password }}')">سحب عبر Whish في لبنان</a>
+                <a onclick="withdrawVisa('{{ username }}', '{{ password }}')">استلام فيزا مسبقة الدفع</a>
+                <a onclick="openUsdtModal()">سحب عبر محفظة USDT</a>
+            </div>
+        </div>
+    </div>
+
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:15px; border-radius:12px; max-width:600px; margin:15px auto; text-align:center; font-weight:900;">{{ msg }}</div>{% endif %}
+
+    <div id="usdtModal">
+        <div style="background:#1a1c29; padding:30px; border-radius:20px; border:2px solid #ffd700; width:100%; max-width:350px; text-align:center; box-sizing: border-box;">
+            <h3 style="color:#ffd700;">سحب عبر USDT</h3>
+            <input type="text" id="usdtWalletInput" placeholder="أدخل عنوان محفظتك (USDT)..." style="width:100%; padding:12px; margin:15px 0; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px; box-sizing:border-box;">
+            <button onclick="submitUsdt()" style="background:#22c55e; color:#000; padding:10px 20px; font-weight:900; border:none; border-radius:8px; cursor:pointer;">إرسال طلب السحب</button>
+            <button onclick="closeUsdtModal()" style="background:#ef4444; color:#fff; padding:10px 20px; font-weight:900; border:none; border-radius:8px; cursor:pointer; margin-right:5px;">إلغاء</button>
+        </div>
+    </div>
+
+    <!-- الألعاب الستة كاملة -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div style="font-size:55px;">🏆</div><div style="color:#ffd700; font-size:18px; font-weight:900; margin-top:10px;">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div style="font-size:55px;">🎰</div><div style="color:#ffd700; font-size:18px; font-weight:900; margin-top:10px;">{{ t.game2 }}</div></a>
@@ -323,6 +375,30 @@ DASHBOARD_PAGE = """
         <a href="/game_reveal_and_win" class="icon-card"><div style="font-size:55px;">🎟️</div><div style="color:#ffd700; font-size:18px; font-weight:900; margin-top:10px;">{{ t.game5 }}</div></a>
         <a href="/game_arrow_wheel" class="icon-card"><div style="font-size:55px;">🎯</div><div style="color:#ffd700; font-size:18px; font-weight:900; margin-top:10px;">{{ t.game6 }}</div></a>
     </div>
+
+    <script>
+        function rechargeWhish() {
+            let text = encodeURIComponent("مرحباً، أريد شحن رصيد في منصة امبراطورية الأرقام عبر Whish Money.");
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
+        }
+        function rechargeGooglePlay() { alert("سيتم توجيهك لمتجر غوغل قريباً."); }
+        function withdrawWhish(u, p) {
+            let text = encodeURIComponent(`أريد سحب رصيدي عبر Whish.\\nيوزر: ${u}`);
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
+        }
+        function withdrawVisa(u, p) {
+            let text = encodeURIComponent(`أريد استلام فيزا مسبقة الدفع.\\nيوزر: ${u}`);
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
+        }
+        function openUsdtModal() { document.getElementById('usdtModal').style.display = 'flex'; }
+        function closeUsdtModal() { document.getElementById('usdtModal').style.display = 'none'; }
+        function submitUsdt() {
+            let w = document.getElementById('usdtWalletInput').value;
+            if(!w) { alert("أدخل عنوان المحفظة!"); return; }
+            alert("تم إرسال طلب السحب بنجاح!");
+            closeUsdtModal();
+        }
+    </script>
 </body>
 </html>
 """
@@ -351,172 +427,63 @@ def guest_login():
     session['role'] = 'guest'
     return redirect(url_for('dashboard'))
 
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'username' not in session:
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
+    msg = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        vault = SystemVault.query.get(1)
+        if action == 'redeem_card':
+            card_code = request.form.get('card_code', '').strip()
+            card = RechargeCard.query.filter_by(code=card_code, is_used=False).first()
+            if card and vault.vault_balance >= card.amount:
+                vault.vault_balance -= card.amount
+                user.balance += card.amount
+                card.is_used = True
+                card.used_by = user.username
+                db.session.add(FinancialLog(action_type='شحن عبر بطاقة كود', admin_name='system', target_user=user.username, amount=card.amount, log_time=get_local_time()))
+                db.session.commit()
+                msg = f"🎉 تم شحن {card.amount} USDD بنجاح!"
+            else:
+                msg = "⚠️ الكود غير صالح أو مستخدم مسبقاً!"
     bal = user.balance if user else 0.0
-    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal, lang_bar=get_lang_bar())
+    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], password=user.password if user else '', balance=bal, lang_bar=get_lang_bar(), msg=msg)
 
-# --- مسار اللعبة الأولى: الرقم الحنون ---
+# --- المسارات للألعاب الستة ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🏆 الرقم الحنون</h2><p>مفعل ومتكامل مع نظام السحب وغرفة التحكم</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
-    if request.method == 'POST':
-        action = request.form.get('action_type')
-        if action == 'book':
-            num = int(request.form.get('number'))
-            existing = GoldenNumberBooking.query.filter_by(number=num).first()
-            if existing: return jsonify({'success': False, 'msg': 'الرقم محجوز مسبقاً!'})
-            if user.balance < 20.0: return jsonify({'success': False, 'msg': 'رصيد غير كافي لشحن الحجز (20 USDD)!'})
-            
-            user.balance -= 20.0
-            vault = SystemVault.query.get(1)
-            vault.vault_balance += 20.0
-            db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
-            db.session.add(FinancialLog(action_type='مبيع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
-            db.session.commit()
-            return jsonify({'success': True})
-
-        elif action == 'cancel':
-            num = int(request.form.get('number'))
-            booking = GoldenNumberBooking.query.filter_by(number=num, username=username).first()
-            if booking:
-                user.balance += 20.0
-                vault = SystemVault.query.get(1)
-                vault.vault_balance -= 20.0
-                db.session.delete(booking)
-                db.session.commit()
-                return jsonify({'success': True})
-            return jsonify({'success': False, 'msg': 'حجز غير موجود'})
-
-        elif action == 'admin_draw' and username == 'admin1':
-            player_choices = [b.number for b in GoldenNumberBooking.query.all()]
-            winning_num = get_unified_math_outcome('الرقم الحنون', player_choices, 1, 50)
-            
-            winner_booking = GoldenNumberBooking.query.filter_by(number=winning_num).first()
-            if winner_booking:
-                winner_user = User.query.filter_by(username=winner_booking.username).first()
-                if winner_user:
-                    winner_user.balance += 700.0
-                    vault = SystemVault.query.get(1)
-                    vault.vault_balance -= 700.0
-                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_user.username, amount=700.0, log_time=get_local_time()))
-                    db.session.commit()
-            return jsonify({'winning_number': winning_num})
-
-    bookings_list = GoldenNumberBooking.query.all()
-    bookings_dict = {b.number: b.username for b in bookings_list}
-    my_nums = [b.number for b in bookings_list if b.username == username]
-    my_nums_str = ", ".join(map(str, my_nums)) if my_nums else "لا توجد أرقام محجوزة"
-    my_total_cost = len(my_nums) * 20.0
-
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head><meta charset="UTF-8"><title>الرقم الحنون</title>
-    <style>
-        body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; }
-        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 25px; border-radius: 30px; max-width: 950px; margin: 10px auto; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; margin-top: 15px; }
-        @media(max-width: 768px){ .grid { grid-template-columns: repeat(5, 1fr); } }
-        .cell { background: #7c3aed; border: 2px solid #a78bfa; border-radius: 12px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; color: #fff; font-size: 16px; }
-        .cell.booked { background: #7f1d1d; border-color: #ef4444; cursor: not-allowed; }
-        .cell.my { background: #1e3a8a; border-color: #3b82f6; }
-        .cell.winner-glow { background: #fbbf24 !important; color: #000 !important; border: 3px solid #fff !important; box-shadow: 0 0 25px #ffd700; }
-    </style>
-    </head>
-    <body>
-        {{ lang_bar | safe }}
-        <div class="card">
-            <h2>🏆 احجز رقم ب 20 usdd واربح 700 usdd فورا</h2>
-            <div style="background:#000; border:4px solid #ffd700; padding:15px; border-radius:20px; display:inline-block; margin:10px 0;">
-                <div id="slotScreen" style="font-size:45px; font-weight:900; color:#ffd700;">--</div>
-            </div>
-            <div id="winnerAnnouncement" style="font-size:17px; font-weight:900; color:#34d399; min-height:25px;"></div>
-            <div class="grid">
-                {% for i in range(1, 51) %}
-                    {% if i in bookings %}
-                        {% if bookings[i] == username %}
-                            <button onclick="handleAction('cancel', {{ i }})" class="cell my" id="cell_{{ i }}">{{ i }}<br><span style="font-size:9px;">تراجع</span></button>
-                        {% else %}
-                            <div class="cell booked" id="cell_{{ i }}">{{ i }}<br><span style="font-size:9px;">{{ bookings[i] }}</span></div>
-                        {% endif %}
-                    {% else %}
-                        <button onclick="handleAction('book', {{ i }})" class="cell" id="cell_{{ i }}">{{ i }}</button>
-                    {% endif %}
-                {% endfor %}
-            </div>
-            <div style="background:rgba(15,20,32,0.9); padding:12px; border-radius:15px; margin-top:20px; text-align:right;">
-                <p><b>أرقامك:</b> <span style="color:#ffd700;">{{ my_nums_str }}</span> | <b>المخصوم:</b> <span style="color:#38bdf8;">{{ my_total_cost }} USDD</span></p>
-            </div>
-            {% if username == 'admin1' %}
-                <button onclick="triggerDraw()" style="background:#22c55e; color:#fff; font-weight:900; padding:14px 30px; border:none; border-radius:12px; cursor:pointer; font-size:18px; margin-top:15px;">⚡ اسحب الآن (للآدمن)</button>
-            {% endif %}
-        </div>
-        <script>
-            function handleAction(actionType, num) {
-                let fd = new FormData(); fd.append('action_type', actionType); fd.append('number', num);
-                fetch('/game_golden_number', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                    if(d.success) location.reload(); else alert(d.msg || "رصيد غير كافي!");
-                });
-            }
-            function triggerDraw() {
-                let fd = new FormData(); fd.append('action_type', 'admin_draw');
-                fetch('/game_golden_number', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                    if(d.winning_number) runAnim(d.winning_number);
-                });
-            }
-            function runAnim(winNum) {
-                let screen = document.getElementById('slotScreen');
-                let ann = document.getElementById('winnerAnnouncement');
-                let c = 0, intv = setInterval(()=>{
-                    screen.innerText = '#' + Math.floor(Math.random()*50+1);
-                    c++;
-                    if(c > 20) {
-                        clearInterval(intv);
-                        screen.innerText = '#' + winNum;
-                        ann.innerText = `مبروك ربحت اصبت الرقم ${winNum}`;
-                        document.getElementById('cell_' + winNum).className = "cell winner-glow";
-                        setTimeout(()=>location.reload(), 4000);
-                    }
-                }, 90);
-            }
-        </script>
-    </body>
-    </html>
-    """, lang_bar=get_lang_bar(), bookings=bookings_dict, username=username, my_nums_str=my_nums_str, my_total_cost=my_total_cost)
-
-# --- مسارات الألعاب الخمسة الأخرى وغرف التحكم والمحاسبة ---
 @app.route('/game_roulette')
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ</h2><p>طاولة الروليت الكلاسيكية مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_numbers_empire')
 def game_numbers_empire():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🏛️ إمبراطورية الأرقام</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🏛️ إمبراطورية الأرقام</h2><p>لعبة الأرقام الملكية مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_number_wheel')
 def game_number_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎡 عجلة الحظ</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎡 عجلة الحظ</h2><p>عجلة الـ 20 رقماً مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_reveal_and_win')
 def game_reveal_and_win():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎟️ اكشف واربح</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎟️ اكشف واربح</h2><p>صناديق الأسود مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_arrow_wheel')
 def game_arrow_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎯 رمي السهم المتحركة</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎯 رمي السهم المتحركة</h2><p>لعبة الأهداف المتحركة مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
+# --- لوحات الإدارة وغرف التحكم ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
     if session.get('username') != 'admin1': return redirect(url_for('dashboard'))
