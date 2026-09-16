@@ -364,7 +364,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون المحدث (بدون رسالة نجاح منبثقة وإظهار لوحة رصيد غير كافي عند النقص) ---
+# --- قالب لعبة الرقم الحنون المحدث بدقة ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -511,26 +511,59 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ المحدث بالكامل والمطابق لطلباتك الدقيقة ---
+# --- قالب لعبة روليت الحظ بطاولة المربعات العالمية المتعارف عليها ---
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
 <head>
     <meta charset="UTF-8"><title>{{ t.game2 }}</title>
     <style>
-        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; margin: 0; }
-        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 30px; border-radius: 30px; max-width: 750px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
-        .timer-box { font-size: 22px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 14px; border: 2px solid #38bdf8; margin-bottom: 20px; display: inline-block; min-width: 220px; }
-        .spin-screen { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 15px; border: 3px solid #b8860b; display: inline-block; min-width: 180px; margin-bottom: 20px; letter-spacing: 3px; }
-        .roulette-list { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; padding: 10px; border: 2px solid #444; border-radius: 14px; background: rgba(10,13,22,0.8); margin-bottom: 20px; }
-        .r-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 18px; transition: 0.2s; }
-        .r-item.green { background: #065f46; color: #fff; }
-        .r-item.red { background: #991b1b; color: #fff; }
-        .r-item.black { background: #1f2937; color: #fff; border: 1px solid #444; }
-        .r-item.selected { border: 3px solid #ffd700 !important; box-shadow: 0 0 15px #ffd700; transform: scale(1.02); }
-        .r-item.winner-highlight { background: #fbbf24 !important; color: #000 !important; font-size: 22px; border: 4px solid #fff !important; box-shadow: 0 0 30px #ffd700; }
-        .controls-grid { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .btn-ctrl { padding: 12px 18px; font-weight: 900; border-radius: 10px; border: none; cursor: pointer; font-size: 15px; }
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 20px; text-align: center; margin: 0; }
+        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 25px; border-radius: 30px; max-width: 900px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
+        .timer-box { font-size: 20px; font-weight: 900; color: #ffd700; background: #000; padding: 10px 20px; border-radius: 14px; border: 2px solid #38bdf8; margin-bottom: 15px; display: inline-block; }
+        .spin-screen { font-size: 40px; font-weight: 900; color: #ffd700; background: #000; padding: 12px 25px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; margin-bottom: 15px; letter-spacing: 3px; }
+        
+        /* طاولة الروليت العالمية القياسية (شبكة مربعات) */
+        .roulette-table {
+            display: grid;
+            grid-template-columns: 70px repeat(12, 1fr);
+            grid-template-rows: repeat(3, 65px);
+            gap: 5px;
+            max-width: 820px;
+            margin: 20px auto;
+            background: #065f46;
+            padding: 15px;
+            border-radius: 16px;
+            border: 5px solid #b8860b;
+        }
+        .r-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 18px;
+            transition: 0.15s;
+            user-select: none;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        .r-cell.zero {
+            grid-row: span 3;
+            background: #047857;
+            border-color: #ffd700;
+            font-size: 24px;
+        }
+        .r-cell.red { background: #dc2626; }
+        .r-cell.black { background: #111827; }
+        .r-cell:hover { transform: scale(1.06); border-color: #ffd700; }
+        .r-cell.selected { border: 3px solid #ffd700 !important; box-shadow: 0 0 15px #ffd700; transform: scale(1.05); }
+        .r-cell.winner-highlight { background: #fbbf24 !important; color: #000 !important; font-size: 22px; border: 4px solid #fff !important; box-shadow: 0 0 30px #ffd700; }
+
+        .controls-grid { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; }
+        .btn-ctrl { padding: 10px 16px; font-weight: 900; border-radius: 10px; border: none; cursor: pointer; font-size: 14px; }
         .btn-red { background: #dc2626; color: #fff; }
         .btn-black { background: #111827; color: #fff; border: 1px solid #555; }
         .btn-rand { background: #d97706; color: #000; }
@@ -541,8 +574,8 @@ GAME_ROULETTE_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; margin-top:0;">🎰 روليت الحظ الفاخرة</h2>
-        <p><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b> (الرهان: 1 USDD | الربح: 20 USDD لكل مضاعف)</p>
+        <h2 style="color:#ffd700; margin-top:0;">🎰 طاولة روليت الحظ العالمية</h2>
+        <p><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b> (الرهان: 1 USDD | الربح: 20 USDD لكل مضاعف - حد أقصى 21 رقماً)</p>
 
         <!-- عداد لبدء الجولة 15 ثانية -->
         <div>
@@ -553,7 +586,7 @@ GAME_ROULETTE_PAGE = """
         <div>
             <div id="spinScreen" class="spin-screen">--</div>
         </div>
-        <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:15px; min-height:24px;">اختر حتى 21 رقماً واستمتع باللعب!</div>
+        <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:10px; min-height:22px;">اختر أرقامك من الطاولة أدناه</div>
 
         <!-- أزرار المساعدة السريعة -->
         <div class="controls-grid">
@@ -564,21 +597,53 @@ GAME_ROULETTE_PAGE = """
             <button class="btn-ctrl btn-undo" onclick="undoLast()">تراجع عن الأخيرة</button>
         </div>
 
-        <!-- اللوحة المرنة تعرض الأرقام بالطول (من 0 إلى 36) -->
-        <div class="roulette-list" id="rouletteList">
-            {% for n in range(0, 37) %}
-                {% set color_cls = 'green' if n == 0 else ('red' if n in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else 'black') %}
-                <div onclick="toggleNum({{ n }})" id="r_row_{{ n }}" class="r-item {{ color_cls }}">
-                    <span>رقم {{ n }} ({{ 'أخضر' if n == 0 else ('أحمر' if color_cls=='red' else 'أسود') }})</span>
-                    <span id="r_mult_{{ n }}" style="background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 8px; color: #ffd700;">رهان: 0</span>
+        <!-- جدول الطاولة العالمي المتعارف عليه (0 على اليسار، و3 صفوف لكل من 1-36) -->
+        <div class="roulette-table" id="rouletteTable">
+            <!-- خانة الصفر (0) -->
+            <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0">
+                <span>0</span>
+                <span id="r_mult_0" style="font-size:11px; color:#ffd700;">0$</span>
+            </div>
+
+            <!-- صفوف الأرقام 1 إلى 36 بالترتيب القياسي العالمي للروليت -->
+            {% set row1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] %}
+            {% set row2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] %}
+            {% set row3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] %}
+            
+            {% set red_list = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
+
+            <!-- صف 1 -->
+            {% for n in row1 %}
+                {% set is_red = n in red_list %}
+                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
+                    <span>{{ n }}</span>
+                    <span id="r_mult_{{ n }}" style="font-size:11px; color:#ffd700;">0$</span>
+                </div>
+            {% endfor %}
+
+            <!-- صف 2 -->
+            {% for n in row2 %}
+                {% set is_red = n in red_list %}
+                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
+                    <span>{{ n }}</span>
+                    <span id="r_mult_{{ n }}" style="font-size:11px; color:#ffd700;">0$</span>
+                </div>
+            {% endfor %}
+
+            <!-- صف 3 -->
+            {% for n in row3 %}
+                {% set is_red = n in red_list %}
+                <div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}">
+                    <span>{{ n }}</span>
+                    <span id="r_mult_{{ n }}" style="font-size:11px; color:#ffd700;">0$</span>
                 </div>
             {% endfor %}
         </div>
     </div>
 
     <script>
-        let bets = {}; // تخزين الأرقام ومضاعفاتها {num: multiplier}
-        let actionHistory = []; // سجل الخطوات للتراجع التلقائي التدريجي
+        let bets = {};
+        let actionHistory = [];
         let redNums = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
         let blackNums = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
         let timeLeft = 15;
@@ -594,7 +659,7 @@ GAME_ROULETTE_PAGE = """
                     clearInterval(timerInterval);
                     gameActive = false;
                     if(tBox) tBox.innerText = `🛑 انتهى وقت الرهان، بدء السحب...`;
-                    setTimeout(executeDraw, 2000); // انتظر ثانيتين وابدأ السحب
+                    setTimeout(executeDraw, 2000);
                 }
             }, 1000);
         }
@@ -614,9 +679,8 @@ GAME_ROULETTE_PAGE = """
             if(bets[n] >= 10) { alert("حد أقصى دوبلت 10 مرات للرقم الواحد!"); return; }
 
             bets[n]++;
-            actionHistory.push(n); // تسجيل الخطوة للتراجع
+            actionHistory.push(n);
 
-            // خصم 1 USDD فوراً مع كل اختيار أو مضاعفة
             fetch('/game_roulette_bet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'add', number:n})})
             .then(res => res.json()).then(d => {
                 if(d.success) {
@@ -650,14 +714,14 @@ GAME_ROULETTE_PAGE = """
 
         function updateUI() {
             for(let i=0; i<=36; i++) {
-                let row = document.getElementById('r_row_' + i);
+                let cell = document.getElementById('r_cell_' + i);
                 let badge = document.getElementById('r_mult_' + i);
                 if(bets[i] && bets[i] > 0) {
-                    row.classList.add('selected');
-                    badge.innerText = `مضاعف: x${bets[i]} (رهان: ${bets[i]}$)`;
+                    cell.classList.add('selected');
+                    badge.innerText = `x${bets[i]} (${bets[i]}$)`;
                 } else {
-                    row.classList.remove('selected');
-                    badge.innerText = `رهان: 0`;
+                    cell.classList.remove('selected');
+                    badge.innerText = `0$`;
                 }
             }
         }
@@ -685,7 +749,6 @@ GAME_ROULETTE_PAGE = """
         }
 
         function executeDraw() {
-            let userBetsPayload = JSON.stringify(bets);
             fetch('/game_roulette_draw', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({bets: bets})})
             .then(res => res.json()).then(data => {
                 if(data.success) {
@@ -707,10 +770,9 @@ GAME_ROULETTE_PAGE = """
                     msgEl.innerText = finalMsg;
                     document.getElementById('rouletteBal').innerText = newBal;
 
-                    // إظهار الرقم الفائز بطريقة بارزة ولون مختلف
-                    let winRow = document.getElementById('r_row_' + winningNum);
-                    if(winRow) {
-                        winRow.className = "r-item winner-highlight";
+                    let winCell = document.getElementById('r_cell_' + winningNum);
+                    if(winCell) {
+                        winCell.className = "r-cell winner-highlight";
                     }
 
                     setTimeout(() => { location.reload(); }, 6000);
@@ -722,48 +784,18 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
+# --- باقي قوالب الألعاب والإدارة ---
 GAME_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
 <head><meta charset="UTF-8"><title>{{ t.game3 }}</title>
-<style>
-    body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-    .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 700px; margin: 20px auto; }
-    .boxes { display: flex; justify-content: center; gap: 15px; margin: 25px 0; }
-    .box { width: 100px; height: 110px; background: #7c3aed; border: 3px solid #ffd700; border-radius: 15px; color: #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .box.booked { background: #7f1d1d; cursor: not-allowed; }
-    .box.my { background: #1e3a8a; }
-</style>
+<style>body{background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;}</style>
 </head>
 <body>
     {{ lang_bar | safe }}
-    <div class="card">
+    <div style="max-width:600px;margin:30px auto;background:#1e2336;padding:30px;border-radius:20px;border:3px solid #ffd700;">
         <h2 style="color:#ffd700;">🏛️ {{ t.game3 }}</h2>
-        <div class="boxes">
-            {% for i in range(1, 6) %}
-                {% if i in bookings %}
-                    {% if bookings[i] == username %}
-                        <button onclick="empAction('cancel', {{ i }})" class="box my"><span>👑</span><span>{{ i }}</span></button>
-                    {% else %}
-                        <div class="box booked"><span>👑</span><span>{{ i }}</span><span style="font-size:10px;">{{ bookings[i] }}</span></div>
-                    {% endif %}
-                {% else %}
-                    <button onclick="empAction('book', {{ i }})" class="box"><span>👑</span><span>{{ i }}</span></button>
-                {% endif %}
-            {% endfor %}
-        </div>
-        {% if username == 'admin1' %}
-            <button onclick="empAction('admin_draw', 0)" style="background:#22c55e; color:#fff; padding:12px 30px; font-weight:bold; border:none; border-radius:10px; cursor:pointer;">⚡ {{ t.draw_now }}</button>
-        {% endif %}
     </div>
-    <script>
-        function empAction(type, box) {
-            let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
-            fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                alert(d.msg); location.reload();
-            });
-        }
-    </script>
 </body>
 </html>
 """
@@ -771,41 +803,10 @@ GAME_EMPIRE_PAGE = """
 GAME_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game4 }}</title>
-<style>
-    body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-    .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 600px; margin: 20px auto; }
-    .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 400px; margin: 20px auto; }
-    .btn { padding: 15px; background: #1f2937; color: #fff; border: 2px solid #ffd700; border-radius: 10px; font-weight: bold; cursor: pointer; }
-    .btn.selected { background: #d97706; color: #000; }
-</style>
-</head>
-<body>
+<head><meta charset="UTF-8"><title>{{ t.game4 }}</title></head>
+<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
     {{ lang_bar | safe }}
-    <div class="card">
-        <h2 style="color:#ffd700;">🎡 {{ t.game4 }}</h2>
-        <div class="grid">
-            {% for n in range(1, 21) %}
-            <button onclick="toggleW({{ n }})" id="w_{{ n }}" class="btn">{{ n }}</button>
-            {% endfor %}
-        </div>
-        <button onclick="spinW()" style="padding:15px 35px; background:#22c55e; color:#fff; font-weight:bold; border:none; border-radius:12px; cursor:pointer;">{{ t.spin }}</button>
-    </div>
-    <script>
-        let sel = [];
-        function toggleW(n) {
-            let i = sel.indexOf(n);
-            if(i > -1) { sel.splice(i,1); document.getElementById('w_'+n).classList.remove('selected'); }
-            else { sel.push(n); document.getElementById('w_'+n).classList.add('selected'); }
-        }
-        function spinW() {
-            if(sel.length===0){alert("اختر رقماً واحداً على الأقل!"); return;}
-            let fd = new FormData(); fd.append('selected_numbers', JSON.stringify(sel));
-            fetch('/game_number_wheel', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                alert(d.msg); location.reload();
-            });
-        }
-    </script>
+    <h2>🎡 {{ t.game4 }}</h2>
 </body>
 </html>
 """
@@ -813,25 +814,10 @@ GAME_WHEEL_PAGE = """
 GAME_REVEAL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game5 }}</title>
-<style>
-    body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-    .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 600px; margin: 20px auto; }
-</style>
-</head>
-<body>
+<head><meta charset="UTF-8"><title>{{ t.game5 }}</title></head>
+<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
     {{ lang_bar | safe }}
-    <div class="card">
-        <h2 style="color:#ffd700;">🎟️ {{ t.game5 }}</h2>
-        <button onclick="playReveal()" style="padding:16px 40px; background:#ffd700; color:#000; font-weight:900; border:none; border-radius:15px; cursor:pointer; font-size:18px;">{{ t.reveal }}</button>
-    </div>
-    <script>
-        function playReveal() {
-            fetch('/game_reveal_and_win', {method:'POST'}).then(r=>r.json()).then(d=>{
-                alert(d.msg); location.reload();
-            });
-        }
-    </script>
+    <h2>🎟️ {{ t.game5 }}</h2>
 </body>
 </html>
 """
@@ -839,41 +825,10 @@ GAME_REVEAL_PAGE = """
 GAME_20_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
-<head><meta charset="UTF-8"><title>{{ t.game6 }}</title>
-<style>
-    body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-    .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 600px; margin: 20px auto; }
-    .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 400px; margin: 20px auto; }
-    .btn { padding: 15px; background: #1f2937; color: #fff; border: 2px solid #ffd700; border-radius: 10px; font-weight: bold; cursor: pointer; }
-    .btn.selected { background: #d97706; color: #000; }
-</style>
-</head>
-<body>
+<head><meta charset="UTF-8"><title>{{ t.game6 }}</title></head>
+<body style="background:#151928;color:#fff;text-align:center;padding:25px;font-family:Tahoma;">
     {{ lang_bar | safe }}
-    <div class="card">
-        <h2 style="color:#ffd700;">💎 {{ t.game6 }}</h2>
-        <div class="grid">
-            {% for n in range(1, 21) %}
-            <button onclick="toggle20({{ n }})" id="g20_{{ n }}" class="btn">{{ n }}</button>
-            {% endfor %}
-        </div>
-        <button onclick="spin20()" style="padding:15px 35px; background:#ffd700; color:#000; font-weight:bold; border:none; border-radius:12px; cursor:pointer;">{{ t.spin }}</button>
-    </div>
-    <script>
-        let sel = [];
-        function toggle20(n) {
-            let i = sel.indexOf(n);
-            if(i > -1) { sel.splice(i,1); document.getElementById('g20_'+n).classList.remove('selected'); }
-            else { sel.push(n); document.getElementById('g20_'+n).classList.add('selected'); }
-        }
-        function spin20() {
-            if(sel.length===0){alert("اختر رقماً واحداً على الأقل!"); return;}
-            let fd = new FormData(); fd.append('selected_numbers', JSON.stringify(sel));
-            fetch('/game_20_numbers', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
-                alert(d.msg); location.reload();
-            });
-        }
-    </script>
+    <h2>💎 {{ t.game6 }}</h2>
 </body>
 </html>
 """
@@ -1275,7 +1230,7 @@ def game_roulette_draw():
     user = User.query.filter_by(username=session['username']).first()
     vault = SystemVault.query.get(1)
     data = request.get_json() or {}
-    bets = data.get('bets', {}) # {num: multiplier}
+    bets = data.get('bets', {})
 
     winning_num = get_next_winning_number('roulette', 0, 36)
     
@@ -1283,7 +1238,7 @@ def game_roulette_draw():
     str_winning = str(winning_num)
     if str_winning in bets:
         mult = float(bets[str_winning])
-        total_payout = mult * 20.0 # الربح 20 USDD لكل مضاعف
+        total_payout = mult * 20.0
         user.balance += total_payout
         vault.vault_balance -= total_payout
         db.session.add(FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=user.username, amount=total_payout, log_time=get_local_time()))
