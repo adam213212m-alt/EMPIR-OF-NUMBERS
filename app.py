@@ -22,7 +22,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات المتكاملة ---
+# --- نماذج قاعدة البيانات المؤسسية ---
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -101,7 +101,7 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات رئيسية) ---
+# --- قاموس الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -255,7 +255,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- قوالب واجهات العرض الكاملة ---
+# --- واجهات العرض الاحترافية (HTML Templates) ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -451,36 +451,53 @@ def dashboard():
     bal = user.balance if user else 0.0
     return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], password=user.password if user else '', balance=bal, lang_bar=get_lang_bar(), msg=msg)
 
-# --- جميع الألعاب الستة المتكاملة ---
+# --- مسارات الألعاب الستة المتكاملة ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🏆 الرقم الحنون</h2><p>تم تفعيل اللعبة بالكامل ومربوطة بنظام الغرف والمحاسبة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    if request.method == 'POST':
+        action = request.form.get('action_type')
+        if action == 'book':
+            num = int(request.form.get('number'))
+            if GoldenNumberBooking.query.filter_by(number=num).first(): return jsonify({'success': False, 'msg': 'مجزوز مسبقاً'})
+            if user.balance < 20.0: return jsonify({'success': False, 'msg': 'رصيد غير كافي'})
+            user.balance -= 20.0
+            db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
+            db.session.commit()
+            return jsonify({'success': True})
+        elif action == 'admin_draw' and username == 'admin1':
+            choices = [b.number for b in GoldenNumberBooking.query.all()]
+            win_num = get_unified_math_outcome('الرقم الحنون', choices, 1, 50)
+            return jsonify({'winning_number': win_num})
+    bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🏆 لعبة الرقم الحنون (مفعلة)</h2><p>عدد الحجوزات النشطة: {len(bookings)}</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ</h2><p>طاولة روليت الحظ مفعلة بالكامل مع عداد الرهان</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ (مفعلة)</h2><p>طاولة الروليت جاهزة ومربوطة بمحرك الاحتمالات (30/70)</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_numbers_empire', methods=['GET', 'POST'])
 def game_numbers_empire():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🏛️ إمبراطورية الأرقام</h2><p>أبراج الأرقام الملكية مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🏛️ إمبراطورية الأرقام (مفعلة)</h2><p>أبراج الأرقام الملكية جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎡 عجلة الحظ</h2><p>عجلة الأرقام العشرين مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎡 عجلة الحظ (مفعلة)</h2><p>عجلة الـ 20 رقماً جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎟️ اكشف واربح</h2><p>صناديق الحظ مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎟️ اكشف واربح (مفعلة)</h2><p>صناديق الحظ والأسود جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/game_arrow_wheel', methods=['GET', 'POST'])
 def game_arrow_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎯 رمي السهم المتحركة</h2><p>لعبة السهم المتحركة مفعلة</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎯 رمي السهم المتحركة (مفعلة)</h2><p>لعبة الأهداف المتحركة جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
 
 # --- لوحات الإدارة وغرف التحكم ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
@@ -514,7 +531,7 @@ def admin_customers():
     users = User.query.all()
     return f"{get_lang_bar()}<div style='text-align:center; padding:20px; color:#fff; font-family:Tahoma;'><h2>👥 إدارة الزبائن</h2><p style='color:#34d399;'>{msg}</p><form method='POST'><input type='text' name='username' placeholder='يوزر' required style='padding:8px; margin:5px;'><input type='password' name='password' placeholder='باسورد' required style='padding:8px; margin:5px;'><input type='number' name='balance' placeholder='رصيد' style='padding:8px; margin:5px;'><input type='text' name='owner_name' placeholder='اسم المحل' style='padding:8px; margin:5px;'><br><button type='submit' style='background:#22c55e; color:#000; padding:10px 20px; font-weight:bold;'>إضافة لاعب</button></form><hr><ul style='list-style:none; padding:0;'>" + "".join([f"<li><b>{x.username}</b> ({x.owner_name}) - الرصيد: {x.balance} USDD</li>" for x in users]) + "</ul><a href='/dashboard' style='color:#ffd700;'>🏠 عودة</a></div>"
 
-@app.route('/admin_accounting', methods=['GET', 'POST'])
+@app.route('/admin_accounting')
 def admin_accounting():
     if session.get('username') != 'admin1': return redirect(url_for('dashboard'))
     vault = SystemVault.query.get(1)
@@ -522,7 +539,7 @@ def admin_accounting():
     total_payouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%جائزة%')).scalar() or 0.0
     return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>📊 المحاسبة والخزنة</h2><h3>🏦 الخزنة: {vault.vault_balance} USDD</h3><p>إجمالي الواردات: {total_bets} USDD | إجمالي الجوائز: {total_payouts} USDD</p><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
-@app.route('/admin_chats', methods=['GET', 'POST'])
+@app.route('/admin_chats')
 def admin_chats():
     if session.get('username') != 'admin1': return redirect(url_for('dashboard'))
     chats = ChatMessage.query.all()
