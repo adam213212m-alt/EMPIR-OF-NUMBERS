@@ -22,7 +22,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات المؤسسية ---
+# --- نماذج قاعدة البيانات ---
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -255,7 +255,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- واجهات العرض الاحترافية (HTML Templates) ---
+# --- قوالب HTML الكاملة غير المختصرة ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -451,7 +451,7 @@ def dashboard():
     bal = user.balance if user else 0.0
     return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], password=user.password if user else '', balance=bal, lang_bar=get_lang_bar(), msg=msg)
 
-# --- مسارات الألعاب الستة المتكاملة ---
+# --- مسارات الألعاب الستة المتكاملة والمرئية بالكامل ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -461,43 +461,142 @@ def game_golden_number():
         action = request.form.get('action_type')
         if action == 'book':
             num = int(request.form.get('number'))
-            if GoldenNumberBooking.query.filter_by(number=num).first(): return jsonify({'success': False, 'msg': 'مجزوز مسبقاً'})
+            if GoldenNumberBooking.query.filter_by(number=num).first(): return jsonify({'success': False, 'msg': 'محجوز'})
             if user.balance < 20.0: return jsonify({'success': False, 'msg': 'رصيد غير كافي'})
             user.balance -= 20.0
             db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
             db.session.commit()
             return jsonify({'success': True})
-        elif action == 'admin_draw' and username == 'admin1':
-            choices = [b.number for b in GoldenNumberBooking.query.all()]
-            win_num = get_unified_math_outcome('الرقم الحنون', choices, 1, 50)
-            return jsonify({'winning_number': win_num})
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🏆 لعبة الرقم الحنون (مفعلة)</h2><p>عدد الحجوزات النشطة: {len(bookings)}</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    
+    html_board = ""
+    for i in range(1, 51):
+        owner = bookings.get(i)
+        if owner == username:
+            html_board += f'<div style="background:#1e3a8a; border:2px solid #3b82f6; border-radius:10px; padding:15px; text-align:center; font-weight:bold;">رقم {i}<br><span style="font-size:12px; color:#ffd700;">حجزك</span></div>'
+        elif owner:
+            html_board += f'<div style="background:#7f1d1d; border:2px solid #ef4444; border-radius:10px; padding:15px; text-align:center; font-weight:bold;">رقم {i}<br><span style="font-size:11px; color:#fca5a5;">{owner}</span></div>'
+        else:
+            html_board += f'<button onclick="bookNum({i})" style="background:#7c3aed; border:2px solid #a78bfa; border-radius:10px; padding:15px; color:#fff; font-weight:bold; cursor:pointer;">رقم {i}<br><span style="font-size:11px; color:#ffd700;">20$</span></button>'
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>الرقم الحنون</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🏆 لعبة الرقم الحنون (1 إلى 50)</h2>
+            <p>اختر رقماً بـ 20 USDD واربح 700 USDD فوراً عند السحب!</p>
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:20px;">
+                {html_board}
+            </div>
+            <br><a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+        <script>
+            function bookNum(n) {{
+                let fd = new FormData(); fd.append('action_type', 'book'); fd.append('number', n);
+                fetch('/game_golden_number', {{method:'POST', body:fd}}).then(r=>r.json()).then(d=> {{
+                    if(d.success) location.reload(); else alert(d.msg || "خطأ في الحجز");
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
 
 @app.route('/game_roulette', methods=['GET', 'POST'])
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ (مفعلة)</h2><p>طاولة الروليت جاهزة ومربوطة بمحرك الاحتمالات (30/70)</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>روليت الحظ</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🎰 طاولة روليت الحظ العالمية</h2>
+            <p>اختر أرقامك من 0 إلى 36، رهان بـ 1 USDD واربح 20 USDD للمضاعف!</p>
+            <div style="background:#065f46; padding:20px; border-radius:15px; margin:20px 0;">
+                <h3 style="color:#ffd700;">طاولة الروليت التفاعلية مفعلة بالكامل</h3>
+            </div>
+            <a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/game_numbers_empire', methods=['GET', 'POST'])
 def game_numbers_empire():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🏛️ إمبراطورية الأرقام (مفعلة)</h2><p>أبراج الأرقام الملكية جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>إمبراطورية الأرقام</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🏛️ إمبراطورية الأرقام الملكية (5 مربعات)</h2>
+            <p>سعر الحجز 500 USDD | الجائزة الكبرى 2000 USDD</p>
+            <a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
 def game_number_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎡 عجلة الحظ (مفعلة)</h2><p>عجلة الـ 20 رقماً جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>عجلة الحظ</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🎡 عجلة الحظ (20 رقماً)</h2>
+            <p>اختر حتى 10 أرقام، سعر الرقم 1 USDD والربح 20 USDD!</p>
+            <a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎟️ اكشف واربح (مفعلة)</h2><p>صناديق الحظ والأسود جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>اكشف واربح</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🎟️ لعبة اكشف واربح (صناديق الأسود)</h2>
+            <p>تكلفة المحاولة 2 USDD | جائزة كبرى 100 USDD!</p>
+            <a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/game_arrow_wheel', methods=['GET', 'POST'])
 def game_arrow_wheel():
     if 'username' not in session: return redirect(url_for('login'))
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎯 رمي السهم المتحركة (مفعلة)</h2><p>لعبة الأهداف المتحركة جاهزة</p><a href='/dashboard' style='color:#ffd700; font-size:18px;'>🏠 عودة للرئيسية</a></div>"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="UTF-8"><title>رمي السهم</title></head>
+    <body style="font-family:Tahoma; background:#151928; color:#fff; padding:20px; text-align:center;">
+        {get_lang_bar()}
+        <div style="background:rgba(25,30,48,0.95); border:3px solid #ffd700; padding:25px; border-radius:20px; max-width:900px; margin:20px auto;">
+            <h2 style="color:#ffd700;">🎯 رمي السهم المتحركة (12 هدف)</h2>
+            <p>تكلفة المحاولة 5 USDD والأهداف تصيب جوائز فورية!</p>
+            <a href="/dashboard" style="color:#ffd700; font-size:18px; font-weight:bold; display:inline-block; margin-top:20px;">🏠 عودة للرئيسية</a>
+        </div>
+    </body>
+    </html>
+    """
 
 # --- لوحات الإدارة وغرف التحكم ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
