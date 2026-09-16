@@ -101,7 +101,7 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- الترجمات (6 لغات) ---
+# --- قاموس الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -166,13 +166,6 @@ def set_lang(lang):
 
 def get_lang_bar():
     curr = session.get('lang', 'ar')
-    ar_sel = 'selected' if curr == 'ar' else ''
-    en_sel = 'selected' if curr == 'en' else ''
-    fr_sel = 'selected' if curr == 'fr' else ''
-    de_sel = 'selected' if curr == 'de' else ''
-    es_sel = 'selected' if curr == 'es' else ''
-    fa_sel = 'selected' if curr == 'fa' else ''
-
     return """
 <div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2); flex-wrap: wrap; gap: 10px;">
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -216,7 +209,14 @@ def get_lang_bar():
         }}).catch(err => {{}});
     }}, 2000);
 </script>
-""".format(ar_sel=ar_sel, en_sel=en_sel, fr_sel=fr_sel, de_sel=de_sel, es_sel=es_sel, fa_sel=fa_sel)
+""".format(
+        ar_sel='selected' if curr=='ar' else '',
+        en_sel='selected' if curr=='en' else '',
+        fr_sel='selected' if curr=='fr' else '',
+        de_sel='selected' if curr=='de' else '',
+        es_sel='selected' if curr=='es' else '',
+        fa_sel='selected' if curr=='fa' else ''
+    )
 
 @app.route('/sw.js')
 def service_worker():
@@ -272,7 +272,7 @@ LOGIN_PAGE = """
         </form>
         <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
             <a href="/guest_login" style="background:rgba(56,189,248,0.15); border:1px solid #38bdf8; color:#38bdf8; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">👁️ تسجيل كزائر (تصفح المنصة)</a>
-            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
+            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد في منصة امبراطورية الأرقام" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
         </div>
         <div style="margin-top:25px; background:#0a0d16; padding:12px; border-radius:15px; border:1px solid #444;">
             <p style="font-size:12px; color:#ffd700; margin:0 0 8px 0;">امسح الكود لفتح اللعبة عبر هاتفك:</p>
@@ -357,7 +357,7 @@ def dashboard():
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
     bal = user.balance if user else 0.0
-    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal)
+    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal, lang_bar=get_lang_bar())
 
 # --- مسار اللعبة الأولى: الرقم الحنون ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
@@ -491,7 +491,7 @@ def game_golden_number():
     </html>
     """, lang_bar=get_lang_bar(), bookings=bookings_dict, username=username, my_nums_str=my_nums_str, my_total_cost=my_total_cost)
 
-# --- مسارات الألعاب الخمسة المتبقية وغرف التحكم والمحاسبة ---
+# --- مسارات الألعاب الخمسة الأخرى وغرف التحكم والمحاسبة ---
 @app.route('/game_roulette')
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
