@@ -352,7 +352,6 @@ def dashboard():
     bal = user.balance if user else 0.0
     return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal, lang_bar=get_lang_bar())
 
-# --- مسارات الألعاب الستة المتكاملة ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -484,45 +483,12 @@ def game_golden_number():
     </html>
     """, lang_bar=get_lang_bar(), bookings=bookings_dict, username=username, my_nums_str=my_nums_str, my_total_cost=my_total_cost)
 
-# --- بقية الألعاب (روليت، إمبراطورية الأرقام، عجلة الحظ، اكشف واربح، رمي السهم) وغرف التحكم ---
 @app.route('/game_roulette')
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head><meta charset="UTF-8"><title>روليت الحظ</title>
-    <style>
-        body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; }
-        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 20px; border-radius: 30px; max-width: 900px; margin: 10px auto; }
-        .roulette-table { display: grid; grid-template-columns: 50px repeat(12, 1fr); grid-template-rows: repeat(3, 50px); gap: 4px; background: #065f46; padding: 10px; border-radius: 16px; margin: 15px auto; }
-        .r-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; border-radius: 6px; cursor: pointer; color: #fff; font-size: 15px; border: 1px solid rgba(255,255,255,0.2); }
-        .r-cell.zero { grid-row: span 3; background: #047857; font-size: 20px; }
-        .r-cell.red { background: #dc2626; }
-        .r-cell.black { background: #111827; }
-        .r-cell.selected { border: 2px solid #ffd700 !important; box-shadow: 0 0 10px #ffd700; }
-    </style>
-    </head>
-    <body>
-        {{ lang_bar | safe }}
-        <div class="card">
-            <h2>🎰 طاولة روليت الحظ العالمية</h2>
-            <p>رصيدك: <span id="rouletteBal">{{ user.balance }}</span> USDD (الرهان: 1 USDD | الربح: 20 USDD)</p>
-            <div id="spinScreen" style="font-size:35px; font-weight:900; color:#ffd700; background:#000; padding:10px 20px; border-radius:14px; border:3px solid #b8860b; display:inline-block; margin:10px 0;">--</div>
-            <div id="rouletteMsg" style="font-weight:900; color:#34d399; min-height:20px;">اختر أرقامك من الطاولة</div>
-            <div class="roulette-table">
-                <div class="r-cell zero" onclick="alert('تم اختيار 0')">0</div>
-                {% for n in range(1, 37) %}
-                    <div class="r-cell {{ 'red' if n in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else 'black' }}" onclick="alert('رقم {{ n }}')"><span>{{ n }}</span></div>
-                {% endfor %}
-            </div>
-        </div>
-    </body>
-    </html>
-    """, lang_bar=get_lang_bar(), user=user)
+    return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff; font-family:Tahoma;'><h2>🎰 روليت الحظ</h2><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
-# بقية الألعاب واللوحات الإدارية
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
     if session.get('username') != 'admin1': return redirect(url_for('dashboard'))
@@ -530,12 +496,11 @@ def admin_game_control():
     if request.method == 'POST':
         game_name = request.form.get('game_name')
         winning_num = int(request.form.get('winning_number'))
-        # حفظ 50 جولة قادمة
         for i in range(1, 51):
             db.session.add(GameFutureDraw(game_name=game_name, round_index=i, winning_number=winning_num))
         db.session.commit()
         msg = f"تم برمجة الـ 50 جولة القادمة للعبة {game_name} بنجاح!"
-    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎮 غرفة تحكم الألعاب (50 جولة)</h2><p style='color:#34d399;'>{msg}</p><form method='POST'><select name='game_name' style='padding:10px; background:#0a0d16; color:#fff;'><option value='الرقم الحنون'>الرقم الحنون</option><option value='روليت الحظ'>روليت الحظ</option></select><input type='number' name='winning_number' placeholder='الرقم الرابح' required style='padding:10px; margin:10px; background:#0a0d16; color:#fff;'><br><button type='submit' style='background:#ffd700; color:#000; padding:10px 20px; font-weight:bold; border:none; border-radius:8px;'>حفظ الجولات</form><br><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
+    return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>🎮 غرفة تحكم الألعاب (50 جولة)</h2><p style='color:#34d399;'>{msg}</p><form method='POST'><select name='game_name' style='padding:10px; background:#0a0d16; color:#fff;'><option value='الرقم الحنون'>الرقم الحنون</option><option value='روليت الحظ'>روليت الحظ</option></select><input type='number' name='winning_number' placeholder='الرقم الرابح' required style='padding:10px; margin:10px; background:#0a0d16; color:#fff;'><br><button type='submit' style='background:#ffd700; color:#000; padding:10px 20px; font-weight:bold; border:none; border-radius:8px;'>حفظ الجولات</button></form><br><a href='/dashboard' style='color:#ffd700;'>🏠 عودة للرئيسية</a></div>"
 
 @app.route('/admin_customers', methods=['GET', 'POST'])
 def admin_customers():
@@ -581,7 +546,6 @@ def chat():
     chats = ChatMessage.query.filter((ChatMessage.sender==username) | (ChatMessage.recipient==username)).all()
     return f"{get_lang_bar()}<div style='text-align:center; padding:30px; color:#fff; font-family:Tahoma;'><h2>💬 غرفة الدردشة والدعم</h2><form method='POST'><input type='text' name='message' placeholder='اكتب رسالتك للإدارة...' required style='padding:10px; width:60%; background:#0a0d16; color:#fff;'><button type='submit' style='background:#38bdf8; color:#000; padding:10px 20px; font-weight:bold;'>إرسال</button></form><hr><div style='max-width:600px; margin:auto; text-align:right;'>" + "".join([f"<p><b>{c.sender}:</b> {c.message}</p>" for c in chats]) + "</div><a href='/dashboard' style='color:#ffd700;'>🏠 عودة</a></div>"
 
-# بقية مسارات الألعاب المؤقتة لضمان عدم حدوث 404
 @app.route('/game_numbers_empire')
 def game_numbers_empire(): return f"{get_lang_bar()}<div style='text-align:center; padding:50px; color:#fff;'><h2>إمبراطورية الأرقام</h2><a href='/dashboard'>🏠 عودة</a></div>"
 @app.route('/game_number_wheel')
