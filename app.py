@@ -166,16 +166,23 @@ def set_lang(lang):
 
 def get_lang_bar():
     curr = session.get('lang', 'ar')
-    return f"""
+    ar_sel = 'selected' if curr == 'ar' else ''
+    en_sel = 'selected' if curr == 'en' else ''
+    fr_sel = 'selected' if curr == 'fr' else ''
+    de_sel = 'selected' if curr == 'de' else ''
+    es_sel = 'selected' if curr == 'es' else ''
+    fa_sel = 'selected' if curr == 'fa' else ''
+
+    return """
 <div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2); flex-wrap: wrap; gap: 10px;">
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
-            <option value="ar" {'selected' if curr=='ar' else ''}>العربية 🇸🇦</option>
-            <option value="en" {'selected' if curr=='en' else ''}>English 🇬🇧</option>
-            <option value="fr" {'selected' if curr=='fr' else ''}>Français 🇫🇷</option>
-            <option value="de" {'selected' if curr=='de' else ''}>Deutsch 🇩🇪</option>
-            <option value="es" {'selected' if curr=='es' else ''}>Español 🇪🇸</option>
-            <option value="fa" {'selected' if curr=='fa' else ''}>فارسی 🇮🇷</option>
+            <option value="ar" {ar_sel}>العربية 🇸🇦</option>
+            <option value="en" {en_sel}>English 🇬🇧</option>
+            <option value="fr" {fr_sel}>Français 🇫🇷</option>
+            <option value="de" {de_sel}>Deutsch 🇩🇪</option>
+            <option value="es" {es_sel}>Español 🇪🇸</option>
+            <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
         </select>
         <a href="javascript:location.reload();" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 12px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">🔄 تحديث</a>
         <button id="installBtn" onclick="installApp()" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: #fff; padding: 6px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none;">📲 تثبيت البرنامج</button>
@@ -188,28 +195,28 @@ def get_lang_bar():
 </div>
 <script>
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
+    window.addEventListener('beforeinstallprompt', (e) => {{
         e.preventDefault();
         deferredPrompt = e;
         let btn = document.getElementById('installBtn');
         if(btn) btn.style.display = 'flex';
-    });
-    function installApp() {
-        if (deferredPrompt) {
+    }});
+    function installApp() {{
+        if (deferredPrompt) {{
             deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => { deferredPrompt = null; });
-        } else {
+            deferredPrompt.userChoice.then((choiceResult) => {{ deferredPrompt = null; }});
+        }} else {{
             alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح واختر 'إضافة إلى الشاشة الرئيسية'.");
-        }
-    }
-    setInterval(() => {
-        fetch('/api/sync_balance').then(res => res.json()).then(data => {
+        }}
+    }}
+    setInterval(() => {{
+        fetch('/api/sync_balance').then(res => res.json()).then(data => {{
             let b = document.getElementById('globalLiveBalance');
             if(b && b.innerText !== String(data.balance)) b.innerText = data.balance;
-        }).catch(err => {});
-    }, 2000);
+        }}).catch(err => {{}});
+    }}, 2000);
 </script>
-"""
+""".format(ar_sel=ar_sel, en_sel=en_sel, fr_sel=fr_sel, de_sel=de_sel, es_sel=es_sel, fa_sel=fa_sel)
 
 @app.route('/sw.js')
 def service_worker():
