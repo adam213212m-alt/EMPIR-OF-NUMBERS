@@ -403,7 +403,7 @@ DASHBOARD_PAGE = """
         function closeUsdtModal() { document.getElementById('usdtModal').style.display = 'none'; }
         function submitUsdt() {
             let w = document.getElementById('usdtWalletInput').value;
-            if(!w) { alert("أدخل عنوان المحفظةة!"); return; }
+            if(!w) { alert("أدخل عنوان المحفظة!"); return; }
             alert("تم إرسال طلب السحب بنجاح!");
             closeUsdtModal();
         }
@@ -495,7 +495,7 @@ GAME_GOLDEN_PAGE = """
                 else {
                     if(data.msg && data.msg.includes("رصيد")) {
                         document.getElementById('insufficientBalanceModal').style.display = 'flex';
-                    } else if(data.msg) { /* تم إخفاء التنبيه المزعج عن الحجز المسبق حسب الطلب */ }
+                    }
                 }
             });
         }
@@ -660,7 +660,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- لعبة إمبراطورية الأرقام الملكية (التصميم الملكي الفاخر + إشعار السحب اليومي 23:00 + الفائز الأخير + المزامنة الفورية للجميع) ---
+# --- لعبة إمبراطورية الأرقام الملكية (تصميم فاخر، تنبيه السحب 23:00، أيقونة الفائز الأخير، ومزامنة فورية للجميع دون تكرار) ---
 GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -671,13 +671,11 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         body { font-family: Tahoma; background: #0f071f; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; }
         .card { background: linear-gradient(135deg, #1f1035 0%, #110522 100%); border: 5px solid #ffd700; padding: 30px; border-radius: 35px; max-width: 850px; margin: 15px auto; box-shadow: 0 0 50px rgba(255,215,0,0.3); box-sizing: border-box; width: 100%; }
         
-        /* أشرطة التنبيهات والتواريخ العلوية */
         .royal-banner { background: linear-gradient(90deg, #78350f, #b45309, #78350f); border: 2px solid #fbbf24; color: #fef08a; padding: 12px 20px; border-radius: 15px; font-weight: 900; font-size: 16px; margin-bottom: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.6); }
         .last-winner-badge { background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8; color: #38bdf8; padding: 10px 20px; border-radius: 14px; font-weight: bold; font-size: 15px; margin-bottom: 20px; display: inline-block; }
 
         .boxes { display: flex; justify-content: center; gap: 18px; margin: 25px 0; flex-wrap: wrap; box-sizing: border-box; }
         
-        /* تصميم ملكي فاخر جداً للمربعات */
         .box { width: 110px; height: 125px; background: linear-gradient(145deg, #581c87, #3b0764); border: 4px solid #ffd700; border-radius: 22px; color: #ffd700; font-size: 19px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; transition: 0.3s; box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
         .box:hover { border-color: #fff; transform: translateY(-5px); box-shadow: 0 15px 35px rgba(255,215,0,0.4); }
         .box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
@@ -693,12 +691,10 @@ GAME_NUMBERS_EMPIRE_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <!-- شريط توقيت السحب اليومي -->
         <div class="royal-banner">
             ⏰ هذه اللعبة تسحب مرة واحدة عند الساعة 23:00 بتوقيت بيروت
         </div>
 
-        <!-- أيقونة الفائز من آخر سحب -->
         <div>
             <div class="last-winner-badge" id="lastWinnerBadge">
                 👑 الفائز من آخر سحب: جاري التحميل...
@@ -736,7 +732,6 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         {% endif %}
     </div>
 
-    <!-- نافذة التهنئة الفخمة الكبرى -->
     <div id="empireResultModal" class="modal-popup">
         <div class="modal-box">
             <h2 style="color: #ffd700; margin-top:0; font-size:32px;">👑 تهانينا الملكية الكبرى</h2>
@@ -748,9 +743,8 @@ GAME_NUMBERS_EMPIRE_PAGE = """
     <script>
         let lastKnownTimestamp = 0;
         let isAnimating = false;
-        let playedDrawTimestamps = new Set(); // لمنع تكرار السحب عند تحديث الصفحة لنفس الحدث
+        let playedDrawTimestamps = new Set();
 
-        // جلب الحالة الفورية للألعاب والفائز الأخير كل 1.2 ثانية
         function pollEmpireStatus() {
             fetch('/api/empire_status').then(res => res.json()).then(data => {
                 if(data.last_winner_info) {
@@ -970,7 +964,6 @@ GAME_REVEAL_PAGE = """
 </html>
 """
 
-# --- لعبة السهم المتحركة (بدون إشعارات 1000 و 500) ---
 GAME_ARROW_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -1328,7 +1321,6 @@ def api_sync_balance():
     user = User.query.filter_by(username=session['username']).first()
     return jsonify({"balance": user.balance if user else 0.0})
 
-# مسار لجلب حالة السحب الفوري والفائز الأخير لإمبراطورية الأرقام
 @app.route('/api/empire_status')
 def api_empire_status():
     state = EmpireGlobalState.query.get(1)
@@ -1537,7 +1529,6 @@ def game_numbers_empire():
             
             msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
             
-            # تحديث الحالة العامة لكي يراها الجميع تلقائياً دون إعادة تحميل مزعجة
             empire_state = EmpireGlobalState.query.get(1)
             empire_state.last_winning_number = winning_num
             empire_state.draw_timestamp = time.time()
