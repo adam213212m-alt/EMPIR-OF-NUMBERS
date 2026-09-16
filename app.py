@@ -65,6 +65,12 @@ class GameFutureDraw(db.Model):
     round_index = db.Column(db.Integer, nullable=False)
     winning_number = db.Column(db.Integer, nullable=False)
 
+# حالة المحاولات العالمية للعبة اكشف واربح
+class RevealAndWinGlobalState(db.Model):
+    __tablename__ = 'reveal_and_win_global'
+    id = db.Column(db.Integer, primary_key=True)
+    total_spins = db.Column(db.Integer, default=0)
+
 # نظام الدردشة الفورية والسرية
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -96,6 +102,8 @@ with app.app_context():
         db.session.add(SystemVault(id=1, vault_balance=1000000.0))
     if not User.query.filter_by(username='admin1').first():
         db.session.add(User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام'))
+    if not RevealAndWinGlobalState.query.get(1):
+        db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
 # --- قاموس الترجمات (6 لغات) ---
@@ -106,7 +114,7 @@ TRANSLATIONS = {
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
         'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
-        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ',
+        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ', 'game5': 'اكشف واربح',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
         'spin': 'تدوير العجلة', 'draw_now': 'اسحب الآن'
     },
@@ -116,7 +124,7 @@ TRANSLATIONS = {
         'recharge': 'Recharge', 'withdraw': 'Withdraw', 'change_pass': 'Change Password', 'logout': 'Logout',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Home', 'customers': 'Customers', 'accounting': 'Vault & Accounting',
         'game_control': '🎮 Game Control', 'chat': '💬 Live Chat',
-        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune',
+        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune', 'game5': 'Reveal & Win',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
         'spin': 'Spin Wheel', 'draw_now': 'Draw Now'
     },
@@ -126,7 +134,7 @@ TRANSLATIONS = {
         'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
         'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
         'game_control': '🎮 Contrôle des Jeux', 'chat': '💬 Chat en Direct',
-        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune',
+        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune', 'game5': 'Révéler & Gagner',
         'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
         'spin': 'Tourner', 'draw_now': 'Tirer'
     },
@@ -136,7 +144,7 @@ TRANSLATIONS = {
         'recharge': 'Aufladen', 'withdraw': 'Auszahlen', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung',
         'game_control': '🎮 Spielkontrolle', 'chat': '💬 Live-Chat',
-        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad',
+        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad', 'game5': 'Aufdecken & Gewinnen',
         'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
         'spin': 'Drehen', 'draw_now': 'Ziehen'
     },
@@ -146,7 +154,7 @@ TRANSLATIONS = {
         'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
         'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
-        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna',
+        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna', 'game5': 'Revelar y Ganar',
         'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
         'spin': 'Girar', 'draw_now': 'Sorteo'
     },
@@ -156,7 +164,7 @@ TRANSLATIONS = {
         'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
         'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
         'game_control': '🎮 کنترل بازی‌ها', 'chat': '💬 پشتیبانی و چت',
-        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس',
+        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس', 'game5': 'کشف کن و برنده شو',
         'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
         'spin': 'چرخش', 'draw_now': 'قرعه‌کشی'
     }
@@ -255,12 +263,12 @@ DASHBOARD_PAGE = """
         .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 8px 15px; border-radius: 12px; border: 1px solid #ffd700; }
         .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; }
         .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-        .icons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-width: 1100px; margin: 30px auto; }
-        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
+        .icons-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; max-width: 1200px; margin: 30px auto; }
+        @media (max-width: 1000px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
         .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 30px 15px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-8px); }
-        .icon-logo { font-size: 65px; margin-bottom: 12px; }
-        .icon-title { color: #ffd700; font-size: 19px; font-weight: 900; }
+        .icon-logo { font-size: 60px; margin-bottom: 12px; }
+        .icon-title { color: #ffd700; font-size: 18px; font-weight: 900; }
         #usdtModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:100; }
     </style>
 </head>
@@ -322,12 +330,13 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الألعاب الأربع: الرقم الحنون، روليت الحظ، إمبراطورية الأرقام الملكية، وعجلة الحظ -->
+    <!-- الألعاب الخمسة: الرقم الحنون، روليت الحظ، إمبراطورية الأرقام الملكية، عجلة الحظ، واكشف واربح -->
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
         <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
+        <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
     </div>
 
     <script>
@@ -825,8 +834,8 @@ GAME_NUMBERS_EMPIRE_PAGE = """
 </html>
 """
 
-# --- قالب اللعبة الرابعة: عجلة الحظ (20 رقم، تكلفة 1، جائزة 20، حد أقصى 10 أرقام، إضاءة الرقم الفائز) ---
-GAME_NUMBER_WHEEL_PAGE = """
+# --- قالب لعبة عجلة الحظ المحدثة بالكامل حسب طلبك ---
+GAME_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
 <head>
@@ -845,7 +854,7 @@ GAME_NUMBER_WHEEL_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; margin-top:0;">🎡 عجلة الحظ الكبرى</h2>
+        <h2 style="color:#ffd700; margin-top:0;">🎡 عجلة الحظ (20 رقم)</h2>
         <p style="font-size:18px; color:#ffd700;">سعر الحجز للرقم: 1 USDD | الجائزة: 20 USDD (حد أقصى 10 أرقام)</p>
 
         <div>
@@ -919,7 +928,6 @@ GAME_NUMBER_WHEEL_PAGE = """
                     msgEl.innerText = finalMsg;
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = newBal : null;
 
-                    // إضاءة الرقم على الشاشة
                     let winBtn = document.getElementById('w_num_' + winningNum);
                     if(winBtn) {
                         winBtn.className = "wheel-btn winner-glow";
@@ -934,7 +942,99 @@ GAME_NUMBER_WHEEL_PAGE = """
 </html>
 """
 
-# --- باقي الصفحات والإدارة لضمان اكتمال المنصة ---
+# --- قالب اللعبة الخامسة: اكشف واربح (5 صناديق، 3 نقرات، محاكاة الاحتمالات 1/100 و 50/100) ---
+GAME_REVEAL_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><title>{{ t.game5 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
+        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 750px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
+        .boxes-grid { display: flex; justify-content: center; gap: 15px; margin: 30px 0; flex-wrap: wrap; }
+        .box-cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #ffd700; border-radius: 18px; width: 110px; height: 120px; font-size: 35px; font-weight: 900; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; user-select: none; }
+        .box-cell:hover { transform: scale(1.05); border-color: #fff; }
+        .box-cell.revealed { background: #1e1b4b !important; border-color: #38bdf8 !important; cursor: default; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0;">🎟️ لعبة اكشف واربح</h2>
+        <p style="font-size:18px; color:#ffd700;">تكلفة المحاولة: 2 USDD | الجائزة الكبرى: 100 USDD (تطابق 3 أسود)</p>
+        <p style="font-size:15px; color:#38bdf8;">تطابق وجهين أسد يعيد لك 1 USDD من قيمة المراهنة!</p>
+
+        <div id="revealMsg" style="font-size: 20px; font-weight: 900; color: #34d399; margin: 20px 0;">اضغط على "ابدأ المحاولة" ثم اختر 3 صناديق لكشفها</div>
+
+        <!-- 5 صناديق فاخرة -->
+        <div class="boxes-grid">
+            {% for i in range(1, 6) %}
+                <div class="box-cell" id="b_{{ i }}" onclick="clickBox({{ i }})">📦</div>
+            {% endfor %}
+        </div>
+
+        <button type="button" id="startBtn" onclick="startReveal()" style="padding: 16px 45px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 20px; border: none; border-radius: 16px; cursor: pointer; margin-top: 15px;">ابدأ المحاولة الجديدة (2 USDD) 🎟️</button>
+    </div>
+
+    <script>
+        let sessionRevealed = [];
+        let clicksCount = 0;
+        let gameActive = false;
+
+        function startReveal() {
+            fetch('/game_reveal_and_win', {method: 'POST'})
+            .then(res => res.json())
+            .then(d => {
+                if(d.success) {
+                    document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = d.balance : null;
+                    sessionRevealed = d.revealed; // مصفوفة فيها 3 عناصر تم تحديدها خلف الكواليس
+                    clicksCount = 0;
+                    gameActive = true;
+                    document.getElementById('revealMsg').innerText = "تم خصم 2 USDD! اختر 3 صناديق من الأخشاب لكشف محتواها الآن.";
+                    document.getElementById('startBtn').style.display = 'none';
+
+                    // إعادة تعيين الصناديق
+                    for(let i=1; i<=5; i++) {
+                        let cell = document.getElementById('b_' + i);
+                        cell.innerText = "📦";
+                        cell.classList.remove('revealed');
+                    }
+                } else {
+                    alert(d.msg || "رصيد غير كافي!");
+                }
+            });
+        }
+
+        function clickBox(boxIdx) {
+            if(!gameActive) { alert("يرجى الضغط على زر 'ابدأ المحاولة الجديدة' أولاً!"); return; }
+            let cell = document.getElementById('b_' + boxIdx);
+            if(cell.classList.contains('revealed')) return; // تم فتحه مسبقاً
+
+            if(clicksCount < sessionRevealed.length) {
+                cell.innerText = sessionRevealed[clicksCount];
+                cell.classList.add('revealed');
+                clicksCount++;
+
+                if(clicksCount === sessionRevealed.length) {
+                    gameActive = false;
+                    // جلب النتيجة من الخادم أو فحصها
+                    setTimeout(() => {
+                        fetch('/game_reveal_result_check', {method: 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({revealed: sessionRevealed})})
+                        .then(res => res.json()).then(resData => {
+                            document.getElementById('revealMsg').innerText = resData.msg;
+                            document.getElementById('startBtn').style.display = 'inline-block';
+                            document.getElementById('startBtn').innerText = "محاولة أخرى (2 USDD)";
+                        });
+                    }, 500);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+# --- بقية الصفحات وإدارة الزبائن ---
 ADMIN_CUSTOMERS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1075,6 +1175,7 @@ ADMIN_GAME_CONTROL_PAGE = """
                 <option value="roulette">روليت الحظ (0-36)</option>
                 <option value="empire">إمبراطورية الأرقام (1-5)</option>
                 <option value="wheel">عجلة الحظ (1-20)</option>
+                <option value="reveal">اكشف واربح</option>
             </select>
             <label>رقم الجولة القادمة (من 1 إلى 50):</label>
             <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
@@ -1414,28 +1515,92 @@ def game_number_wheel():
     lang_key = session.get('lang', 'ar')
     if request.method == 'POST':
         nums = json.loads(request.form.get('selected_numbers', '[]'))
-        cost = float(len(nums) * 1.0) # سعر الحجز 1 USDD لكل رقم
+        cost = float(len(nums) * 1.0)
         if nums and user.balance >= cost:
             user.balance -= cost
             vault.vault_balance += cost
-            db.session.add(FinancialLog(action_type='مبيع رهان عجلة الحظ الكبرى', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
+            db.session.add(FinancialLog(action_type='مبيع رهان عجلة الحظ', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
             
             winning_num = get_next_winning_number('wheel', 1, 20)
-            payout = 0.0
             if winning_num in nums:
-                payout = 20.0 # الجائزة 20 USDD
-                user.balance += payout
-                vault.vault_balance -= payout
-                db.session.add(FinancialLog(action_type='جائزة عجلة الحظ الكبرى', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
-                msg = f"🎉 مبروك! استقرت العجلة عند الرقم #{winning_num} وفزت بـ 20 USDD!"
+                user.balance += 20.0
+                vault.vault_balance -= 20.0
+                db.session.add(FinancialLog(action_type='جائزة عجلة الحظ', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
+                msg = f"مبروك ربحت 20 usdd للرقم {winning_num}"
             else:
-                msg = f"❌ حظ أوفر! استقرت العجلة عند الرقم #{winning_num}"
+                msg = "حظ اوفر"
 
             db.session.commit()
             return jsonify({"success": True, "winning_num": winning_num, "balance": user.balance, "msg": msg})
         else:
-            return jsonify({"success": False, "msg": "رصيد غير كافي أو لم تقتَر أرقاماً!"})
-    return render_template_string(GAME_NUMBER_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+            return jsonify({"success": False, "msg": "رصيد غير كافي أو لم تختار أرقاماً!"})
+    return render_template_string(GAME_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+
+@app.route('/game_reveal_and_win', methods=['GET', 'POST'])
+def game_reveal_and_win():
+    if 'username' not in session: return redirect(url_for('login'))
+    user = User.query.filter_by(username=session['username']).first()
+    vault = SystemVault.query.get(1)
+    t = get_t()
+    lang_key = session.get('lang', 'ar')
+    
+    state = RevealAndWinGlobalState.query.get(1)
+    if not state:
+        state = RevealAndWinGlobalState(id=1, total_spins=0)
+        db.session.add(state)
+        db.session.commit()
+
+    if request.method == 'POST':
+        if user.balance >= 2.0:
+            user.balance -= 2.0
+            vault.vault_balance += 2.0
+            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=2.0, log_time=get_local_time()))
+            
+            state.total_spins += 1
+            mod_val = state.total_spins % 100
+            
+            # تطابق 3 وجوه أسد مرة واحدة في كل 100 محاولة، و50 مرة لتطابق وجهين
+            if mod_val == 0:
+                revealed = ['🦁', '🦁', '🦁']
+                session['reveal_outcome'] = 'win_3'
+            elif mod_val <= 50:
+                revealed = ['🦁', '🦁', random.choice(['7', '3'])]
+                session['reveal_outcome'] = 'win_2'
+            else:
+                revealed = ['🦁', '7', '3']
+                session['reveal_outcome'] = 'loss'
+
+            db.session.commit()
+            return jsonify({"success": True, "balance": user.balance, "revealed": revealed})
+        else:
+            return jsonify({"success": False, "msg": "رصيد غير كافي! تكلفة المحاولة 2 USDD"})
+
+    return render_template_string(GAME_REVEAL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
+
+@app.route('/game_reveal_result_check', methods=['POST'])
+def game_reveal_result_check():
+    if 'username' not in session: return jsonify({"success": False})
+    user = User.query.filter_by(username=session['username']).first()
+    vault = SystemVault.query.get(1)
+    outcome = session.get('reveal_outcome', 'loss')
+    
+    if outcome == 'win_3':
+        payout = 100.0
+        user.balance += payout
+        vault.vault_balance -= payout
+        db.session.add(FinancialLog(action_type='جائزة اكشف واربح الكبرى', admin_name='system', target_user=user.username, amount=payout, log_time=get_local_time()))
+        msg = "مبروك ربحت 100 USDD لتطابق ثلاثة وجوه أسد!"
+    elif outcome == 'win_2':
+        refund = 1.0
+        user.balance += refund
+        vault.vault_balance -= refund
+        db.session.add(FinancialLog(action_type='استرجاع جزئي اكشف واربح', admin_name='system', target_user=user.username, amount=refund, log_time=get_local_time()))
+        msg = "نجحت في تطابق وجهين أسد واسترددت 1 USDD!"
+    else:
+        msg = "حظ أوفر في المحاولة القادمة"
+
+    db.session.commit()
+    return jsonify({"success": True, "msg": msg, "balance": user.balance})
 
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
