@@ -101,13 +101,13 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات) ---
+# --- الترجمات (6 لغات) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
         'login': 'دخول للبرنامج', 'username': 'اسم المستخدم', 'password': 'كلمة المرور', 'balance': 'الرصيد',
-        'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
-        'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
+        'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'logout': 'خروج',
+        'dashboard': 'لوحة التحكم', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
         'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
         'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ', 'game5': 'اكشف واربح', 'game6': 'رمي السهم المتحركة'
     },
@@ -166,23 +166,16 @@ def set_lang(lang):
 
 def get_lang_bar():
     curr = session.get('lang', 'ar')
-    ar_sel = 'selected' if curr == 'ar' else ''
-    en_sel = 'selected' if curr == 'en' else ''
-    fr_sel = 'selected' if curr == 'fr' else ''
-    de_sel = 'selected' if curr == 'de' else ''
-    es_sel = 'selected' if curr == 'es' else ''
-    fa_sel = 'selected' if curr == 'fa' else ''
-
     return f"""
 <div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2); flex-wrap: wrap; gap: 10px;">
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
-            <option value="ar" {ar_sel}>العربية 🇸🇦</option>
-            <option value="en" {en_sel}>English 🇬🇧</option>
-            <option value="fr" {fr_sel}>Français 🇫🇷</option>
-            <option value="de" {de_sel}>Deutsch 🇩🇪</option>
-            <option value="es" {es_sel}>Español 🇪🇸</option>
-            <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
+            <option value="ar" {'selected' if curr=='ar' else ''}>العربية 🇸🇦</option>
+            <option value="en" {'selected' if curr=='en' else ''}>English 🇬🇧</option>
+            <option value="fr" {'selected' if curr=='fr' else ''}>Français 🇫🇷</option>
+            <option value="de" {'selected' if curr=='de' else ''}>Deutsch 🇩🇪</option>
+            <option value="es" {'selected' if curr=='es' else ''}>Español 🇪🇸</option>
+            <option value="fa" {'selected' if curr=='fa' else ''}>فارسی 🇮🇷</option>
         </select>
         <a href="javascript:location.reload();" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 12px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">🔄 تحديث</a>
         <button id="installBtn" onclick="installApp()" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: #fff; padding: 6px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none;">📲 تثبيت البرنامج</button>
@@ -195,26 +188,26 @@ def get_lang_bar():
 </div>
 <script>
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {{
+    window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
         let btn = document.getElementById('installBtn');
         if(btn) btn.style.display = 'flex';
-    }});
-    function installApp() {{
-        if (deferredPrompt) {{
+    });
+    function installApp() {
+        if (deferredPrompt) {
             deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => {{ deferredPrompt = null; }});
-        }} else {{
+            deferredPrompt.userChoice.then((choiceResult) => { deferredPrompt = null; });
+        } else {
             alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح واختر 'إضافة إلى الشاشة الرئيسية'.");
         }
-    }}
-    setInterval(() => {{
-        fetch('/api/sync_balance').then(res => res.json()).then(data => {{
+    }
+    setInterval(() => {
+        fetch('/api/sync_balance').then(res => res.json()).then(data => {
             let b = document.getElementById('globalLiveBalance');
             if(b && b.innerText !== String(data.balance)) b.innerText = data.balance;
-        }}).catch(err => {{}});
-    }}, 2000);
+        }).catch(err => {});
+    }, 2000);
 </script>
 """
 
@@ -229,7 +222,7 @@ def sync_balance():
         return jsonify({'balance': u.balance if u else 0.0})
     return jsonify({'balance': 0.0})
 
-# --- محرك المعادلة الرياضية الموحدة (30% للبرنامج / 70% للجوائز) ---
+# --- المحرك الرياضي (30% للشركة / 70% للجوائز) ---
 def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
     if future:
@@ -256,7 +249,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- صفحات الواجهات الرئيسية (متضمنة QR Code، الزائر، والواتساب) ---
+# --- صفحات الواجهات (مع دعم الزائر، واتساب، و QR Code) ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -272,7 +265,7 @@ LOGIN_PAGE = """
         </form>
         <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
             <a href="/guest_login" style="background:rgba(56,189,248,0.15); border:1px solid #38bdf8; color:#38bdf8; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">👁️ تسجيل كزائر (تصفح المنصة)</a>
-            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد في منصة امبراطورية الأرقام" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
+            <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; display:block;">💬 إنشاء حساب عبر واتساب</a>
         </div>
         <div style="margin-top:25px; background:#0a0d16; padding:12px; border-radius:15px; border:1px solid #444;">
             <p style="font-size:12px; color:#ffd700; margin:0 0 8px 0;">امسح الكود لفتح اللعبة عبر هاتفك:</p>
@@ -347,7 +340,7 @@ def login():
 def guest_login():
     session.clear()
     session['username'] = 'زائر_' + ''.join(random.choices(string.digits, k=4))
-    session['balance'] = 100.0  # رصيد ترحيبي تجريبي للزائر
+    session['balance'] = 100.0
     session['role'] = 'guest'
     return redirect(url_for('dashboard'))
 
@@ -357,7 +350,7 @@ def dashboard():
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session['username']).first()
     bal = user.balance if user else 0.0
-    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal, lang_bar=get_lang_bar())
+    return render_template_string(DASHBOARD_PAGE, t=get_t(), username=session['username'], balance=bal)
 
 # --- مسار اللعبة الأولى: الرقم الحنون ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
@@ -491,7 +484,7 @@ def game_golden_number():
     </html>
     """, lang_bar=get_lang_bar(), bookings=bookings_dict, username=username, my_nums_str=my_nums_str, my_total_cost=my_total_cost)
 
-# --- مسارات الألعاب الأخرى ولوحات الآدمن والدردشة ---
+# --- مسارات الألعاب الخمسة المتبقية وغرف التحكم والمحاسبة ---
 @app.route('/game_roulette')
 def game_roulette():
     if 'username' not in session: return redirect(url_for('login'))
