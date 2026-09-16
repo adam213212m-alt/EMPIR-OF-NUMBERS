@@ -106,7 +106,7 @@ TRANSLATIONS = {
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
         'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
-        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام',
+        'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
         'spin': 'تدوير العجلة', 'draw_now': 'اسحب الآن'
     },
@@ -116,7 +116,7 @@ TRANSLATIONS = {
         'recharge': 'Recharge', 'withdraw': 'Withdraw', 'change_pass': 'Change Password', 'logout': 'Logout',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Home', 'customers': 'Customers', 'accounting': 'Vault & Accounting',
         'game_control': '🎮 Game Control', 'chat': '💬 Live Chat',
-        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers',
+        'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
         'spin': 'Spin Wheel', 'draw_now': 'Draw Now'
     },
@@ -126,7 +126,7 @@ TRANSLATIONS = {
         'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
         'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
         'game_control': '🎮 Contrôle des Jeux', 'chat': '💬 Chat en Direct',
-        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres',
+        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune',
         'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
         'spin': 'Tourner', 'draw_now': 'Tirer'
     },
@@ -136,7 +136,7 @@ TRANSLATIONS = {
         'recharge': 'Aufladen', 'withdraw': 'Auszahlen', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
         'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung',
         'game_control': '🎮 Spielkontrolle', 'chat': '💬 Live-Chat',
-        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen',
+        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad',
         'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
         'spin': 'Drehen', 'draw_now': 'Ziehen'
     },
@@ -146,7 +146,7 @@ TRANSLATIONS = {
         'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
         'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
         'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
-        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers',
+        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna',
         'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
         'spin': 'Girar', 'draw_now': 'Sorteo'
     },
@@ -156,7 +156,7 @@ TRANSLATIONS = {
         'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
         'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
         'game_control': '🎮 کنترل بازی‌ها', 'chat': '💬 پشتیبانی و چت',
-        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد',
+        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس',
         'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
         'spin': 'چرخش', 'draw_now': 'قرعه‌کشی'
     }
@@ -255,12 +255,12 @@ DASHBOARD_PAGE = """
         .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 8px 15px; border-radius: 12px; border: 1px solid #ffd700; }
         .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; }
         .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-        .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 1000px; margin: 30px auto; }
-        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(1, 1fr); } }
-        .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 35px 20px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
+        .icons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-width: 1100px; margin: 30px auto; }
+        @media (max-width: 900px) { .icons-grid { grid-template-columns: repeat(2, 1fr); } }
+        .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 28px; padding: 30px 15px; text-align: center; text-decoration: none; box-shadow: 0 20px 45px rgba(0,0,0,0.9); transition: 0.3s; }
         .icon-card:hover { border-color: #ffd700; transform: translateY(-8px); }
-        .icon-logo { font-size: 75px; margin-bottom: 15px; }
-        .icon-title { color: #ffd700; font-size: 21px; font-weight: 900; }
+        .icon-logo { font-size: 65px; margin-bottom: 12px; }
+        .icon-title { color: #ffd700; font-size: 19px; font-weight: 900; }
         #usdtModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:100; }
     </style>
 </head>
@@ -322,11 +322,12 @@ DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- الألعاب الأساسية: الرقم الحنون، روليت الحظ، وإمبراطورية الأرقام الملكية -->
-    <div class="icons-grid" style="max-width: 900px; margin: 30px auto;">
+    <!-- الألعاب الأربع: الرقم الحنون، روليت الحظ، إمبراطورية الأرقام الملكية، وعجلة الحظ -->
+    <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
         <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
+        <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
     </div>
 
     <script>
@@ -356,7 +357,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- قالب لعبة الرقم الحنون الدقيق ---
+# --- قالب لعبة الرقم الحنون ---
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -492,7 +493,7 @@ GAME_GOLDEN_PAGE = """
 </html>
 """
 
-# --- قالب لعبة روليت الحظ بطاولة المربعات العالمية ---
+# --- قالب لعبة روليت الحظ ---
 GAME_ROULETTE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -754,7 +755,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- قالب لعبة إمبراطورية الأرقام (5 أرقام ملكية) ---
+# --- قالب لعبة إمبراطورية الأرقام الملكية ---
 GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -824,7 +825,116 @@ GAME_NUMBERS_EMPIRE_PAGE = """
 </html>
 """
 
-# --- بقية الصفحات والإدارة لضمان اكتمال المنصة ---
+# --- قالب اللعبة الرابعة: عجلة الحظ (20 رقم، تكلفة 1، جائزة 20، حد أقصى 10 أرقام، إضاءة الرقم الفائز) ---
+GAME_NUMBER_WHEEL_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><title>{{ t.game4 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 25px; text-align: center; }
+        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 35px; border-radius: 30px; max-width: 750px; margin: 20px auto; box-shadow: 0 25px 60px rgba(0,0,0,0.8); }
+        .wheel-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px auto; max-width: 500px; }
+        .wheel-btn { background: #1f2937; border: 2px solid #ffd700; border-radius: 12px; padding: 18px; font-size: 20px; font-weight: 900; color: #fff; cursor: pointer; transition: 0.2s; }
+        .wheel-btn.selected { background: #d97706 !important; color: #000 !important; border-color: #fff !important; transform: scale(1.05); }
+        .wheel-btn.winner-glow { background: #fbbf24 !important; color: #000 !important; border: 3px solid #fff !important; box-shadow: 0 0 30px #ffd700; transform: scale(1.12); }
+        .spin-screen { font-size: 50px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 15px; border: 3px solid #b8860b; display: inline-block; min-width: 160px; margin: 15px 0; letter-spacing: 4px; }
+        .selection-box { background: rgba(15,20,32,0.9); border: 2px solid #38bdf8; padding: 15px; border-radius: 14px; margin-top: 20px; text-align: right; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0;">🎡 عجلة الحظ الكبرى</h2>
+        <p style="font-size:18px; color:#ffd700;">سعر الحجز للرقم: 1 USDD | الجائزة: 20 USDD (حد أقصى 10 أرقام)</p>
+
+        <div>
+            <div id="wheelSlot" class="spin-screen">--</div>
+        </div>
+        <div id="wheelMsg" style="font-size:18px; font-weight:900; color:#34d399; margin:10px 0;">اختر من 1 إلى 10 أرقام وابدأ السحب</div>
+
+        <!-- قائمة حجز فاخرة بـ 20 رقم -->
+        <div class="wheel-grid">
+            {% for n in range(1, 21) %}
+                <button type="button" id="w_num_{{ n }}" onclick="toggleWheelNum({{ n }})" class="wheel-btn">{{ n }}</button>
+            {% endfor %}
+        </div>
+
+        <!-- خانة تكتب للاعب الأرقام المختارة وقيمتها -->
+        <div class="selection-box">
+            <h4 style="color: #38bdf8; margin-top:0;">📋 أرقامك المختارة وقيمة الرهان</h4>
+            <p style="margin: 5px 0; font-size: 16px;"><b>الأرقام المحددة:</b> <span id="selectedListText" style="color: #ffd700;">لا توجد أرقام مختارة</span></p>
+            <p style="margin: 5px 0; font-size: 16px;"><b>إجمالي قيمة الرهان:</b> <span id="totalCostText" style="color: #34d399;">0 USDD</span></p>
+        </div>
+
+        <button type="button" onclick="spinWheel()" style="padding: 16px 45px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 20px; border: none; border-radius: 16px; cursor: pointer; margin-top: 25px;">ابدأ السحب 🎡</button>
+    </div>
+
+    <script>
+        let wheelSelected = [];
+
+        function toggleWheelNum(n) {
+            let idx = wheelSelected.indexOf(n);
+            if(idx > -1) {
+                wheelSelected.splice(idx, 1);
+                document.getElementById('w_num_' + n).classList.remove('selected');
+            } else {
+                if(wheelSelected.length >= 10) { alert("لا يمكن اختيار أكثر من 10 أرقام في المحاولة الواحدة!"); return; }
+                wheelSelected.push(n);
+                document.getElementById('w_num_' + n).classList.add('selected');
+            }
+            updateSelectionBox();
+        }
+
+        function updateSelectionBox() {
+            let txt = wheelSelected.length > 0 ? wheelSelected.join(', ') : 'لا توجد أرقام مختارة';
+            let cost = wheelSelected.length * 1.0;
+            document.getElementById('selectedListText').innerText = txt;
+            document.getElementById('totalCostText').innerText = cost + ' USDD';
+        }
+
+        function spinWheel() {
+            if(wheelSelected.length === 0) { alert("يرجى اختيار رقم واحد على الأقل قبل بدء السحب!"); return; }
+            let fd = new FormData();
+            fd.append('selected_numbers', JSON.stringify(wheelSelected));
+            fetch('/game_number_wheel', {method: 'POST', body: fd}).then(res => res.json()).then(d => {
+                if(d.success) {
+                    runWheelAnimation(d.winning_num, d.msg, d.balance);
+                } else {
+                    alert(d.msg || "حدث خطأ أو رصيد غير كافي!");
+                }
+            });
+        }
+
+        function runWheelAnimation(winningNum, finalMsg, newBal) {
+            let screen = document.getElementById('wheelSlot');
+            let msgEl = document.getElementById('wheelMsg');
+            let counter = 0;
+            let interval = setInterval(() => {
+                screen.innerText = '#' + Math.floor(Math.random() * 20 + 1);
+                counter++;
+                if(counter > 20) {
+                    clearInterval(interval);
+                    screen.innerText = '#' + winningNum;
+                    msgEl.innerText = finalMsg;
+                    document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = newBal : null;
+
+                    // إضاءة الرقم على الشاشة
+                    let winBtn = document.getElementById('w_num_' + winningNum);
+                    if(winBtn) {
+                        winBtn.className = "wheel-btn winner-glow";
+                    }
+
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 90);
+        }
+    </script>
+</body>
+</html>
+"""
+
+# --- باقي الصفحات والإدارة لضمان اكتمال المنصة ---
 ADMIN_CUSTOMERS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -964,6 +1074,7 @@ ADMIN_GAME_CONTROL_PAGE = """
                 <option value="golden">الرقم الحنون (1-50)</option>
                 <option value="roulette">روليت الحظ (0-36)</option>
                 <option value="empire">إمبراطورية الأرقام (1-5)</option>
+                <option value="wheel">عجلة الحظ (1-20)</option>
             </select>
             <label>رقم الجولة القادمة (من 1 إلى 50):</label>
             <input type="number" name="round_index" min="1" max="50" required placeholder="رقم الجولة...">
@@ -1073,7 +1184,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك وتوجيه التطبيق ---
+# --- مسارات الفلاسك والتوجيه ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1292,6 +1403,39 @@ def game_numbers_empire():
             return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
     bookings = {b.number: b.username for b in NumbersEmpireBooking.query.all()}
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings)
+
+@app.route('/game_number_wheel', methods=['GET', 'POST'])
+def game_number_wheel():
+    if 'username' not in session: return redirect(url_for('login'))
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    vault = SystemVault.query.get(1)
+    t = get_t()
+    lang_key = session.get('lang', 'ar')
+    if request.method == 'POST':
+        nums = json.loads(request.form.get('selected_numbers', '[]'))
+        cost = float(len(nums) * 1.0) # سعر الحجز 1 USDD لكل رقم
+        if nums and user.balance >= cost:
+            user.balance -= cost
+            vault.vault_balance += cost
+            db.session.add(FinancialLog(action_type='مبيع رهان عجلة الحظ الكبرى', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
+            
+            winning_num = get_next_winning_number('wheel', 1, 20)
+            payout = 0.0
+            if winning_num in nums:
+                payout = 20.0 # الجائزة 20 USDD
+                user.balance += payout
+                vault.vault_balance -= payout
+                db.session.add(FinancialLog(action_type='جائزة عجلة الحظ الكبرى', admin_name='system', target_user=username, amount=payout, log_time=get_local_time()))
+                msg = f"🎉 مبروك! استقرت العجلة عند الرقم #{winning_num} وفزت بـ 20 USDD!"
+            else:
+                msg = f"❌ حظ أوفر! استقرت العجلة عند الرقم #{winning_num}"
+
+            db.session.commit()
+            return jsonify({"success": True, "winning_num": winning_num, "balance": user.balance, "msg": msg})
+        else:
+            return jsonify({"success": False, "msg": "رصيد غير كافي أو لم تقتَر أرقاماً!"})
+    return render_template_string(GAME_NUMBER_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
