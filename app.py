@@ -68,6 +68,13 @@ class RevealAndWinGlobalState(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     total_spins = db.Column(db.Integer, default=0)
 
+# جدول تتبع حالة السحب الفوري لإمبراطورية الأرقام لظهوره عند الجميع تلقائياً
+class EmpireGlobalState(db.Model):
+    __tablename__ = 'empire_global_state'
+    id = db.Column(db.Integer, primary_key=True)
+    last_winning_number = db.Column(db.Integer, default=0)
+    draw_timestamp = db.Column(db.Float, default=0.0)
+
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -99,6 +106,8 @@ with app.app_context():
         db.session.add(User(username='admin1', password='admin123', balance=0.0, role='admin', created_by='system', owner_name='المشرف العام'))
     if not RevealAndWinGlobalState.query.get(1):
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
+    if not EmpireGlobalState.query.get(1):
+        db.session.add(EmpireGlobalState(id=1, last_winning_number=0, draw_timestamp=0.0))
     db.session.commit()
 
 TRANSLATIONS = {
@@ -481,29 +490,20 @@ GAME_GOLDEN_PAGE = """
             fd.append('action_type', actionType);
             fd.append('number', numberVal);
             fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
-                if(data.success) {
-                    location.reload();
-                } else {
+                if(data.success) { location.reload(); }
+                else {
                     if(data.msg && data.msg.includes("رصيد")) {
                         document.getElementById('insufficientBalanceModal').style.display = 'flex';
-                    } else if(data.msg) {
-                        alert(data.msg);
-                    }
+                    } else if(data.msg) { alert(data.msg); }
                 }
             });
         }
-        function closeInsufficientModal() {
-            document.getElementById('insufficientBalanceModal').style.display = 'none';
-        }
+        function closeInsufficientModal() { document.getElementById('insufficientBalanceModal').style.display = 'none'; }
         function triggerDraw() {
-            let fd = new FormData();
-            fd.append('action_type', 'admin_draw');
+            let fd = new FormData(); fd.append('action_type', 'admin_draw');
             fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
-                if(data.winning_number) {
-                    runDrawAnimation(data.winning_number);
-                } else if(data.msg) {
-                    alert(data.msg);
-                }
+                if(data.winning_number) { runDrawAnimation(data.winning_number); }
+                else if(data.msg) { alert(data.msg); }
             });
         }
         function runDrawAnimation(winningNum) {
@@ -659,7 +659,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- لعبة إمبراطورية الأرقام الملكية (المحدثة خصيصاً بالأنيميشن والإضاءة والمودال المطلوب) ---
+# --- لعبة إمبراطورية الأرقام الملكية (المحدثة بنظام التحديث التلقائي الفوري لجميع اللاعبين) ---
 GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -714,7 +714,6 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         {% endif %}
     </div>
 
-    <!-- نافذة منبثقة كبيرة للتهنئة بالفوز الملكي -->
     <div id="empireResultModal" class="modal-popup">
         <div class="modal-box">
             <h2 style="color: #ffd700; margin-top:0; font-size:30px;">👑 تهانينا الملكية</h2>
@@ -724,10 +723,27 @@ GAME_NUMBERS_EMPIRE_PAGE = """
     </div>
 
     <script>
+        let lastKnownTimestamp = 0;
+        let isAnimating = false;
+
+        // نظام تحديث تلقائي فوري لجميع اللاعبين (يتحقق كل 1.5 ثانية)
+        setInterval(() => {
+            if(isAnimating) return;
+            fetch('/api/empire_status').then(res => res.json()).then(data => {
+                if(data.timestamp && data.timestamp > lastKnownTimestamp) {
+                    lastKnownTimestamp = data.timestamp;
+                    if(data.winning_number > 0) {
+                        runEmpireAnimation(data.winning_number, `مبروك للرقم ${data.winning_number} فاز بـ 2000 USDD`);
+                    }
+                }
+            }).catch(err => {});
+        }, 1500);
+
         function empAction(type, box) {
             let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
             fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
                 if(d.winning_number) {
+                    // الآدمن يشغل العرض فوراً عبر استجابة الطلب
                     runEmpireAnimation(d.winning_number, d.msg);
                 } else {
                     if(d.msg) alert(d.msg);
@@ -737,28 +753,26 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         }
 
         function runEmpireAnimation(winningNum, finalMsg) {
+            isAnimating = true;
             let screen = document.getElementById('empireSlot');
             let ann = document.getElementById('empireAnnouncement');
             let counter = 0;
             
-            // حركة سريعة للأرقام داخل المربع الأسود
             let interval = setInterval(() => {
                 let randNum = Math.floor(Math.random() * 5) + 1;
                 screen.innerText = '#' + randNum;
                 counter++;
-                if(counter > 25) {
+                if(counter > 20) {
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
                     ann.innerText = finalMsg;
 
-                    // إضاءة وتوهج المربع الفائز باللون الذهبي
                     let winBox = document.getElementById('emp_box_' + winningNum);
                     if(winBox) {
                         winBox.classList.add('winner-glow');
                     }
 
-                    // إظهار نافذة التهنئة الكبيرة المطلوبة
-                    document.getElementById('empireModalText').innerText = `مبروك للرقم ${winningNum} فاز بـ 2000 USDD`;
+                    document.getElementById('empireModalText').innerText = finalMsg;
                     document.getElementById('empireResultModal').style.display = 'flex';
                 }
             }, 75);
@@ -1280,6 +1294,15 @@ def api_sync_balance():
     user = User.query.filter_by(username=session['username']).first()
     return jsonify({"balance": user.balance if user else 0.0})
 
+# مسار لجلب حالة السحب الفوري لإمبراطورية الأرقام
+@app.route('/api/empire_status')
+def api_empire_status():
+    state = EmpireGlobalState.query.get(1)
+    return jsonify({
+        "winning_number": state.last_winning_number if state else 0,
+        "timestamp": state.draw_timestamp if state else 0.0
+    })
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     t = get_t()
@@ -1474,7 +1497,14 @@ def game_numbers_empire():
                     winner_u.balance += 2000.0
                     vault.vault_balance -= 2000.0
                     db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
+            
             msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
+            
+            # تحديث الحالة العامة لكي يراها جميع اللاعبين خلال أقل من ثانيتين تلقائياً
+            empire_state = EmpireGlobalState.query.get(1)
+            empire_state.last_winning_number = winning_num
+            empire_state.draw_timestamp = time.time()
+
             NumbersEmpireBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
@@ -1557,7 +1587,7 @@ def game_reveal_and_win():
         if user.balance >= 2.0:
             user.balance -= 2.0
             vault.vault_balance += 2.0
-            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
+            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=2.0, log_time=get_local_time()))
             state.total_spins += 1
             mod_val = state.total_spins % 100
             future = GameFutureDraw.query.filter_by(game_name='reveal').order_by(GameFutureDraw.round_index.asc()).first()
@@ -1571,9 +1601,17 @@ def game_reveal_and_win():
                 elif mod_val <= 50: outcome = 'win_2'
                 else: outcome = 'loss'
             session['reveal_outcome'] = outcome
-            if outcome == 'win_3': revealed = ['🦁', '🦁', '🦁']
-            elif outcome == 'win_2': revealed = ['🦁', '🦁', random.choice(['7', '3'])]
-            else: revealed = ['🦁', '7', '3']
+            
+            # خلط وترتيب الرموز عشوائياً حتى لا يظهر وجه الأسد دائماً من أول كشفين
+            if outcome == 'win_3':
+                revealed = ['🦁', '🦁', '🦁']
+            elif outcome == 'win_2':
+                revealed = ['🦁', '🦁', random.choice(['7', '3'])]
+                random.shuffle(revealed)
+            else:
+                revealed = ['🦁', '7', '3']
+                random.shuffle(revealed)
+
             db.session.commit()
             return jsonify({"success": True, "balance": user.balance, "revealed": revealed})
         else:
