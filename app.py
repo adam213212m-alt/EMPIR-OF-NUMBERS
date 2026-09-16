@@ -68,12 +68,13 @@ class RevealAndWinGlobalState(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     total_spins = db.Column(db.Integer, default=0)
 
-# جدول تتبع حالة السحب الفوري لإمبراطورية الأرقام لظهوره عند الجميع تلقائياً
+# جدول تتبع حالة السحب الفوري لإمبراطورية الأرقام والفائز الأخير
 class EmpireGlobalState(db.Model):
     __tablename__ = 'empire_global_state'
     id = db.Column(db.Integer, primary_key=True)
     last_winning_number = db.Column(db.Integer, default=0)
     draw_timestamp = db.Column(db.Float, default=0.0)
+    last_winner_info = db.Column(db.String(150), default='لا يوجد فائز سابق بعد')
 
 class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
@@ -107,7 +108,7 @@ with app.app_context():
     if not RevealAndWinGlobalState.query.get(1):
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     if not EmpireGlobalState.query.get(1):
-        db.session.add(EmpireGlobalState(id=1, last_winning_number=0, draw_timestamp=0.0))
+        db.session.add(EmpireGlobalState(id=1, last_winning_number=0, draw_timestamp=0.0, last_winner_info='لا يوجد فائز سابق بعد'))
     db.session.commit()
 
 TRANSLATIONS = {
@@ -402,7 +403,7 @@ DASHBOARD_PAGE = """
         function closeUsdtModal() { document.getElementById('usdtModal').style.display = 'none'; }
         function submitUsdt() {
             let w = document.getElementById('usdtWalletInput').value;
-            if(!w) { alert("أدخل عنوان المحفظة!"); return; }
+            if(!w) { alert("أدخل عنوان المحفظةة!"); return; }
             alert("تم إرسال طلب السحب بنجاح!");
             closeUsdtModal();
         }
@@ -494,7 +495,7 @@ GAME_GOLDEN_PAGE = """
                 else {
                     if(data.msg && data.msg.includes("رصيد")) {
                         document.getElementById('insufficientBalanceModal').style.display = 'flex';
-                    } else if(data.msg) { alert(data.msg); }
+                    } else if(data.msg) { /* تم إخفاء التنبيه المزعج عن الحجز المسبق حسب الطلب */ }
                 }
             });
         }
@@ -659,7 +660,7 @@ GAME_ROULETTE_PAGE = """
 </html>
 """
 
-# --- لعبة إمبراطورية الأرقام الملكية (المحدثة بنظام التحديث التلقائي الفوري لجميع اللاعبين) ---
+# --- لعبة إمبراطورية الأرقام الملكية (التصميم الملكي الفاخر + إشعار السحب اليومي 23:00 + الفائز الأخير + المزامنة الفورية للجميع) ---
 GAME_NUMBERS_EMPIRE_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -667,87 +668,119 @@ GAME_NUMBERS_EMPIRE_PAGE = """
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ t.game3 }}</title>
     <style>
-        body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; }
-        .card { background: rgba(25,30,48,0.95); border: 4px solid #ffd700; padding: 25px; border-radius: 30px; max-width: 800px; margin: 15px auto; box-sizing: border-box; width: 100%; }
-        .boxes { display: flex; justify-content: center; gap: 15px; margin: 25px 0; flex-wrap: wrap; box-sizing: border-box; }
-        .box { width: 100px; height: 110px; background: #7c3aed; border: 3px solid #ffd700; border-radius: 20px; color: #fff; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; transition: 0.3s; }
-        .box.booked { background: #7f1d1d; cursor: not-allowed; }
-        .box.my { background: #1e3a8a; }
-        .box.winner-glow { background: #fbbf24 !important; border: 4px solid #fff !important; box-shadow: 0 0 35px #ffd700; color: #000 !important; transform: scale(1.15); animation: pulseGlow 0.6s infinite alternate; }
-        @keyframes pulseGlow { 0% { transform: scale(1.1); } 100% { transform: scale(1.2); } }
-        .slot-box { font-size: 40px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 14px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; max-width: 100%; box-sizing: border-box; }
+        body { font-family: Tahoma; background: #0f071f; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; }
+        .card { background: linear-gradient(135deg, #1f1035 0%, #110522 100%); border: 5px solid #ffd700; padding: 30px; border-radius: 35px; max-width: 850px; margin: 15px auto; box-shadow: 0 0 50px rgba(255,215,0,0.3); box-sizing: border-box; width: 100%; }
+        
+        /* أشرطة التنبيهات والتواريخ العلوية */
+        .royal-banner { background: linear-gradient(90deg, #78350f, #b45309, #78350f); border: 2px solid #fbbf24; color: #fef08a; padding: 12px 20px; border-radius: 15px; font-weight: 900; font-size: 16px; margin-bottom: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.6); }
+        .last-winner-badge { background: rgba(15, 23, 42, 0.95); border: 2px solid #38bdf8; color: #38bdf8; padding: 10px 20px; border-radius: 14px; font-weight: bold; font-size: 15px; margin-bottom: 20px; display: inline-block; }
+
+        .boxes { display: flex; justify-content: center; gap: 18px; margin: 25px 0; flex-wrap: wrap; box-sizing: border-box; }
+        
+        /* تصميم ملكي فاخر جداً للمربعات */
+        .box { width: 110px; height: 125px; background: linear-gradient(145deg, #581c87, #3b0764); border: 4px solid #ffd700; border-radius: 22px; color: #ffd700; font-size: 19px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; transition: 0.3s; box-shadow: 0 10px 25px rgba(0,0,0,0.7); }
+        .box:hover { border-color: #fff; transform: translateY(-5px); box-shadow: 0 15px 35px rgba(255,215,0,0.4); }
+        .box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; color: #fca5a5 !important; cursor: not-allowed; }
+        .box.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #60a5fa !important; color: #93c5fd !important; }
+        .box.winner-glow { background: linear-gradient(145deg, #fbbf24, #d97706) !important; border: 4px solid #fff !important; box-shadow: 0 0 50px #ffd700; color: #000 !important; transform: scale(1.18); animation: pulseGlow 0.6s infinite alternate; }
+        @keyframes pulseGlow { 0% { transform: scale(1.12); } 100% { transform: scale(1.22); } }
+        
+        .slot-box { font-size: 45px; font-weight: 900; color: #ffd700; background: #000; padding: 15px; border-radius: 18px; border: 4px solid #b8860b; display: inline-block; min-width: 160px; max-width: 100%; box-sizing: border-box; box-shadow: inset 0 0 20px rgba(255,215,0,0.5); }
         .modal-popup { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:300; box-sizing: border-box; padding: 15px; }
-        .modal-box { background:#1a1c29; padding:35px; border-radius:25px; border:4px solid #ffd700; width:100%; max-width:420px; text-align:center; box-shadow:0 15px 40px rgba(0,0,0,0.9); box-sizing: border-box; }
+        .modal-box { background:#1a1c29; padding:40px; border-radius:28px; border:5px solid #ffd700; width:100%; max-width:450px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.9); box-sizing: border-box; }
     </style>
 </head>
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; font-size: 22px;">🏛️ إمبراطورية الأرقام الملكية (5 أرقام)</h2>
-        <p style="font-size:16px; color:#ffd700;">سعر الحجز: 500 USDD | الجائزة الكبرى: 2000 USDD</p>
-
-        <div style="background:#000; padding:15px; border-radius:20px; border:3px solid #38bdf8; margin:15px 0; box-sizing: border-box;">
-            <div id="empireSlot" class="slot-box">--</div>
-            <div id="empireAnnouncement" style="font-size:16px; color:#34d399; margin-top:8px; font-weight:900;">في انتظار السحب الفاخر...</div>
+        <!-- شريط توقيت السحب اليومي -->
+        <div class="royal-banner">
+            ⏰ هذه اللعبة تسحب مرة واحدة عند الساعة 23:00 بتوقيت بيروت
         </div>
 
-        {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:10px; margin:12px 0;">{{ msg }}</div>{% endif %}
+        <!-- أيقونة الفائز من آخر سحب -->
+        <div>
+            <div class="last-winner-badge" id="lastWinnerBadge">
+                👑 الفائز من آخر سحب: جاري التحميل...
+            </div>
+        </div>
+
+        <h2 style="color:#ffd700; font-size: 24px; margin-top:5px;">🏛️ إمبراطورية الأرقام الملكية الفاخرة</h2>
+        <p style="font-size:16px; color:#fde047;">سعر الحجز: 500 USDD | الجائزة الكبرى: 2000 USDD</p>
+
+        <div style="background:#05030a; padding:20px; border-radius:22px; border:4px solid #ffd700; margin:15px 0; box-sizing: border-box;">
+            <div id="empireSlot" class="slot-box">--</div>
+            <div id="empireAnnouncement" style="font-size:17px; color:#34d399; margin-top:10px; font-weight:900;">في انتظار السحب الملكي...</div>
+        </div>
+
+        {% if msg %}<div style="background:#065f46; color:#34d399; padding:12px; border-radius:12px; margin:12px 0; font-weight:bold;">{{ msg }}</div>{% endif %}
 
         <div class="boxes">
             {% for i in range(1, 6) %}
                 {% if i in bookings %}
                     {% if bookings[i] == username %}
-                        <button onclick="empAction('cancel', {{ i }})" class="box my" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">تراجع</span></button>
+                        <button onclick="empAction('cancel', {{ i }})" class="box my" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px; margin-top:5px;">تراجع</span></button>
                     {% else %}
-                        <div class="box booked" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">{{ bookings[i] }}</span></div>
+                        <div class="box booked" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px; margin-top:5px;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
-                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">500$</span></button>
+                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:12px; margin-top:5px; color:#fef08a;">500$</span></button>
                 {% endif %}
             {% endfor %}
         </div>
 
         {% if username == 'admin1' %}
-            <div style="margin-top:20px;">
-                <button onclick="empAction('admin_draw', 0)" style="background:#22c55e; color:#fff; padding:12px 30px; font-weight:bold; border:none; border-radius:12px; cursor:pointer; font-size:16px;">⚡ بدء السحب الملكي</button>
+            <div style="margin-top:25px;">
+                <button onclick="empAction('admin_draw', 0)" style="background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; padding: 14px 35px; font-weight: 900; border: none; border-radius: 14px; cursor: pointer; font-size: 18px; box-shadow: 0 5px 20px rgba(34,197,94,0.5);">⚡ بدء السحب الملكي الفوري</button>
             </div>
         {% endif %}
     </div>
 
+    <!-- نافذة التهنئة الفخمة الكبرى -->
     <div id="empireResultModal" class="modal-popup">
         <div class="modal-box">
-            <h2 style="color: #ffd700; margin-top:0; font-size:30px;">👑 تهانينا الملكية</h2>
-            <p id="empireModalText" style="font-size: 20px; color: #34d399; font-weight: 900; margin: 20px 0;"></p>
-            <button onclick="closeEmpireModal()" style="background:#ffd700; color:#000; padding:12px 35px; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:16px;">حسناً</button>
+            <h2 style="color: #ffd700; margin-top:0; font-size:32px;">👑 تهانينا الملكية الكبرى</h2>
+            <p id="empireModalText" style="font-size: 22px; color: #34d399; font-weight: 900; margin: 25px 0;"></p>
+            <button onclick="closeEmpireModal()" style="background:#ffd700; color:#000; padding:14px 40px; font-weight:900; border:none; border-radius:14px; cursor:pointer; font-size:17px; box-shadow: 0 5px 20px rgba(255,215,0,0.5);">حسناً</button>
         </div>
     </div>
 
     <script>
         let lastKnownTimestamp = 0;
         let isAnimating = false;
+        let playedDrawTimestamps = new Set(); // لمنع تكرار السحب عند تحديث الصفحة لنفس الحدث
 
-        // نظام تحديث تلقائي فوري لجميع اللاعبين (يتحقق كل 1.5 ثانية)
-        setInterval(() => {
-            if(isAnimating) return;
+        // جلب الحالة الفورية للألعاب والفائز الأخير كل 1.2 ثانية
+        function pollEmpireStatus() {
             fetch('/api/empire_status').then(res => res.json()).then(data => {
+                if(data.last_winner_info) {
+                    document.getElementById('lastWinnerBadge').innerText = "👑 الفائز من آخر سحب: " + data.last_winner_info;
+                }
                 if(data.timestamp && data.timestamp > lastKnownTimestamp) {
                     lastKnownTimestamp = data.timestamp;
-                    if(data.winning_number > 0) {
-                        runEmpireAnimation(data.winning_number, `مبروك للرقم ${data.winning_number} فاز بـ 2000 USDD`);
+                    if(data.winning_number > 0 && !playedDrawTimestamps.has(data.timestamp)) {
+                        playedDrawTimestamps.add(data.timestamp);
+                        if(!isAnimating) {
+                            runEmpireAnimation(data.winning_number, `مبروك للرقم ${data.winning_number} فاز بـ 2000 USDD`);
+                        }
                     }
                 }
             }).catch(err => {});
-        }, 1500);
+        }
+
+        setInterval(pollEmpireStatus, 1200);
+        pollEmpireStatus();
 
         function empAction(type, box) {
             let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
             fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
                 if(d.winning_number) {
-                    // الآدمن يشغل العرض فوراً عبر استجابة الطلب
-                    runEmpireAnimation(d.winning_number, d.msg);
+                    if(!isAnimating) {
+                        runEmpireAnimation(d.winning_number, d.msg);
+                    }
                 } else {
-                    if(d.msg) alert(d.msg);
-                    location.reload();
+                    if(d.msg && !d.msg.includes("محجوز")) { alert(d.msg); }
+                    if(!d.msg || !d.msg.includes("محجوز")) { location.reload(); }
                 }
             });
         }
@@ -762,7 +795,7 @@ GAME_NUMBERS_EMPIRE_PAGE = """
                 let randNum = Math.floor(Math.random() * 5) + 1;
                 screen.innerText = '#' + randNum;
                 counter++;
-                if(counter > 20) {
+                if(counter > 22) {
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
                     ann.innerText = finalMsg;
@@ -937,6 +970,7 @@ GAME_REVEAL_PAGE = """
 </html>
 """
 
+# --- لعبة السهم المتحركة (بدون إشعارات 1000 و 500) ---
 GAME_ARROW_WHEEL_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -956,7 +990,7 @@ GAME_ARROW_WHEEL_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700; margin-top:0; font-size: 22px;">🎯 لعبة رمي السهم المتحركة (12 هدف)</h2>
-        <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 5 USDD | الهدف 1000 و 500 يظهران على العجلة للاختبار ولكن لا يمكن إصابتهما!</p>
+        <p style="font-size:16px; color:#ffd700;">تكلفة المحاولة: 5 USDD</p>
         <p style="font-size:14px; color:#38bdf8;">الهدف الذي يُصاب يعود ربحه فوراً إلى صندوق اللاعب!</p>
         <div class="wheel-container"><div id="arrowScreen" class="arrow-screen">🎯 جاهز للرمي</div></div>
         <div id="arrowMsg" style="font-size: 16px; font-weight: 900; color: #34d399; margin: 12px 0;">اضغط على "ارم السهم" لبدء الرمية</div>
@@ -1294,13 +1328,14 @@ def api_sync_balance():
     user = User.query.filter_by(username=session['username']).first()
     return jsonify({"balance": user.balance if user else 0.0})
 
-# مسار لجلب حالة السحب الفوري لإمبراطورية الأرقام
+# مسار لجلب حالة السحب الفوري والفائز الأخير لإمبراطورية الأرقام
 @app.route('/api/empire_status')
 def api_empire_status():
     state = EmpireGlobalState.query.get(1)
     return jsonify({
         "winning_number": state.last_winning_number if state else 0,
-        "timestamp": state.draw_timestamp if state else 0.0
+        "timestamp": state.draw_timestamp if state else 0.0,
+        "last_winner_info": state.last_winner_info if state else 'لا يوجد فائز سابق بعد'
     })
 
 @app.route('/', methods=['GET', 'POST'])
@@ -1491,19 +1526,22 @@ def game_numbers_empire():
         elif action == 'admin_draw' and username == 'admin1':
             winning_num = get_unified_math_outcome('empire', [], 1, 5)
             winner_b = NumbersEmpireBooking.query.filter_by(number=winning_num).first()
+            winner_desc = f"الرقم #{winning_num}"
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
                 if winner_u:
                     winner_u.balance += 2000.0
                     vault.vault_balance -= 2000.0
                     db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
+                    winner_desc = f"الرقم #{winning_num} (للاعب: {winner_u.username})"
             
             msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
             
-            # تحديث الحالة العامة لكي يراها جميع اللاعبين خلال أقل من ثانيتين تلقائياً
+            # تحديث الحالة العامة لكي يراها الجميع تلقائياً دون إعادة تحميل مزعجة
             empire_state = EmpireGlobalState.query.get(1)
             empire_state.last_winning_number = winning_num
             empire_state.draw_timestamp = time.time()
+            empire_state.last_winner_info = winner_desc
 
             NumbersEmpireBooking.query.delete()
             db.session.commit()
@@ -1602,7 +1640,6 @@ def game_reveal_and_win():
                 else: outcome = 'loss'
             session['reveal_outcome'] = outcome
             
-            # خلط وترتيب الرموز عشوائياً حتى لا يظهر وجه الأسد دائماً من أول كشفين
             if outcome == 'win_3':
                 revealed = ['🦁', '🦁', '🦁']
             elif outcome == 'win_2':
