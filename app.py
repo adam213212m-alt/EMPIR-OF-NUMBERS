@@ -151,7 +151,7 @@ TRANSLATIONS = {
     'es': {
         'dir': 'ltr', 'title': 'Imperio de los Números', 'subtitle': 'Plataforma de Jeux Super Interactive 12D',
         'login': 'Iniciar Sesión', 'username': 'Nombre de usuario', 'password': 'Contraseña', 'balance': 'Saldo',
-        'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
+        'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrار Sesión',
         'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
         'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
         'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna', 'game5': 'Revelar y Ganar', 'game6': 'Lanzamiento de Flecha',
@@ -242,7 +242,6 @@ def get_lang_bar():
 def service_worker():
     return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
 
-# --- محرك المعادلة الرياضية الموحدة (30% للبرنامج / 70% للجوائز) للألعاب الأربعة ---
 def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
     if future:
@@ -290,7 +289,6 @@ LOGIN_PAGE = """
             <a href="https://wa.me/96176030208?text=مرحباً، أريد إنشاء حساب جديد في منصة امبراطورية الأرقام" target="_blank" style="background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#34d399; padding:12px; text-decoration:none; border-radius:12px; font-weight:bold; font-size:15px; display:block;">💬 إنشاء حساب عبر واتساب</a>
         </div>
 
-        <!-- QR Code للمنصة -->
         <div style="margin-top:25px; background:#0a0d16; padding:12px; border-radius:15px; border:1px solid #444;">
             <p style="font-size:12px; color:#ffd700; margin:0 0 8px 0;">امسح الكود لفتح اللعبة عبر هاتفك:</p>
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ request.host_url }}" alt="QR Code" style="border-radius:8px; border:2px solid #ffd700;">
@@ -334,7 +332,7 @@ DASHBOARD_PAGE = """
     <div class="header">
         <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap;">
             <h2 style="color:#ffd700; margin:0;">👑 {{ t.title }} (12D)</h2>
-            <div style="background:rgba(15,20,32,0.9); padding:8px 15px; border-radius:10px;">👤 <b>{{ username }}</b> {% if role == 'guest' %}<span style="color:#38bdf8; font-size:12px;">(زائر)</span>{% endif %}</div>
+            <div style="background:rgba(15,20,32,0.9); padding:8px 15px; border-radius:10px;">👤 <b>{{ username }}</b></div>
             <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:8px 18px; border-radius:10px; font-weight:900;">{{ t.balance }}: <span id="liveBalance">{{ balance }}</span> USDD</div>
         </div>
         <div style="display:flex; gap:12px; flex-wrap:wrap;">
