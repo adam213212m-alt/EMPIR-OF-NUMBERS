@@ -212,6 +212,10 @@ def get_lang_bar():
 </script>
 """
 
+@app.route('/sw.js')
+def service_worker():
+    return app.response_class("self.addEventListener('fetch', function(event) { });", mimetype='application/javascript')
+
 def get_next_winning_number(game_name, default_min, default_max):
     future = GameFutureDraw.query.filter_by(game_name=game_name).order_by(GameFutureDraw.round_index.asc()).first()
     if future:
@@ -1067,7 +1071,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- مسارات الفلاسك وتوجيه التطبيق ---
+# --- مسارات الفلاسك والتوجيه ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
