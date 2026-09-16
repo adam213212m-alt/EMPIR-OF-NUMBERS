@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 import os
 
 app = Flask(__name__)
-app.secret_key = 'empire_of_numbers_secure_2026_master_key'
+app.secret_key = 'empire_of_numbers_secure_2026_master_enterprise_key'
 
 # --- توقيت مدينة بيروت (لبنان) ---
 def get_local_time():
@@ -22,7 +22,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات ---
+# --- نماذج قاعدة البيانات المؤسسية ---
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -101,7 +101,7 @@ with app.app_context():
         db.session.add(RevealAndWinGlobalState(id=1, total_spins=0))
     db.session.commit()
 
-# --- قاموس الترجمات (6 لغات) ---
+# --- قاموس الترجمات (6 لغات رئيسية) ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -255,7 +255,7 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- قوالب HTML الكاملة غير المختصرة ---
+# --- واجهات العرض (HTML Templates) الشاملة والمتكاملة ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -467,6 +467,10 @@ def game_golden_number():
             db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
             db.session.commit()
             return jsonify({'success': True})
+        elif action == 'admin_draw' and username == 'admin1':
+            choices = [b.number for b in GoldenNumberBooking.query.all()]
+            win_num = get_unified_math_outcome('الرقم الحنون', choices, 1, 50)
+            return jsonify({'winning_number': win_num})
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     
     html_board = ""
