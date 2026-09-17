@@ -47,6 +47,17 @@ class FinancialLog(db.Model):
     amount = db.Column(db.Float)
     log_time = db.Column(db.String(50))
 
+class PlayerActivity(db.Model):
+    __tablename__ = 'player_activities'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(80), nullable=False)
+    game_name = db.Column(db.String(100), nullable=False)
+    bet_details = db.Column(db.String(255), nullable=False)
+    amount = db.Column(db.Float, default=0.0)
+    outcome = db.Column(db.String(50), nullable=False) # 'ربح' أو 'خسارة'
+    winning_number = db.Column(db.String(50), default='---')
+    timestamp = db.Column(db.String(50), nullable=False)
+
 class RechargeCard(db.Model):
     __tablename__ = 'recharge_cards'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -116,7 +127,7 @@ TRANSLATIONS = {
         'login': 'دخول للبرنامج', 'username': 'اسم المستخدم', 'password': 'كلمة المرور', 'balance': 'الرصيد',
         'recharge': 'شحن رصيد', 'withdraw': 'سحب رصيد', 'change_pass': 'تغيير الباسورد', 'logout': 'خروج',
         'dashboard': 'لوحة التحكم', 'back_dash': '🏠 الرئيسية', 'customers': 'الزبائن', 'accounting': 'المحاسبة والخزنة',
-        'game_control': '🎮 غرفة تحكم الألعاب', 'chat': '💬 الدردشة الفورية',
+        'game_control': '🎮 إدارة الألعاب', 'chat': '💬 الدردشة الفورية',
         'game1': 'الرقم الحنون', 'game2': 'روليت الحظ', 'game3': 'إمبراطورية الأرقام', 'game4': 'عجلة الحظ', 'game5': 'اكشف واربح', 'game6': 'رمي السهم المتحركة',
         'cost': 'التكلفة', 'prize': 'الجائزة', 'book': 'حجز', 'cancel': 'تراجع', 'booked': 'محجوز',
         'spin': 'تدوير العجلة', 'draw_now': 'اسحب الآن'
@@ -223,7 +234,7 @@ def get_lang_bar():
                 deferredPrompt = null;
             }});
         }} else {{
-            alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح واختار 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
+            alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح (القائمة) واختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
         }}
     }}
 
@@ -285,8 +296,8 @@ LOGIN_PAGE = """
             <button type="submit" style="width:100%; padding:14px; background:linear-gradient(135deg, #ffd700, #ff8c00); color:#000; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:17px; margin-top:5px;">{{ t.login }}</button>
         </form>
 
-        <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px; border-top:1px solid rgba(255,215,0,0.2); pt:15px;">
-            <a href="https://wa.me/96176030208?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A5%D9%86%D8%B4%D8%A7%D8%A1%20%D8%AD%D8%B3%D8%A7%D8%A8%20%D8%AC%D8%AF%D9%8A%D8%AF%20%D9%81%D9%8A%20%D9%85%D9%86%D8%B5%D8%A9%20%D8%A7%D9%85%D8%A8%D8%B1%D8%A7%D8%B7%D9%88%D8%B1%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A3%D8%B1%D9%82%D8%A7%D9%85" target="_blank" style="background:#25d366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">💬 إنشاء حساب عبر الواتساب</a>
+        <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px; border-top:1px solid rgba(255,215,0,0.2); padding-top:15px;">
+            <a href="https://wa.me/96176030208?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%B8%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A5%D9%86%D8%B4%D8%A7%D8%A1%20%D8%AD%D8%B3%D8%A7%D8%A8%20%D8%AC%D8%AF%D9%8A%D8%AF%20%D9%81%D9%8A%20%D9%85%D9%86%D8%B5%D8%A9%20%D8%A7%D9%85%D8%A8%D8%B1%D8%A7%D8%B7%D9%88%D8%B1%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A3%D8%B1%D9%82%D8%A7%D9%85" target="_blank" style="background:#25d366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">💬 إنشاء حساب عبر الواتساب</a>
             <a href="/guest_login" style="background:rgba(59,130,246,0.2); border:1px solid #3b82f6; color:#38bdf8; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">👁️ دخول زائر (تصفح الألعاب)</a>
         </div>
     </div>
@@ -333,6 +344,7 @@ DASHBOARD_PAGE = """
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             {% if username == 'admin1' %}
                 <a href="/admin_game_control" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">🎮 {{ t.game_control }}</a>
+                <a href="/admin_player_logs" style="background:#a78bfa; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📋 حركات اللاعبين</a>
                 <a href="/admin_chats" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">💬 إدارة الدردشة</a>
                 <a href="/admin_customers" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 {{ t.customers }}</a>
                 <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 {{ t.accounting }}</a>
@@ -1087,6 +1099,60 @@ ADMIN_CUSTOMERS_PAGE = """
 </html>
 """
 
+ADMIN_PLAYER_LOGS_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>حركات اللاعبين</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; margin:0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
+        th { background: #0a0d16; color: #ffd700; }
+        select, input { padding: 10px; border-radius: 8px; background: #0a0d16; color: #fff; border: 1px solid #444; font-size: 14px; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2 style="font-size:20px;">📋 غرفة حركات اللاعبين والرهانات</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:14px;">الرئيسية</a>
+    
+    <div style="background: rgba(25,30,48,0.9); padding: 20px; border-radius: 18px; max-width: 1100px; margin: 20px auto; border: 2px solid #ffd700; box-sizing: border-box;">
+        <form method="GET" style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:15px;">
+            <label style="font-weight:bold;">فلترة حسب اللاعب:</label>
+            <select name="player" onchange="this.form.submit()" style="min-width:200px;">
+                <option value="">جميع اللاعبين</option>
+                {% for u in users_list %}
+                <option value="{{ u.username }}" {% if selected_player == u.username %}selected{% endif %}>{{ u.username }}</option>
+                {% endfor %}
+            </select>
+            {% if selected_player %}
+            <a href="/admin_player_logs" style="background:#ef4444; color:#fff; padding:8px 14px; text-decoration:none; border-radius:8px; font-size:13px; font-weight:bold;">إلغاء الفلتر</a>
+            {% endif %}
+        </form>
+
+        <div style="overflow-x:auto;">
+            <table>
+                <tr><th>#</th><th>اسم اللاعب</th><th>اللعبة</th><th>تفاصيل الرهان</th><th>المبلغ</th><th>النتيجة</th><th>الرقم الفائز</th><th>وقت الحركة</th></tr>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.id }}</td>
+                    <td style="color:#ffd700; font-weight:bold;">{{ log.username }}</td>
+                    <td style="color:#38bdf8;">{{ log.game_name }}</td>
+                    <td>{{ log.bet_details }}</td>
+                    <td style="color:#34d399;">{{ log.amount }} USDD</td>
+                    <td><span style="padding:4px 8px; border-radius:6px; background:{% if log.outcome == 'ربح' %}rgba(34,197,94,0.3){% else %}rgba(239,68,68,0.3){% endif %};">{{ log.outcome }}</span></td>
+                    <td style="color:#fbbf24; font-weight:bold;">{{ log.winning_number }}</td>
+                    <td style="font-size:11px; color:#aaa;">{{ log.timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 ADMIN_ACCOUNTING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1168,7 +1234,7 @@ ADMIN_GAME_CONTROL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>غرفة تحكم الألعاب</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>إدارة الألعاب</title>
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing:border-box; margin:0; }
         .panel { background: rgba(25,30,48,0.95); padding: 20px; border-radius: 18px; border: 2px solid #ffd700; max-width: 800px; margin: 15px auto; text-align: right; box-sizing: border-box; }
@@ -1177,7 +1243,8 @@ ADMIN_GAME_CONTROL_PAGE = """
 </head>
 <body>
     {{ lang_bar | safe }}
-    <h2 style="font-size:20px;">🎮 غرفة تحكم الألعاب - إعدادات لكل لعبة بشكل منفرد</h2>
+    <h2 style="font-size:20px;">🎮 غرفة إدارة الألعاب والتحكم بالأرقام الرابحة</h2>
+    <p style="color:#94a3b8; font-size:14px;">(إن تركت الحقول فارغة أو لم تحدد رقماً، سيعمل النظام تلقائياً بنسبة الأرباح والعائدات العشوائية)</p>
     <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:14px;">الرئيسية</a>
     {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:10px; margin:12px auto; max-width:500px; font-weight:bold; font-size:14px;">{{ msg }}</div>{% endif %}
     
@@ -1445,6 +1512,7 @@ def game_golden_number():
                 vault.vault_balance += 20.0
                 db.session.add(FinancialLog(action_type='مبيع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'حجز الرقم #{num}', amount=20.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True})
             else:
@@ -1457,6 +1525,7 @@ def game_golden_number():
                 user.balance += 20.0
                 vault.vault_balance -= 20.0
                 db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'إلغاء حجز رقم #{num}', amount=20.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم التراجع عن الحجز واسترداد 20 USDD"})
             else:
@@ -1470,6 +1539,7 @@ def game_golden_number():
                     winner_u.balance += 700.0
                     vault.vault_balance -= 700.0
                     db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=700.0, log_time=get_local_time()))
+                    db.session.add(PlayerActivity(username=winner_u.username, game_name='الرقم الحنون', bet_details=f'ربح الجائزة الكبرى', amount=700.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
             GoldenNumberBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num})
@@ -1505,10 +1575,12 @@ def game_roulette_bet():
 @app.route('/game_roulette_draw', methods=['POST'])
 def game_roulette_draw():
     if 'username' not in session: return jsonify({"success": False})
-    user = User.query.filter_by(username=session['username']).first()
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
     vault = SystemVault.query.get(1)
     data = request.get_json() or {}
     bets = data.get('bets', {})
+    total_bet_amount = sum(float(v) for v in bets.values())
     player_choices = [int(k) for k in bets.keys()]
     winning_num = get_unified_math_outcome('roulette', player_choices, 0, 36)
     total_payout = 0.0
@@ -1519,10 +1591,14 @@ def game_roulette_draw():
         user.balance += total_payout
         vault.vault_balance -= total_payout
         db.session.add(FinancialLog(action_type='جائزة روليت الحظ', admin_name='system', target_user=user.username, amount=total_payout, log_time=get_local_time()))
-        db.session.commit()
+        outcome = 'ربح'
         msg = f"🎉 مبروك! ظهر الرقم الفائز #{winning_num} وفزت بـ {total_payout} USDD!"
     else:
+        outcome = 'خسارة'
         msg = f"❌ حظ أوفر! الرقم الفائز كان #{winning_num}"
+    
+    db.session.add(PlayerActivity(username=username, game_name='روليت الحظ', bet_details=f'رهانات على الأرقام: {json.dumps(bets)}', amount=total_bet_amount, outcome=outcome, winning_number=str(winning_num), timestamp=get_local_time()))
+    db.session.commit()
     return jsonify({"success": True, "winning_number": winning_num, "msg": msg, "balance": user.balance})
 
 @app.route('/game_roulette', methods=['GET'])
@@ -1549,6 +1625,7 @@ def game_numbers_empire():
             vault.vault_balance += 500.0
             db.session.add(FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
             db.session.add(NumbersEmpireBooking(username=username, number=box, booking_date=get_local_time()))
+            db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'حجز مربع #{box}', amount=500.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "msg": f"تم حجز المربع #{box}"})
         elif action == 'cancel':
@@ -1558,6 +1635,7 @@ def game_numbers_empire():
                 user.balance += 500.0
                 vault.vault_balance -= 500.0
                 db.session.add(FinancialLog(action_type='استرجاع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'إلغاء حجز مربع #{box}', amount=500.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم التراجع واسترداد 500 USDD"})
         elif action == 'admin_draw' and username == 'admin1':
@@ -1570,6 +1648,7 @@ def game_numbers_empire():
                     winner_u.balance += 2000.0
                     vault.vault_balance -= 2000.0
                     db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
+                    db.session.add(PlayerActivity(username=winner_u.username, game_name='إمبراطورية الأرقام', bet_details=f'ربح الجائزة الكبرى إمبراطورية الأرقام', amount=2000.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
                     winner_desc = f"الرقم #{winning_num} (للاعب: {winner_u.username})"
             
             msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
@@ -1605,9 +1684,12 @@ def game_number_wheel():
                 user.balance += 20.0
                 vault.vault_balance -= 20.0
                 db.session.add(FinancialLog(action_type='جائزة عجلة الحظ', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
+                outcome = 'ربح'
                 msg = f"مبروك ربحت 20 usdd للرقم {winning_num}"
             else:
+                outcome = 'خسارة'
                 msg = "حظ اوفر"
+            db.session.add(PlayerActivity(username=username, game_name='عجلة الحظ', bet_details=f'الأرقام المختارة: {nums}', amount=cost, outcome=outcome, winning_number=str(winning_num), timestamp=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "winning_num": winning_num, "balance": user.balance, "msg": msg})
         else:
@@ -1635,10 +1717,13 @@ def game_arrow_wheel():
                 user.balance += prize
                 vault.vault_balance -= prize
                 db.session.add(FinancialLog(action_type='جائزة رمي السهم المتحركة', admin_name='system', target_user=username, amount=prize, log_time=get_local_time()))
+                outcome = 'ربح'
                 msg = f"مبروك ربحت اصبت الهدف: {chosen_label}"
             else:
                 chosen_label, prize = 'حظ أوفر', 0.0
+                outcome = 'خسارة'
                 msg = f"حظ اوفر"
+            db.session.add(PlayerActivity(username=username, game_name='رمي السهم المتحركة', bet_details='محاولة رمي سهم', amount=cost, outcome=outcome, winning_number=chosen_label, timestamp=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "hit_target": chosen_label, "msg": msg, "balance": user.balance})
         else:
@@ -1648,7 +1733,8 @@ def game_arrow_wheel():
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
 def game_reveal_and_win():
     if 'username' not in session: return redirect(url_for('login'))
-    user = User.query.filter_by(username=session['username']).first()
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
     vault = SystemVault.query.get(1)
     t = get_t()
     lang_key = session.get('lang', 'ar')
@@ -1694,7 +1780,8 @@ def game_reveal_and_win():
 @app.route('/game_reveal_result_check', methods=['POST'])
 def game_reveal_result_check():
     if 'username' not in session: return jsonify({"success": False})
-    user = User.query.filter_by(username=session['username']).first()
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
     vault = SystemVault.query.get(1)
     outcome = session.get('reveal_outcome', 'loss')
     if outcome == 'win_3':
@@ -1702,15 +1789,20 @@ def game_reveal_result_check():
         user.balance += payout
         vault.vault_balance -= payout
         db.session.add(FinancialLog(action_type='جائزة اكشف واربح الكبرى', admin_name='system', target_user=user.username, amount=payout, log_time=get_local_time()))
+        res_outcome = 'ربح'
         msg = "مبروك ربحت 100 USDD لتطابق ثلاثة وجوه أسد!"
     elif outcome == 'win_2':
         refund = 1.0
         user.balance += refund
         vault.vault_balance -= refund
         db.session.add(FinancialLog(action_type='استرجاع جزئي اكشف واربح', admin_name='system', target_user=user.username, amount=refund, log_time=get_local_time()))
+        res_outcome = 'ربح جزئي'
         msg = "نجحت في تطابق وجهين أسد واسترددت 1 USDD!"
     else:
+        res_outcome = 'خسارة'
         msg = "حظ أوفر في المحاولة القادمة"
+    
+    db.session.add(PlayerActivity(username=username, game_name='اكشف واربح', bet_details='فتح 3 صناديق', amount=2.0, outcome=res_outcome, winning_number=outcome, timestamp=get_local_time()))
     db.session.commit()
     return jsonify({"success": True, "msg": msg, "balance": user.balance})
 
@@ -1730,6 +1822,17 @@ def admin_game_control():
         db.session.commit()
         msg = f"تمت برمجة الرقم {winning_number} للجولة #{round_index} في لعبة {game_name} بنجاح!"
     return render_template_string(ADMIN_GAME_CONTROL_PAGE, lang_bar=get_lang_bar(), msg=msg)
+
+@app.route('/admin_player_logs', methods=['GET'])
+def admin_player_logs():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    selected_player = request.args.get('player', '').strip()
+    users_list = User.query.all()
+    if selected_player:
+        logs = PlayerActivity.query.filter_by(username=selected_player).order_by(PlayerActivity.id.desc()).all()
+    else:
+        logs = PlayerActivity.query.order_by(PlayerActivity.id.desc()).all()
+    return render_template_string(ADMIN_PLAYER_LOGS_PAGE, lang_bar=get_lang_bar(), logs=logs, users_list=users_list, selected_player=selected_player)
 
 @app.route('/chat', methods=['GET', 'POST'])
 def chat():
