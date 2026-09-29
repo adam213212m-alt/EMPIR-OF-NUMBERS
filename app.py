@@ -407,11 +407,11 @@ DASHBOARD_PAGE = """
         }
         function rechargeGooglePlay() { alert("سيتم توجيهك لمتجر غوغل قريباً."); }
         function withdrawWhish(u, p) {
-            let text = encodeURIComponent(`أريد سحب رصيدي عبر Whish.\\nيوزر: ${u}\\nباسورد: ${p}`);
+            let text = encodeURIComponent(`أريد سحب رصيدي عبر Whish.\nيوزر: ${u}\nباسورد: ${p}`);
             window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
         }
         function withdrawVisa(u, p) {
-            let text = encodeURIComponent(`أريد استلام فيزا مسبقة الدفع.\\nيوزر: ${u}\\nباسورد: ${p}`);
+            let text = encodeURIComponent(`أريد استلام فيزا مسبقة الدفع.\nيوزر: ${u}\nباسورد: ${p}`);
             window.open(`https://wa.me/96176030208?text=${text}`, '_blank');
         }
         function openUsdtModal() { document.getElementById('usdtModal').style.display = 'flex'; }
@@ -456,7 +456,7 @@ GAME_GOLDEN_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <div class="header-box">
-            <h2 style="color: #ffd700; margin: 0 0 6px 0; font-size: 18px;">احجز رقم ب 20 usdd واربح 700 usdd فورا</h2>
+            <h2 style="color: #ffd700; margin: 0 0 6px 0; font-size: 18px;">احجز رقم ب 2 usdd واربح 70 usdd فورا</h2>
             <p style="color: #f8fafc; margin: 0; font-size: 14px; font-weight: bold;">السحب يوميا الساعة 22:00 بتوقيت مدينة بيروت</p>
         </div>
 
@@ -532,7 +532,7 @@ GAME_GOLDEN_PAGE = """
                 if(counter > 22) {
                     clearInterval(interval);
                     screen.innerText = '#' + winningNum;
-                    ann.innerText = `مبروك ربحت 700 usdd للرقم ${winningNum}`;
+                    ann.innerText = `مبروك ربحت 70 usdd للرقم ${winningNum}`;
                     let winCell = document.getElementById('cell_' + winningNum);
                     if(winCell) {
                         winCell.className = "cell winner-glow";
@@ -558,7 +558,7 @@ GAME_ROULETTE_PAGE = """
         .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 15px; border-radius: 25px; max-width: 900px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
         .timer-box { font-size: 16px; font-weight: 900; color: #ffd700; background: #000; padding: 6px 12px; border-radius: 12px; border: 2px solid #38bdf8; margin-bottom: 10px; display: inline-block; }
         .spin-screen { font-size: 30px; font-weight: 900; color: #ffd700; background: #000; padding: 8px 15px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; margin-bottom: 10px; letter-spacing: 2px; }
-        .total-bet-display { background: rgba(255,215,0,0.15); border: 2px solid #ffd700; padding: 8px 15px; border-radius: 12px; font-weight: 900; color: #ffd700; margin: 8px auto; max-width: 320px; font-size: 15px; box-sizing: border-box; }
+        .total-bet-display { background: rgba(255,215,0,0.15); border: 2px solid #ffd700; padding: 8px 15px; border-radius: 12px; font-weight: 900; color: #ffd700; margin: 8px auto; max-width: 320px; font-size: 15px; box-sizing: border-box; width: 100%; }
         .roulette-table { display: grid; grid-template-columns: 45px repeat(12, 1fr); grid-template-rows: repeat(3, 45px); gap: 3px; max-width: 100%; overflow-x: auto; margin: 12px auto; background: #065f46; padding: 8px; border-radius: 14px; border: 3px solid #b8860b; box-sizing: border-box; }
         @media(max-width: 768px) { .roulette-table { grid-template-columns: 30px repeat(12, minmax(26px, 1fr)); grid-template-rows: repeat(3, 38px); padding: 4px; gap: 2px; } }
         .r-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; border-radius: 5px; cursor: pointer; color: #fff; font-size: 14px; transition: 0.15s; user-select: none; border: 1px solid rgba(255,255,255,0.2); box-sizing: border-box; }
@@ -744,7 +744,7 @@ GAME_NUMBERS_EMPIRE_PAGE = """
         </div>
 
         <h2 style="color:#ffd700; font-size: 20px; margin-top:0;">🏛️ إمبراطورية الأرقام الملكية الفاخرة</h2>
-        <p style="font-size:14px; color:#fde047; margin:5px 0;">سعر الحجز: 500 USDD | الجائزة الكبرى: 2000 USDD</p>
+        <p style="font-size:14px; color:#fde047; margin:5px 0;">سعر الحجز: 50 USDD | الجائزة الكبرى: 200 USDD</p>
 
         <div style="background:#05030a; padding:15px; border-radius:18px; border:3px solid #ffd700; margin:12px 0; box-sizing: border-box;">
             <div id="empireSlot" class="slot-box">--</div>
@@ -762,7 +762,7 @@ GAME_NUMBERS_EMPIRE_PAGE = """
                         <div class="box booked" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:10px; margin-top:4px;">{{ bookings[i] }}</span></div>
                     {% endif %}
                 {% else %}
-                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px; margin-top:4px; color:#fef08a;">500$</span></button>
+                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px; margin-top:4px; color:#fef08a;">50$</span></button>
                 {% endif %}
             {% endfor %}
         </div>
@@ -797,7 +797,7 @@ GAME_NUMBERS_EMPIRE_PAGE = """
                     if(data.winning_number > 0 && !playedDrawTimestamps.has(data.timestamp)) {
                         playedDrawTimestamps.add(data.timestamp);
                         if(!isAnimating) {
-                            runEmpireAnimation(data.winning_number, `مبروك للرقم ${data.winning_number} فاز بـ 2000 USDD`);
+                            runEmpireAnimation(data.winning_number, `مبروك للرقم ${data.winning_number} فاز بـ 200 USDD`);
                         }
                     }
                 }
@@ -950,15 +950,15 @@ GAME_REVEAL_PAGE = """
     {{ lang_bar | safe }}
     <div class="card">
         <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎟️ لعبة اكشف واربح</h2>
-        <p style="font-size:14px; color:#ffd700; margin:5px 0;">تكلفة المحاولة: 2 USDD | الجائزة الكبرى: 100 USDD (تطابق 3 أسود)</p>
-        <p style="font-size:13px; color:#38bdf8; margin:5px 0;">تطابق وجهين أسد يعيد لك 1 USDD من قيمة المراهنة!</p>
+        <p style="font-size:14px; color:#ffd700; margin:5px 0;">تكلفة المحاولة: 1 USDD | الجائزة الكبرى: 100 USDD (تطابق 3 أسود)</p>
+        <p style="font-size:13px; color:#38bdf8; margin:5px 0;">تطابق وجهين أسد يعيد لك 0.5 USDD من قيمة المراهنة!</p>
         <div id="revealMsg" style="font-size: 15px; font-weight: 900; color: #34d399; margin: 12px 0;">اضغط على الزر أدناه ثم اختر 3 صناديق لكشفها</div>
         <div class="boxes-grid">
             {% for i in range(1, 6) %}
                 <div class="box-cell" id="b_{{ i }}" onclick="clickBox({{ i }})">📦</div>
             {% endfor %}
         </div>
-        <button type="button" id="startBtn" onclick="startReveal()" style="padding: 12px 35px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px;">ابدأ المحاولة الجديدة (2 USDD) 🎟️</button>
+        <button type="button" id="startBtn" onclick="startReveal()" style="padding: 12px 35px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px;">ابدأ المحاولة الجديدة (1 USDD) 🎟️</button>
     </div>
     <script>
         let sessionRevealed = []; let clicksCount = 0; let gameActive = false;
@@ -969,7 +969,7 @@ GAME_REVEAL_PAGE = """
                 if(d.success) {
                     document.getElementById('rouletteBal') ? document.getElementById('rouletteBal').innerText = d.balance : null;
                     sessionRevealed = d.revealed; clicksCount = 0; gameActive = true;
-                    document.getElementById('revealMsg').innerText = "تم خصم 2 USDD! اختر 3 صناديق من الصناديق لكشف محتواها الآن.";
+                    document.getElementById('revealMsg').innerText = "تم خصم 1 USDD! اختر 3 صناديق من الصناديق لكشف محتواها الآن.";
                     document.getElementById('startBtn').style.display = 'none';
                     for(let i=1; i<=5; i++) { let cell = document.getElementById('b_' + i); cell.innerText = "📦"; cell.classList.remove('revealed'); }
                 } else { alert(d.msg || "رصيد غير كافي!"); }
@@ -988,7 +988,7 @@ GAME_REVEAL_PAGE = """
                         .then(res => res.json()).then(resData => {
                             document.getElementById('revealMsg').innerText = resData.msg;
                             document.getElementById('startBtn').style.display = 'inline-block';
-                            document.getElementById('startBtn').innerText = "محاولة أخرى (2 USDD)";
+                            document.getElementById('startBtn').innerText = "محاولة أخرى (1 USDD)";
                         });
                     }, 500);
                 }
@@ -1017,12 +1017,12 @@ GAME_ARROW_WHEEL_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎯 لعبة رمي السهم المتحركة (12 هدف)</h2>
-        <p style="font-size:14px; color:#ffd700; margin:5px 0;">تكلفة المحاولة: 5 USDD</p>
-        <p style="font-size:13px; color:#38bdf8; margin:5px 0;">الهدف الذي يُصاب يعود ربحه فوراً إلى صندوق اللاعب!</p>
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎯 لعبة رمي السهم المتحركة</h2>
+        <p style="font-size:14px; color:#ffd700; margin:5px 0;">تكلفة المحاولة: 1 USDD</p>
+        <p style="font-size:13px; color:#38bdf8; margin:5px 0;">70% إعادة الرصيد | 5% دوبل الرصيد | 10% نصف الرهان | 15% خسارة</p>
         <div class="wheel-container"><div id="arrowScreen" class="arrow-screen">🎯 جاهز للرمي</div></div>
         <div id="arrowMsg" style="font-size: 15px; font-weight: 900; color: #34d399; margin: 10px 0;">اضغط على "ارم السهم" لبدء الرمية</div>
-        <button type="button" onclick="throwArrow()" style="padding: 14px 35px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 18px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px; box-shadow: 0 8px 20px rgba(34,197,94,0.4);">🎯 ارم السهم (5 USDD)</button>
+        <button type="button" onclick="throwArrow()" style="padding: 14px 35px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 18px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px; box-shadow: 0 8px 20px rgba(34,197,94,0.4);">🎯 ارم السهم (1 USDD)</button>
     </div>
     <div id="resultModal" class="modal-popup">
         <div class="modal-box">
@@ -1044,7 +1044,7 @@ GAME_ARROW_WHEEL_PAGE = """
         }
         function runArrowAnimation(hitTarget, finalMsg, newBal) {
             let screen = document.getElementById('arrowScreen'); let counter = 0;
-            let targetsPoolAnim = ['1 USDD', '2 USDD', '1000 USDD', '3 USDD', '500 USDD', '4 USDD', '5 USDD', '1000 USDD', 'حظ أوفر', '500 USDD', '1 USDD', '1000 USDD'];
+            let targetsPoolAnim = ['استرداد 1$', 'دوبل 2$', 'نصف 0.5$', 'حظ أوفر', 'استرداد 1$', 'دوبل 2$'];
             let interval = setInterval(() => {
                 let randT = targetsPoolAnim[Math.floor(Math.random() * targetsPoolAnim.length)];
                 screen.innerText = randT; counter++;
@@ -1507,12 +1507,12 @@ def game_golden_number():
             existing_booking = GoldenNumberBooking.query.filter_by(number=num).first()
             if existing_booking:
                 return jsonify({"success": False, "msg": "هذا الرقم محجوز مسبقاً!"})
-            if user.balance >= 20.0:
-                user.balance -= 20.0
-                vault.vault_balance += 20.0
-                db.session.add(FinancialLog(action_type='مبيع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
+            if user.balance >= 2.0:
+                user.balance -= 2.0
+                vault.vault_balance += 2.0
+                db.session.add(FinancialLog(action_type='مبيع رهان الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
                 db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
-                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'حجز الرقم #{num}', amount=20.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'حجز الرقم #{num}', amount=2.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True})
             else:
@@ -1522,12 +1522,12 @@ def game_golden_number():
             b = GoldenNumberBooking.query.filter_by(number=num, username=username).first()
             if b:
                 db.session.delete(b)
-                user.balance += 20.0
-                vault.vault_balance -= 20.0
-                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=20.0, log_time=get_local_time()))
-                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'إلغاء حجز رقم #{num}', amount=20.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
+                user.balance += 2.0
+                vault.vault_balance -= 2.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان الرقم الحنون', admin_name='system', target_user=username, amount=2.0, log_time=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='الرقم الحنون', bet_details=f'إلغاء حجز رقم #{num}', amount=2.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
-                return jsonify({"success": True, "msg": "تم التراجع عن الحجز واسترداد 20 USDD"})
+                return jsonify({"success": True, "msg": "تم التراجع عن الحجز واسترداد 2 USDD"})
             else:
                 return jsonify({"success": False, "msg": "لا يمكنك إلغاء حجز لا يخصك!"})
         elif action == 'admin_draw' and username == 'admin1':
@@ -1536,17 +1536,17 @@ def game_golden_number():
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
                 if winner_u:
-                    winner_u.balance += 700.0
-                    vault.vault_balance -= 700.0
-                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=700.0, log_time=get_local_time()))
-                    db.session.add(PlayerActivity(username=winner_u.username, game_name='الرقم الحنون', bet_details=f'ربح الجائزة الكبرى', amount=700.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
+                    winner_u.balance += 70.0
+                    vault.vault_balance -= 70.0
+                    db.session.add(FinancialLog(action_type='جائزة الرقم الحنون', admin_name='admin1', target_user=winner_u.username, amount=70.0, log_time=get_local_time()))
+                    db.session.add(PlayerActivity(username=winner_u.username, game_name='الرقم الحنون', bet_details=f'ربح الجائزة الكبرى', amount=70.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
             GoldenNumberBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num})
     bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
     my_bookings_list = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
     my_nums_str = ', '.join(map(str, my_bookings_list)) if my_bookings_list else 'لا يوجد حجوزات حالياً'
-    my_total_cost = len(my_bookings_list) * 20.0
+    my_total_cost = len(my_bookings_list) * 2.0
     return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, my_nums_str=my_nums_str, my_total_cost=my_total_cost, msg=msg)
 
 @app.route('/game_roulette_bet', methods=['POST'])
@@ -1620,24 +1620,24 @@ def game_numbers_empire():
     if request.method == 'POST':
         action = request.form.get('action_type')
         box = int(request.form.get('box_number', 0))
-        if action == 'book' and user.balance >= 500.0 and not NumbersEmpireBooking.query.filter_by(number=box).first():
-            user.balance -= 500.0
-            vault.vault_balance += 500.0
-            db.session.add(FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
+        if action == 'book' and user.balance >= 50.0 and not NumbersEmpireBooking.query.filter_by(number=box).first():
+            user.balance -= 50.0
+            vault.vault_balance += 50.0
+            db.session.add(FinancialLog(action_type='مبيع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=50.0, log_time=get_local_time()))
             db.session.add(NumbersEmpireBooking(username=username, number=box, booking_date=get_local_time()))
-            db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'حجز مربع #{box}', amount=500.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
+            db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'حجز مربع #{box}', amount=50.0, outcome='قيد الانتظار', winning_number='---', timestamp=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "msg": f"تم حجز المربع #{box}"})
         elif action == 'cancel':
             b = NumbersEmpireBooking.query.filter_by(number=box, username=username).first()
             if b:
                 db.session.delete(b)
-                user.balance += 500.0
-                vault.vault_balance -= 500.0
-                db.session.add(FinancialLog(action_type='استرجاع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=500.0, log_time=get_local_time()))
-                db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'إلغاء حجز مربع #{box}', amount=500.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
+                user.balance += 50.0
+                vault.vault_balance -= 50.0
+                db.session.add(FinancialLog(action_type='استرجاع رهان إمبراطورية الأرقام', admin_name='system', target_user=username, amount=50.0, log_time=get_local_time()))
+                db.session.add(PlayerActivity(username=username, game_name='إمبراطورية الأرقام', bet_details=f'إلغاء حجز مربع #{box}', amount=50.0, outcome='استرداد', winning_number='---', timestamp=get_local_time()))
                 db.session.commit()
-                return jsonify({"success": True, "msg": "تم التراجع واسترداد 500 USDD"})
+                return jsonify({"success": True, "msg": "تم التراجع واسترداد 50 USDD"})
         elif action == 'admin_draw' and username == 'admin1':
             winning_num = get_unified_math_outcome('empire', [], 1, 5)
             winner_b = NumbersEmpireBooking.query.filter_by(number=winning_num).first()
@@ -1645,13 +1645,13 @@ def game_numbers_empire():
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
                 if winner_u:
-                    winner_u.balance += 2000.0
-                    vault.vault_balance -= 2000.0
-                    db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=2000.0, log_time=get_local_time()))
-                    db.session.add(PlayerActivity(username=winner_u.username, game_name='إمبراطورية الأرقام', bet_details=f'ربح الجائزة الكبرى إمبراطورية الأرقام', amount=2000.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
+                    winner_u.balance += 200.0
+                    vault.vault_balance -= 200.0
+                    db.session.add(FinancialLog(action_type='جائزة إمبراطورية الأرقام', admin_name='admin1', target_user=winner_u.username, amount=200.0, log_time=get_local_time()))
+                    db.session.add(PlayerActivity(username=winner_u.username, game_name='إمبراطورية الأرقام', bet_details=f'ربح الجائزة الكبرى إمبراطورية الأرقام', amount=200.0, outcome='ربح', winning_number=str(winning_num), timestamp=get_local_time()))
                     winner_desc = f"الرقم #{winning_num} (للاعب: {winner_u.username})"
             
-            msg = f"مبروك للرقم {winning_num} فاز بـ 2000 USDD"
+            msg = f"مبروك للرقم {winning_num} فاز بـ 200 USDD"
             
             empire_state = EmpireGlobalState.query.get(1)
             empire_state.last_winning_number = winning_num
@@ -1705,29 +1705,45 @@ def game_arrow_wheel():
     t = get_t()
     lang_key = session.get('lang', 'ar')
     if request.method == 'POST':
-        cost = 5.0
+        cost = 1.0
         if user.balance >= cost:
             user.balance -= cost
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان رمي السهم المتحركة', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
-            valid_targets_vals = [1, 2, 3, 4, 5, 0]
-            chosen_val = get_unified_math_outcome('arrow_wheel', valid_targets_vals, 0, 5)
-            if chosen_val > 0:
-                chosen_label, prize = f'{chosen_val} USDD', float(chosen_val)
+            
+            # 70% refund (1 USDD), 5% double (2 USDD), 10% half (0.5 USDD), 15% lose (0 USDD)
+            rand_val = random.random()
+            if rand_val < 0.70:
+                prize = 1.0
+                chosen_label = 'استرداد 1$'
+                outcome = 'ربح'
+                msg = "مبروك! أصبت هدف (إعادة الرصيد): استرددت 1 USDD"
+            elif rand_val < 0.75: # 0.70 to 0.75 is 5%
+                prize = 2.0
+                chosen_label = 'دوبل 2$'
+                outcome = 'ربح'
+                msg = "🎉 مبروك! أصبت هدف (دوبل الرصيد): ربحت 2 USDD"
+            elif rand_val < 0.85: # 0.75 to 0.85 is 10%
+                prize = 0.5
+                chosen_label = 'نصف 0.5$'
+                outcome = 'ربح جزئي'
+                msg = "أصبت هدف (نصف الرهان): استرددت 0.5 USDD"
+            else: # 0.85 to 1.00 is 15%
+                prize = 0.0
+                chosen_label = 'حظ أوفر'
+                outcome = 'خسارة'
+                msg = "حظ أوفر! لم تصب أي جائزة في هذه المحاولة"
+
+            if prize > 0:
                 user.balance += prize
                 vault.vault_balance -= prize
                 db.session.add(FinancialLog(action_type='جائزة رمي السهم المتحركة', admin_name='system', target_user=username, amount=prize, log_time=get_local_time()))
-                outcome = 'ربح'
-                msg = f"مبروك ربحت اصبت الهدف: {chosen_label}"
-            else:
-                chosen_label, prize = 'حظ أوفر', 0.0
-                outcome = 'خسارة'
-                msg = f"حظ اوفر"
+
             db.session.add(PlayerActivity(username=username, game_name='رمي السهم المتحركة', bet_details='محاولة رمي سهم', amount=cost, outcome=outcome, winning_number=chosen_label, timestamp=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "hit_target": chosen_label, "msg": msg, "balance": user.balance})
         else:
-            return jsonify({"success": False, "msg": "رصيد غير كافي! ثمن الرمية 5 USDD"})
+            return jsonify({"success": False, "msg": "رصيد غير كافي! ثمن الرمية 1 USDD"})
     return render_template_string(GAME_ARROW_WHEEL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/game_reveal_and_win', methods=['GET', 'POST'])
@@ -1744,10 +1760,10 @@ def game_reveal_and_win():
         db.session.add(state)
         db.session.commit()
     if request.method == 'POST':
-        if user.balance >= 2.0:
-            user.balance -= 2.0
-            vault.vault_balance += 2.0
-            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=2.0, log_time=get_local_time()))
+        if user.balance >= 1.0:
+            user.balance -= 1.0
+            vault.vault_balance += 1.0
+            db.session.add(FinancialLog(action_type='مبيع رهان اكشف واربح', admin_name='system', target_user=user.username, amount=1.0, log_time=get_local_time()))
             state.total_spins += 1
             mod_val = state.total_spins % 100
             future = GameFutureDraw.query.filter_by(game_name='reveal').order_by(GameFutureDraw.round_index.asc()).first()
@@ -1774,7 +1790,7 @@ def game_reveal_and_win():
             db.session.commit()
             return jsonify({"success": True, "balance": user.balance, "revealed": revealed})
         else:
-            return jsonify({"success": False, "msg": "رصيد غير كافي! تكلفة المحاولة 2 USDD"})
+            return jsonify({"success": False, "msg": "رصيد غير كافي! تكلفة المحاولة 1 USDD"})
     return render_template_string(GAME_REVEAL_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), balance=user.balance)
 
 @app.route('/game_reveal_result_check', methods=['POST'])
@@ -1792,17 +1808,17 @@ def game_reveal_result_check():
         res_outcome = 'ربح'
         msg = "مبروك ربحت 100 USDD لتطابق ثلاثة وجوه أسد!"
     elif outcome == 'win_2':
-        refund = 1.0
+        refund = 0.5
         user.balance += refund
         vault.vault_balance -= refund
         db.session.add(FinancialLog(action_type='استرجاع جزئي اكشف واربح', admin_name='system', target_user=user.username, amount=refund, log_time=get_local_time()))
         res_outcome = 'ربح جزئي'
-        msg = "نجحت في تطابق وجهين أسد واسترددت 1 USDD!"
+        msg = "نجحت في تطابق وجهين أسد واسترددت 0.5 USDD!"
     else:
         res_outcome = 'خسارة'
         msg = "حظ أوفر في المحاولة القادمة"
     
-    db.session.add(PlayerActivity(username=username, game_name='اكشف واربح', bet_details='فتح 3 صناديق', amount=2.0, outcome=res_outcome, winning_number=outcome, timestamp=get_local_time()))
+    db.session.add(PlayerActivity(username=username, game_name='اكشف واربح', bet_details='فتح 3 صناديق', amount=1.0, outcome=res_outcome, winning_number=outcome, timestamp=get_local_time()))
     db.session.commit()
     return jsonify({"success": True, "msg": msg, "balance": user.balance})
 
