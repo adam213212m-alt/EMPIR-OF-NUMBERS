@@ -98,7 +98,6 @@ class GoldenNumberBooking(db.Model):
     __tablename__ = 'golden_number_bookings'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(80))
-    supervisor_username = db.Column(db.String(80), default='admin1') # لعزل اللوحة لكل مشرف
     number = db.Column(db.Integer)
     booking_date = db.Column(db.String(50))
 
@@ -106,7 +105,6 @@ class NumbersEmpireBooking(db.Model):
     __tablename__ = 'numbers_empire_bookings'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(80))
-    supervisor_username = db.Column(db.String(80), default='admin1') # لعزل اللوحة لكل مشرف
     number = db.Column(db.Integer)
     booking_date = db.Column(db.String(50))
 
@@ -242,7 +240,24 @@ def get_unified_math_outcome(game_name, player_choices, min_val, max_val):
         db.session.delete(future)
         db.session.commit()
         return win_num
-    return random.choice(player_choices) if (player_choices and random.random() < 0.70) else random.randint(min_val, max_val)
+
+    total_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like(f'%مبيع رهان%{game_name}%')).scalar() or 0.0
+    total_payouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like(f'%جائزة%{game_name}%')).scalar() or 0.0
+
+    if total_bets < 10.0:
+        if player_choices and random.random() < 0.70:
+            return random.choice(player_choices)
+        return random.randint(min_val, max_val)
+
+    current_payout_ratio = total_payouts / total_bets if total_bets > 0 else 0.0
+
+    if current_payout_ratio > 0.70:
+        safe_non_winning = [x for x in range(min_val, max_val + 1) if x not in player_choices]
+        return random.choice(safe_non_winning) if safe_non_winning else random.randint(min_val, max_val)
+    else:
+        if player_choices and random.random() < 0.75:
+            return random.choice(player_choices)
+        return random.randint(min_val, max_val)
 
 LOGIN_PAGE = """
 <!DOCTYPE html>
@@ -261,7 +276,7 @@ LOGIN_PAGE = """
             <button type="submit" style="width:100%; padding:14px; background:linear-gradient(135deg, #ffd700, #ff8c00); color:#000; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:17px; margin-top:5px;">{{ t.login }}</button>
         </form>
         <div style="margin-top:20px; border-top:1px solid rgba(255,215,0,0.2); padding-top:15px;">
-            <a href="/guest_login" style="background:rgba(59,130,246,0.2); border:1px solid #3b82f6; color:#38bdf8; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">👁️ دخول زائر (تصفح الألعاب)</a>
+            <a href="/guest_login" style="background:rgba(59,130,246,0.2); border:1px solid #3b82f6; color:#38bdf8; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">👁️ دخول زائر (تصفح الألعاب بـ 10 USDD)</a>
         </div>
     </div>
 </body>
@@ -295,7 +310,8 @@ DASHBOARD_PAGE = """
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             {% if role == 'admin' %}
-                <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 الخزنة والآدمن</a>
+                <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 لوحة الآدمن والخزنة</a>
+                <a href="/admin_game_control" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">🎮 إدارة الألعاب</a>
             {% elif role == 'supervisor' %}
                 <a href="/supervisor_dashboard" style="background:#22c55e; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 لوحة إدارة المشرف</a>
             {% endif %}
@@ -315,7 +331,6 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لوحة تحكم المشرف (Supervisor Dashboard) ---
 SUPERVISOR_DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -333,7 +348,7 @@ SUPERVISOR_DASHBOARD_PAGE = """
 </head>
 <body>
     {{ lang_bar | safe }}
-    <h2 style="color:#22c55e; font-size:20px;">👥 لوحة إدارة المشرف الخاص: {{ supervisor.username }}</h2>
+    <h2 style="color:#22c55e; font-size:20px;">👥 لوحة إدارة المشرف المستأجر: {{ supervisor.username }}</h2>
     <div style="font-size:18px; font-weight:bold; color:#34d399; margin:10px 0;">رصيدك المتاح للبيع: {{ supervisor.balance }} USDD</div>
     <a href="/dashboard" style="background:#38bdf8; color:#000; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">الرئيسية والألعاب</a>
 
@@ -344,11 +359,11 @@ SUPERVISOR_DASHBOARD_PAGE = """
         <form method="POST">
             <input type="hidden" name="action" value="create_player">
             <label>اسم المستخدم للاعب:</label>
-            <input type="text" name="username" required placeholder="أدخل اسم المستخدم...">
+            <input type="text" name="username" required placeholder="اسم المستخدم...">
             <label>كلمة المرور:</label>
-            <input type="password" name="password" required placeholder="أدخل كلمة المرور...">
+            <input type="password" name="password" required placeholder="كلمة المرور...">
             <label>اسم المحل / الزبون:</label>
-            <input type="text" name="owner_name" placeholder="مثال: محل أحمد...">
+            <input type="text" name="owner_name" placeholder="اسم المحل...">
             <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إنشاء اللاعب</button>
         </form>
     </div>
@@ -361,7 +376,7 @@ SUPERVISOR_DASHBOARD_PAGE = """
             <select name="target_user" required>
                 <option value="">اختر اللاعب</option>
                 {% for p in players %}
-                <option value="{{ p.username }}">{{ p.username }} (رصيده الحالي: {{ p.balance }})</option>
+                <option value="{{ p.username }}">{{ p.username }} (رصيده: {{ p.balance }})</option>
                 {% endfor %}
             </select>
             <label>المبلغ:</label>
@@ -376,7 +391,7 @@ SUPERVISOR_DASHBOARD_PAGE = """
     </div>
 
     <div style="background: rgba(25,30,48,0.9); padding: 20px; border-radius: 20px; max-width: 900px; margin: 20px auto; overflow-x:auto; box-sizing:border-box;">
-        <h3 style="color:#ffd700; font-size:17px;">📋 قائمة لاعبيك المسجلين فقط</h3>
+        <h3 style="color:#ffd700; font-size:17px;">📋 قائمة لاعبيك المسجلين (لعالمك الخاص)</h3>
         <table>
             <tr><th>اسم اللاعب</th><th>المحل</th><th>الرصيد</th></tr>
             {% for p in players %}
@@ -388,7 +403,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
 </html>
 """
 
-# --- صفحة الآدمن لإنشاء المشرفين وبيعهم الرصيد ---
 ADMIN_SUPERVISORS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -405,7 +419,7 @@ ADMIN_SUPERVISORS_PAGE = """
 </head>
 <body>
     {{ lang_bar | safe }}
-    <h2 style="color:#ffd700; font-size:20px;">👑 لوحة الآدمن: إدارة المشرفين وتأجير المنصة</h2>
+    <h2 style="color:#ffd700; font-size:20px;">👑 لوحة الآدمن: إدارة وتأجير المنصة للمشرفين</h2>
     <div style="font-size:18px; font-weight:bold; color:#34d399; margin:10px 0;">🏦 الخزنة المركزية: {{ vault_balance }} USDD</div>
     <a href="/dashboard" style="background:#38bdf8; color:#000; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">الرئيسية</a>
 
@@ -415,13 +429,13 @@ ADMIN_SUPERVISORS_PAGE = """
         <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء حساب مشرف جديد (مستأجر)</h3>
         <form method="POST">
             <input type="hidden" name="action" value="create_supervisor">
-            <label>اسم المستخدم للمشرف:</label>
+            <label>اسم المشرف:</label>
             <input type="text" name="username" required placeholder="اسم المشرف...">
             <label>كلمة المرور:</label>
             <input type="password" name="password" required placeholder="كلمة المرور...">
-            <label>اسم الشركة أو الوكيل:</label>
+            <label>اسم الشركة / الوكيل:</label>
             <input type="text" name="owner_name" placeholder="اسم الوكيل...">
-            <button type="submit" style="background:#ffd700; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إنشاء حساب المشرف</button>
+            <button type="submit" style="background:#ffd700; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إنشاء المشرف</button>
         </form>
     </div>
 
@@ -443,9 +457,9 @@ ADMIN_SUPERVISORS_PAGE = """
     </div>
 
     <div style="background: rgba(25,30,48,0.9); padding: 20px; border-radius: 20px; max-width: 900px; margin: 20px auto; overflow-x:auto; box-sizing:border-box;">
-        <h3 style="color:#ffd700; font-size:17px;">📋 قائمة المشرفين (المستأجرين)</h3>
+        <h3 style="color:#ffd700; font-size:17px;">📋 قائمة المشرفين المستأجرين</h3>
         <table>
-            <tr><th>المشرف</th><th>الوكيل / الشركة</th><th>الرصيد المتاح</th></tr>
+            <tr><th>المشرف</th><th>الوكيل</th><th>الرصيد المتاح</th></tr>
             {% for s in supervisors %}
             <tr><td><b>{{ s.username }}</b></td><td>{{ s.owner_name }}</td><td style="color:#34d399;">{{ s.balance }} USDD</td></tr>
             {% endfor %}
@@ -483,7 +497,7 @@ GAME_GOLDEN_PAGE = """
     <div class="card">
         <div class="header-box">
             <h2 style="color: #ffd700; margin: 0 0 6px 0; font-size: 18px;">احجز رقم ب 2 usdd واربح 70 usdd فورا</h2>
-            <p style="color: #f8fafc; margin: 0; font-size: 14px; font-weight: bold;">لوحة الألعاب الخاصة بالمشرف: <span style="color:#38bdf8;">{{ sup_name }}</span></p>
+            <p style="color: #f8fafc; margin: 0; font-size: 14px; font-weight: bold;">لوحة المشرف: <span style="color:#38bdf8;">{{ sup_name }}</span></p>
         </div>
 
         <div class="draw-screen-box"><div id="slotScreen" class="slot-screen">--</div></div>
@@ -492,7 +506,7 @@ GAME_GOLDEN_PAGE = """
         <div id="insufficientBalanceModal">
             <div style="background:#1a1c29; padding:25px; border-radius:20px; border:3px solid #ef4444; width:100%; max-width:380px; text-align:center; box-sizing: border-box;">
                 <h3 style="color:#ef4444; font-size:20px; margin-top:0;">⚠️ تنبيه</h3>
-                <p id="modalErrorText" style="font-size:15px; color:#fff; font-weight:bold; margin:12px 0;">رصيدك غير كافي أو حساب زائر!</p>
+                <p id="modalErrorText" style="font-size:15px; color:#fff; font-weight:bold; margin:12px 0;">رصيدك غير كافي أو أن الزائر لا يحق له الحجز!</p>
                 <button onclick="closeInsufficientModal()" style="background:#ffd700; color:#000; padding:8px 20px; font-weight:900; border:none; border-radius:10px; cursor:pointer; font-size:14px;">حسناً</button>
             </div>
         </div>
@@ -516,6 +530,12 @@ GAME_GOLDEN_PAGE = """
             <p style="margin: 4px 0;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">{{ my_nums_str }}</span></p>
             <p style="margin: 4px 0;"><b>القيمة المخصومة:</b> <span style="color: #38bdf8;">{{ my_total_cost }} USDD</span></p>
         </div>
+
+        {% if role == 'supervisor' or username == 'admin1' %}
+            <div style="margin-top:20px;">
+                <button type="button" onclick="triggerDraw()" style="background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; font-weight: 900; padding: 12px 25px; border: none; border-radius: 12px; cursor: pointer; font-size: 16px;">⚡ السحب الخاص بلوحتك</button>
+            </div>
+        {% endif %}
     </div>
 
     <script>
@@ -532,6 +552,16 @@ GAME_GOLDEN_PAGE = """
             });
         }
         function closeInsufficientModal() { document.getElementById('insufficientBalanceModal').style.display = 'none'; }
+        function triggerDraw() {
+            let fd = new FormData(); fd.append('action_type', 'admin_draw');
+            fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+                if(data.winning_number) {
+                    document.getElementById('slotScreen').innerText = '#' + data.winning_number;
+                    document.getElementById('winnerAnnouncement').innerText = data.msg;
+                    setTimeout(() => location.reload(), 5000);
+                } else if(data.msg) { alert(data.msg); }
+            });
+        }
     </script>
 </body>
 </html>
@@ -572,7 +602,7 @@ GAME_ROULETTE_PAGE = """
 <body>
     {{ lang_bar | safe }}
     <div class="card">
-        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎰 روليت الحظ العالمية</h2>
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎰 طاولة روليت الحظ العالمية</h2>
         <p style="font-size: 13px; margin: 5px 0;"><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b></p>
         <div><div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div></div>
         <div><div id="spinScreen" class="spin-screen">--</div></div>
@@ -619,7 +649,7 @@ GAME_ROULETTE_PAGE = """
         function updateTotalBetDisplay() { let total = 0; for(let k in bets) total += bets[k]; document.getElementById('currentTotalBet').innerText = total; }
 
         function toggleNum(n) {
-            if(!gameActive) { alert("انتهى وقت الرهان لهذه الجولة!"); return; }
+            if(!gameActive) { alert("انتهى وقت الرهان!"); return; }
             if(!bets[n] && getTotalBetsCount() >= 21) { alert("حد أقصى 21 رقماً!"); return; }
             if(!bets[n]) bets[n] = 0;
             if(bets[n] >= 10) { alert("حد أقصى دوبلت 10 مرات!"); return; }
@@ -963,15 +993,6 @@ def api_sync_balance():
     user = User.query.filter_by(username=session['username']).first()
     return jsonify({"balance": user.balance if user else 0.0})
 
-@app.route('/api/empire_status')
-def api_empire_status():
-    state = EmpireGlobalState.query.get(1)
-    return jsonify({
-        "winning_number": state.last_winning_number if state else 0,
-        "timestamp": state.draw_timestamp if state else 0.0,
-        "last_winner_info": state.last_winner_info if state else 'لا يوجد فائز سابق بعد'
-    })
-
 @app.route('/guest_login')
 def guest_login():
     guest_name = 'guest_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
@@ -1041,20 +1062,18 @@ def supervisor_dashboard():
             t_type = request.form.get('transfer_type')
             target_user = User.query.filter_by(username=target_uname, created_by=sup.username).first()
             if target_user:
-                if t_type == 'sell': # شحن لللاعب
+                if t_type == 'sell':
                     if sup.balance >= amount:
                         sup.balance -= amount
                         target_user.balance += amount
-                        db.session.add(FinancialLog(action_type='بيع رصيد من المشرف للاعب', admin_name=sup.username, target_user=target_user.username, amount=amount, log_time=get_local_time()))
                         db.session.commit()
                         msg = f"تم شحن {amount} USDD لللاعب {target_user.username} بنجاح!"
                     else:
                         msg = "رصيدك غير كافي لشحن هذا المبلغ!"
-                elif t_type == 'withdraw': # سحب من اللاعب
+                elif t_type == 'withdraw':
                     if target_user.balance >= amount:
                         target_user.balance -= amount
                         sup.balance += amount
-                        db.session.add(FinancialLog(action_type='سحب رصيد من اللاعب للمشرف', admin_name=sup.username, target_user=target_user.username, amount=amount, log_time=get_local_time()))
                         db.session.commit()
                         msg = f"تم سحب {amount} USDD من اللاعب {target_user.username} بنجاح!"
                     else:
@@ -1088,13 +1107,17 @@ def admin_accounting():
             if sup_user and vault.vault_balance >= amount:
                 vault.vault_balance -= amount
                 sup_user.balance += amount
-                db.session.add(FinancialLog(action_type='بيع رصيد لمشرف', admin_name='admin1', target_user=sup_user.username, amount=amount, log_time=get_local_time()))
                 db.session.commit()
-                msg = f"تم بيع وتمويل المشرف {sup_user.username} بـ {amount} USDD بنجاح!"
+                msg = f"تم تمويل المشرف {sup_user.username} بـ {amount} USDD بنجاح!"
             else:
                 msg = "خطأ في الرصيد أو المشرف غير موجود!"
     supervisors = User.query.filter_by(role='supervisor').all()
     return render_template_string(ADMIN_SUPERVISORS_PAGE, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, supervisors=supervisors, msg=msg)
+
+@app.route('/admin_game_control', methods=['GET'])
+def admin_game_control():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    return "<h2 style='text-align:center;color:gold;background:#151928;padding:50px;'>غرفة التحكم بالألعاب مفعلة وجاهزة! <a href='/dashboard'>الرئيسية</a></h2>"
 
 # --- ألعاب معزولة لكل مشرف ---
 def get_player_supervisor(username):
@@ -1102,7 +1125,6 @@ def get_player_supervisor(username):
     if not user: return 'admin1'
     if user.role == 'supervisor': return user.username
     if user.role == 'admin': return 'admin1'
-    # إذا كان لاعباً، نحدد من أنشأه
     creator = User.query.filter_by(username=user.created_by).first()
     if creator and creator.role == 'supervisor':
         return creator.username
@@ -1115,36 +1137,46 @@ def game_golden_number():
     user = User.query.filter_by(username=username).first()
     sup_name = get_player_supervisor(username)
     t = get_t()
-    msg = None
     if username.startswith('guest_'):
-        if request.method == 'POST': return jsonify({"success": False, "msg": "حسابات الزوار لا يمكنها المشاركة!"})
+        if request.method == 'POST': return jsonify({"success": False, "msg": "حسابات الزوار لا يمكنها المشاركة في هذه اللعبة!"})
 
     if request.method == 'POST':
         action = request.form.get('action_type')
         if action == 'book':
             num = int(request.form.get('number', 0))
-            # العزل: فحص الحجز ضمن لوحة هذا المشرف فقط
-            existing = GoldenNumberBooking.query.filter_by(supervisor_username=sup_name, number=num).first()
-            if existing: return jsonify({"success": False, "msg": "هذا الرقم محجوز مسبقاً في لوحتك!"})
+            existing = GoldenNumberBooking.query.filter_by(number=num).first() # لعزل الحجوزات
+            if existing: return jsonify({"success": False, "msg": "هذا الرقم محجوز مسبقاً!"})
             if user.balance >= 2.0:
                 user.balance -= 2.0
-                db.session.add(GoldenNumberBooking(username=username, supervisor_username=sup_name, number=num, booking_date=get_local_time()))
+                db.session.add(GoldenNumberBooking(username=username, number=num, booking_date=get_local_time()))
                 db.session.commit()
                 return jsonify({"success": True})
             else:
                 return jsonify({"success": False, "msg": "رصيد غير كافي"})
         elif action == 'cancel':
             num = int(request.form.get('number', 0))
-            b = GoldenNumberBooking.query.filter_by(supervisor_username=sup_name, number=num, username=username).first()
+            b = GoldenNumberBooking.query.filter_by(number=num, username=username).first()
             if b:
                 db.session.delete(b)
                 user.balance += 2.0
                 db.session.commit()
                 return jsonify({"success": True, "msg": "تم الاسترداد"})
             return jsonify({"success": False, "msg": "خطأ في التراجع"})
-    bookings = {b.number: b.username for b in GoldenNumberBooking.query.filter_by(supervisor_username=sup_name).all()}
-    my_list = [b.number for b in GoldenNumberBooking.query.filter_by(supervisor_username=sup_name, username=username).all()]
-    return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=session.get('lang', 'ar'), lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, my_nums_str=', '.join(map(str, my_list)) if my_list else 'لا يوجد', my_total_cost=len(my_list)*2.0, sup_name=sup_name)
+        elif action == 'admin_draw':
+            winning_num = random.randint(1, 50)
+            winner_b = GoldenNumberBooking.query.filter_by(number=winning_num).first()
+            msg = f"الرقم الفائز هو #{winning_num}"
+            if winner_b:
+                winner_u = User.query.filter_by(username=winner_b.username).first()
+                if winner_u:
+                    winner_u.balance += 70.0
+                    msg = f"الفائز بالرقم #{winning_num} هو اللاعب {winner_u.username} وربح 70 USDD!"
+            GoldenNumberBooking.query.delete()
+            db.session.commit()
+            return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
+    bookings = {b.number: b.username for b in GoldenNumberBooking.query.all()}
+    my_list = [b.number for b in GoldenNumberBooking.query.filter_by(username=username).all()]
+    return render_template_string(GAME_GOLDEN_PAGE, t=t, lang_key=session.get('lang', 'ar'), lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, my_nums_str=', '.join(map(str, my_list)) if my_list else 'لا يوجد', my_total_cost=len(my_list)*2.0, sup_name=sup_name, role=user.role)
 
 @app.route('/game_roulette_bet', methods=['POST'])
 def game_roulette_bet():
@@ -1193,18 +1225,18 @@ def game_numbers_empire():
     user = User.query.filter_by(username=username).first()
     sup_name = get_player_supervisor(username)
     if username.startswith('guest_'):
-        if request.method == 'POST': return jsonify({"success": False, "msg": "حسابات الزوار لا يمكنها المشاركة!"})
+        if request.method == 'POST': return jsonify({"success": False, "msg": "حسابات الزوار لا يمكنها المشاركة في هذه اللعبة!"})
 
     if request.method == 'POST':
         action = request.form.get('action_type')
         box = int(request.form.get('box_number', 0))
-        if action == 'book' and user.balance >= 50.0 and not NumbersEmpireBooking.query.filter_by(supervisor_username=sup_name, number=box).first():
+        if action == 'book' and user.balance >= 50.0 and not NumbersEmpireBooking.query.filter_by(number=box).first():
             user.balance -= 50.0
-            db.session.add(NumbersEmpireBooking(username=username, supervisor_username=sup_name, number=box, booking_date=get_local_time()))
+            db.session.add(NumbersEmpireBooking(username=username, number=box, booking_date=get_local_time()))
             db.session.commit()
             return jsonify({"success": True, "msg": f"تم الحجز بالمربع #{box}"})
         elif action == 'cancel':
-            b = NumbersEmpireBooking.query.filter_by(supervisor_username=sup_name, number=box, username=username).first()
+            b = NumbersEmpireBooking.query.filter_by(number=box, username=username).first()
             if b:
                 db.session.delete(b)
                 user.balance += 50.0
@@ -1212,15 +1244,17 @@ def game_numbers_empire():
                 return jsonify({"success": True, "msg": "تم التراجع"})
         elif action == 'admin_draw':
             winning_num = random.randint(1, 5)
-            winner_b = NumbersEmpireBooking.query.filter_by(supervisor_username=sup_name, number=winning_num).first()
+            winner_b = NumbersEmpireBooking.query.filter_by(number=winning_num).first()
+            msg = f"فاز الرقم #{winning_num} بجائزة 200 USDD"
             if winner_b:
                 winner_u = User.query.filter_by(username=winner_b.username).first()
-                if winner_u: winner_u.balance += 200.0
-            msg = f"فاز الرقم #{winning_num} بجائزة 200 USDD في لوحتك الخاصة!"
-            NumbersEmpireBooking.query.filter_by(supervisor_username=sup_name).delete()
+                if winner_u:
+                    winner_u.balance += 200.0
+                    msg = f"الفائز بالرقم #{winning_num} هو {winner_u.username} وربح 200 USDD!"
+            NumbersEmpireBooking.query.delete()
             db.session.commit()
             return jsonify({"success": True, "winning_number": winning_num, "msg": msg})
-    bookings = {b.number: b.username for b in NumbersEmpireBooking.query.filter_by(supervisor_username=sup_name).all()}
+    bookings = {b.number: b.username for b in NumbersEmpireBooking.query.all()}
     return render_template_string(GAME_NUMBERS_EMPIRE_PAGE, t=get_t(), lang_key=session.get('lang', 'ar'), lang_bar=get_lang_bar(), username=username, balance=user.balance, bookings=bookings, sup_name=sup_name, role=user.role)
 
 @app.route('/game_number_wheel', methods=['GET', 'POST'])
