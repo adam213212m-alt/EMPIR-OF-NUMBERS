@@ -22,16 +22,16 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات الأصلية ---
+# --- نماذج قاعدة البيانات ---
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     balance = db.Column(db.Float, default=0.0)
-    role = db.Column(db.String(20), nullable=False, default='user')
+    role = db.Column(db.String(20), nullable=False, default='user') # 'admin', 'supervisor', 'user'
     created_by = db.Column(db.String(80), nullable=False, default='system')
-    owner_name = db.Column(db.String(100), default='غير محدد')
+    owner_name = db.Column(db.String(100), default='غير مححدد')
 
 class SystemVault(db.Model):
     __tablename__ = 'system_vault'
@@ -210,7 +210,6 @@ def get_lang_bar():
             <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
         </select>
         <a href="javascript:location.reload();" title="تحديث الصفحة" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 12px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; display: flex; align-items: center; gap: 5px;">🔄 تحديث</a>
-        <button id="installBtn" onclick="installApp()" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: #fff; padding: 6px 14px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; display: none; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(59,130,246,0.4);">📲 تثبيت البرنامج</button>
     </div>
     <div style="display:flex; gap:15px; align-items:center; flex-wrap: wrap;">
         <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:6px 14px; border-radius:8px; font-weight:900; font-size:14px;">الرصيد: <span id="globalLiveBalance">...</span> USDD</div>
@@ -219,25 +218,6 @@ def get_lang_bar():
     </div>
 </div>
 <script>
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {{
-        e.preventDefault();
-        deferredPrompt = e;
-        let btn = document.getElementById('installBtn');
-        if(btn) btn.style.display = 'flex';
-    }});
-
-    function installApp() {{
-        if (deferredPrompt) {{
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => {{
-                deferredPrompt = null;
-            }});
-        }} else {{
-            alert("لتثبيت التطبيق على هاتفك، انقر على خيارات المتصفح (القائمة) واختر 'إضافة إلى الشاشة الرئيسية' (Add to Home Screen).");
-        }}
-    }}
-
     setInterval(() => {{
         fetch('/api/sync_balance').then(res => res.json()).then(data => {{
             let b1 = document.getElementById('liveBalance');
@@ -297,7 +277,7 @@ LOGIN_PAGE = """
         </form>
 
         <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px; border-top:1px solid rgba(255,215,0,0.2); padding-top:15px;">
-            <a href="https://wa.me/96176030208?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%B8%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A5%D9%86%D8%B4%D8%A7%D8%A1%20%D8%AD%D8%B3%D8%A7%D8%A8%20%D8%AC%D8%AF%D9%8A%D8%AF%20%D9%81%D9%8A%20%D9%85%D9%86%D8%B5%D8%A9%20%D8%A7%D9%85%D8%A8%D8%B1%D8%A7%D8%B7%D9%88%D8%B1%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A3%D8%B1%D9%82%D8%A7%D9%85" target="_blank" style="background:#25d366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">💬 إنشاء حساب عبر الواتساب</a>
+            <a href="https://wa.me/96176030208?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D9%88%D8%AF%20%D8%A5%D9%86%D8%B4%D8%A7%D8%A1%20%D8%AD%D8%B3%D8%A7%D8%A8%20%D8%AC%D8%AF%D9%8A%D8%AF%20%D9%81%D9%8A%20%D9%85%D9%86%D8%B5%D8%A9%20%D8%A5%D9%85%D8%A8%D8%B1%D8%A7%D8%B7%D9%88%D8%B1%D9%8A%D8%A9%20%D8%A7%D9%84%D8%A3%D8%B1%D9%82%D8%A7%D9%85.%0AHello,%20I%20would%20like%20to%20create%20a%20new%20account%20on%20the%20Empire%20of%20Numbers%20platform." target="_blank" style="background:#25d366; color:#fff; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">💬 إنشاء حساب عبر الواتساب</a>
             <a href="/guest_login" style="background:rgba(59,130,246,0.2); border:1px solid #3b82f6; color:#38bdf8; padding:12px; border-radius:12px; text-decoration:none; font-weight:bold; display:block; font-size:14px; box-sizing:border-box;">👁️ دخول زائر (تصفح بـ 10 USDD)</a>
         </div>
     </div>
@@ -343,10 +323,10 @@ DASHBOARD_PAGE = """
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             {% if username == 'admin1' %}
+                <a href="/admin_supervisors" style="background:#22c55e; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 إدارة المشرفين</a>
                 <a href="/admin_game_control" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">🎮 {{ t.game_control }}</a>
                 <a href="/admin_player_logs" style="background:#a78bfa; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📋 حركات اللاعبين</a>
                 <a href="/admin_chats" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">💬 إدارة الدردشة</a>
-                <a href="/admin_customers" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 {{ t.customers }}</a>
                 <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 {{ t.accounting }}</a>
             {% endif %}
             <a href="/logout" style="background:#ef4444; color:#fff; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">{{ t.logout }}</a>
@@ -423,6 +403,74 @@ DASHBOARD_PAGE = """
             closeUsdtModal();
         }
     </script>
+</body>
+</html>
+"""
+
+# --- صفحة إدارة المشرفين (عدد لا نهائي) ---
+ADMIN_SUPERVISORS_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة المشرفين المستأجرين - الآدمن</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; margin:0; }
+        .box { background: rgba(25,30,48,0.9); padding: 20px; border-radius: 18px; max-width: 500px; margin: 15px auto; border: 2px solid #ffd700; text-align: right; box-sizing: border-box; }
+        input, select { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; background: #0a0d16; color: #fff; border: 1px solid #444; box-sizing: border-box; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
+        th { background: #0a0d16; color: #ffd700; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2 style="color:#ffd700; font-size:20px;">👥 لوحة إدارة المشرفين المستأجرين (عدد لا نهائي)</h2>
+    <div style="font-size:18px; font-weight:bold; color:#34d399; margin:10px 0;">🏦 الخزنة المركزية: {{ vault_balance }} USDD</div>
+    <a href="/dashboard" style="background:#38bdf8; color:#000; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">الرئيسية</a>
+
+    {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:10px; margin:15px auto; max-width:500px; font-weight:bold; font-size:14px;">{{ msg }}</div>{% endif %}
+
+    <div class="box">
+        <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء حساب مشرف جديد</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="create_supervisor">
+            <label>اسم المستخدم للمشرف:</label>
+            <input type="text" name="username" required placeholder="اسم المشرف...">
+            <label>كلمة المرور:</label>
+            <input type="password" name="password" required placeholder="كلمة المرور...">
+            <label>اسم الوكيل أو المحل:</label>
+            <input type="text" name="owner_name" placeholder="اسم الوكيل...">
+            <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إنشاء المشرف فوراً</button>
+        </form>
+    </div>
+
+    <div class="box" style="border-color:#38bdf8;">
+        <h3 style="color:#38bdf8; margin-top:0; font-size:17px; text-align:center;">💳 بيع وتمويل رصيد لمشرف</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="fund_supervisor">
+            <label>اختر المشرف:</label>
+            <select name="target_sup" required>
+                <option value="">اختر المشرف</option>
+                {% for s in supervisors %}
+                <option value="{{ s.username }}">{{ s.username }} (رصيده الحالي: {{ s.balance }})</option>
+                {% endfor %}
+            </select>
+            <label>المبلغ (USDD):</label>
+            <input type="number" name="amount" min="1" required placeholder="المبلغ...">
+            <button type="submit" style="background:#38bdf8; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إتمام التمويل من الخزنة</button>
+        </form>
+    </div>
+
+    <div style="background: rgba(25,30,48,0.9); padding: 20px; border-radius: 20px; max-width: 900px; margin: 20px auto; overflow-x:auto; box-sizing:border-box;">
+        <h3 style="color:#ffd700; font-size:17px;">📋 قائمة المشرفين المسجلين</h3>
+        <table>
+            <tr><th>المشرف</th><th>الوكيل / المحل</th><th>الرصيد المتاح</th></tr>
+            {% for s in supervisors %}
+            <tr><td><b>{{ s.username }}</b></td><td>{{ s.owner_name }}</td><td style="color:#34d399;">{{ s.balance }} USDD</td></tr>
+            {% endfor %}
+        </table>
+    </div>
 </body>
 </html>
 """
@@ -1056,7 +1104,7 @@ GAME_ARROW_WHEEL_PAGE = """
                 }
             }, 80);
         }
-        function closeModal() { document.getElementById('resultModal карда'] ? '' : null; document.getElementById('resultModal').style.display = 'none'; location.reload(); }
+        function closeModal() { document.getElementById('resultModal').style.display = 'none'; location.reload(); }
     </script>
 </body>
 </html>
@@ -1411,7 +1459,7 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# --- جميع مسارات الألعاب الأصلية بكامل معطياتها ---
+# --- Routes وأكواد التشغيل ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1493,6 +1541,40 @@ def dashboard():
             else:
                 msg = "⚠️ الكود غير صالح أو مستخدم مسبقاً!"
     return render_template_string(DASHBOARD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, password=user.password, balance=user.balance, msg=msg)
+
+# --- لوحة الآدمن لإنشاء عدد لا نهائي من المشرفين ---
+@app.route('/admin_supervisors', methods=['GET', 'POST'])
+def admin_supervisors():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    vault = SystemVault.query.get(1)
+    msg = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'create_supervisor':
+            uname = request.form.get('username', '').strip()
+            pwd = request.form.get('password', '').strip()
+            owner = request.form.get('owner_name', 'مشرف مستقل').strip()
+            if uname and pwd and not User.query.filter_by(username=uname).first():
+                new_sup = User(username=uname, password=pwd, balance=0.0, role='supervisor', created_by='admin1', owner_name=owner)
+                db.session.add(new_sup)
+                db.session.commit()
+                msg = f"تم إنشاء المشرف {uname} بنجاح!"
+            else:
+                msg = "خطأ: اسم المشرف موجود مسبقاً أو بيانات ناقصة!"
+        elif action == 'fund_supervisor':
+            target_sup = request.form.get('target_sup')
+            amount = float(request.form.get('amount', 0))
+            sup_user = User.query.filter_by(username=target_sup, role='supervisor').first()
+            if sup_user and vault.vault_balance >= amount:
+                vault.vault_balance -= amount
+                sup_user.balance += amount
+                db.session.add(FinancialLog(action_type='تمويل رصيد لمشرف', admin_name='admin1', target_user=sup_user.username, amount=amount, log_time=get_local_time()))
+                db.session.commit()
+                msg = f"تم تمويل المشرف {sup_user.username} بـ {amount} USDD بنجاح!"
+            else:
+                msg = "خطأ في الرصيد أو المشرف غير موجود!"
+    supervisors = User.query.filter_by(role='supervisor').all()
+    return render_template_string(ADMIN_SUPERVISORS_PAGE, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, supervisors=supervisors, msg=msg)
 
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
