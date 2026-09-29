@@ -467,8 +467,8 @@ GAME_GOLDEN_PAGE = """
 
         <div id="insufficientBalanceModal">
             <div style="background:#1a1c29; padding:25px; border-radius:20px; border:3px solid #ef4444; width:100%; max-width:380px; text-align:center; box-sizing: border-box;">
-                <h3 style="color:#ef4444; font-size:20px; margin-top:0;">⚠️ تنبيه الرصيد</h3>
-                <p style="font-size:15px; color:#fff; font-weight:bold; margin:12px 0;">رصيدك غير كافي الرجاء الشحن</p>
+                <h3 style="color:#ef4444; font-size:20px; margin-top:0;">⚠️ تنبيه الرصيد أو الصلاحية</h3>
+                <p id="modalErrorText" style="font-size:15px; color:#fff; font-weight:bold; margin:12px 0;">رصيدك غير كافي أو أن حساب الزائر غير مسموح له بالمشاركة في هذه اللعبة الكبرى!</p>
                 <button onclick="closeInsufficientModal()" style="background:#ffd700; color:#000; padding:8px 20px; font-weight:900; border:none; border-radius:10px; cursor:pointer; font-size:14px;">حسناً</button>
             </div>
         </div>
@@ -508,7 +508,8 @@ GAME_GOLDEN_PAGE = """
             fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
                 if(data.success) { location.reload(); }
                 else {
-                    if(data.msg && data.msg.includes("رصيد")) {
+                    if(data.msg) {
+                        document.getElementById('modalErrorText').innerText = data.msg;
                         document.getElementById('insufficientBalanceModal').style.display = 'flex';
                     }
                 }
@@ -813,7 +814,7 @@ GAME_NUMBERS_EMPIRE_PAGE = """
                 if(d.winning_number) {
                     if(!isAnimating) { runEmpireAnimation(d.winning_number, d.msg); }
                 } else {
-                    if(d.msg && !d.msg.includes("محجوز")) { alert(d.msg); }
+                    if(d.msg) { alert(d.msg); }
                     if(!d.msg || !d.msg.includes("محجوز")) { location.reload(); }
                 }
             });
@@ -1394,7 +1395,7 @@ ADMIN_CHATS_PAGE = """
             </div>
             <form method="POST" style="display:flex; gap:8px; flex-wrap:wrap;">
                 <input type="hidden" name="recipient" value="{{ active_user }}">
-                <input type="text" name="message" required placeholder="اكتب ردك للاعب..." style="flex:1; min-width:180px; padding:10px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px; font-size:14px;">
+                <input type="text" name="message" required placeholder="اكتب ردك للالاعب..." style="flex:1; min-width:180px; padding:10px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px; font-size:14px;">
                 <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:0 18px; border:none; border-radius:8px; cursor:pointer;">إرسال الرد</button>
             </form>
             {% else %}
@@ -1433,12 +1434,12 @@ def api_empire_status():
 @app.route('/guest_login')
 def guest_login():
     guest_name = 'guest_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
-    u = User(username=guest_name, password='guest_password', balance=100.0, role='user', created_by='guest', owner_name='زائر تصفح')
+    u = User(username=guest_name, password='guest_password', balance=10.0, role='user', created_by='guest', owner_name='زائر تصفح')
     db.session.add(u)
     db.session.commit()
     session.clear()
     session['username'] = guest_name
-    session['balance'] = 100.0
+    session['balance'] = 10.0
     session['role'] = 'user'
     return redirect(url_for('dashboard'))
 
@@ -1500,6 +1501,9 @@ def game_golden_number():
     t = get_t()
     lang_key = session.get('lang', 'ar')
     msg = None
+    if username.startswith('guest_'):
+        if request.method == 'POST':
+            return jsonify({"success": False, "msg": "عذراً، حسابات الزوار غير مسموح لها بالمشاركة في لعبة الرقم الحنون!"})
     if request.method == 'POST':
         action = request.form.get('action_type')
         if action == 'book':
@@ -1617,6 +1621,9 @@ def game_numbers_empire():
     vault = SystemVault.query.get(1)
     t = get_t()
     lang_key = session.get('lang', 'ar')
+    if username.startswith('guest_'):
+        if request.method == 'POST':
+            return jsonify({"success": False, "msg": "عذراً، حسابات الزوار غير مسموح لها بالمشاركة في إمبراطورية الأرقام!"})
     if request.method == 'POST':
         action = request.form.get('action_type')
         box = int(request.form.get('box_number', 0))
@@ -1711,24 +1718,23 @@ def game_arrow_wheel():
             vault.vault_balance += cost
             db.session.add(FinancialLog(action_type='مبيع رهان رمي السهم المتحركة', admin_name='system', target_user=username, amount=cost, log_time=get_local_time()))
             
-            # 70% refund (1 USDD), 5% double (2 USDD), 10% half (0.5 USDD), 15% lose (0 USDD)
             rand_val = random.random()
             if rand_val < 0.70:
                 prize = 1.0
                 chosen_label = 'استرداد 1$'
                 outcome = 'ربح'
                 msg = "مبروك! أصبت هدف (إعادة الرصيد): استرددت 1 USDD"
-            elif rand_val < 0.75: # 0.70 to 0.75 is 5%
+            elif rand_val < 0.75:
                 prize = 2.0
                 chosen_label = 'دوبل 2$'
                 outcome = 'ربح'
                 msg = "🎉 مبروك! أصبت هدف (دوبل الرصيد): ربحت 2 USDD"
-            elif rand_val < 0.85: # 0.75 to 0.85 is 10%
+            elif rand_val < 0.85:
                 prize = 0.5
                 chosen_label = 'نصف 0.5$'
                 outcome = 'ربح جزئي'
                 msg = "أصبت هدف (نصف الرهان): استرددت 0.5 USDD"
-            else: # 0.85 to 1.00 is 15%
+            else:
                 prize = 0.0
                 chosen_label = 'حظ أوفر'
                 outcome = 'خسارة'
