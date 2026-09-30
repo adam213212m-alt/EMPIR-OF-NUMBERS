@@ -265,7 +265,7 @@ def get_unified_math_outcome(game_name, supervisor_scope, player_choices, min_va
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- صفحات القوالب والتصميم الفاخر ---
+# --- قوالب الواجهات الكاملة ذات التصميم الفاخر ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1081,7 +1081,7 @@ GAME_ARROW_WHEEL_PAGE = """
 </html>
 """
 
-# --- المسارات والتحكم الكامل ---
+# --- مسارات التطبيق والتحكم الكامل ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
