@@ -22,7 +22,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- نماذج قاعدة البيانات ---
+# --- نماذج قاعدة البيانات الشاملة ---
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -55,7 +55,7 @@ class PlayerActivity(db.Model):
     game_name = db.Column(db.String(100), nullable=False)
     bet_details = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Float, default=0.0)
-    outcome = db.Column(db.String(50), nullable=False) # 'ربح' أو 'خسارة'
+    outcome = db.Column(db.String(50), nullable=False)
     winning_number = db.Column(db.String(50), default='---')
     timestamp = db.Column(db.String(50), nullable=False)
 
@@ -125,7 +125,7 @@ with app.app_context():
         db.session.add(EmpireGlobalState(id=1, last_winning_number=0, draw_timestamp=0.0, last_winner_info='لا يوجد فائز سابق بعد'))
     db.session.commit()
 
-# --- الترجمات الكاملة بـ 6 لغات ---
+# --- الترجمات بـ 6 لغات كاملة ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام الملكية', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -265,7 +265,7 @@ def get_unified_math_outcome(game_name, supervisor_scope, player_choices, min_va
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- صفحات الواجهات وتصميم فاخر (Glassmorphic) ---
+# --- صفحات القوالب والتصميم الفاخر ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -280,7 +280,7 @@ LOGIN_PAGE = """
         <form method="POST">
             <input type="text" name="username" placeholder="{{ t.username }}" required style="width:100%; padding:14px; margin:10px 0; border-radius:12px; background:rgba(10, 13, 22, 0.9); color:#fff; border:1px solid #555; box-sizing:border-box; font-size:15px;">
             <input type="password" name="password" placeholder="{{ t.password }}" required style="width:100%; padding:14px; margin:10px 0; border-radius:12px; background:rgba(10, 13, 22, 0.9); color:#fff; border:1px solid #555; box-sizing:border-box; font-size:15px;">
-            <button type="submit" style="width:100%; padding:14px; background:linear-gradient(135deg, #ffd700, #ff8c00); color:#000; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:17px; margin-top:5px; box-shadow: 0 5px 15px rgba(255,215,0,0.3);">{{ t.login }}</button>
+            <button type="submit" style="width:100%; padding:14px; background:linear-gradient(135deg, #ffd700, #ff8c00); color:#000; font-weight:900; border:none; border-radius:12px; cursor:pointer; font-size:17px; margin-top:5px;">{{ t.login }}</button>
         </form>
     </div>
 </body>
@@ -303,7 +303,7 @@ DASHBOARD_PAGE = """
         .icons-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 1000px; margin: 20px auto; box-sizing: border-box; width: 100%; }
         @media (max-width: 768px) { .icons-grid { grid-template-columns: repeat(1, 1fr); max-width: 100%; padding: 0 5px; } }
         .icon-card { background: rgba(25,30,48,0.95); border: 3px solid rgba(184,134,11,0.6); border-radius: 24px; padding: 25px 10px; text-align: center; text-decoration: none; box-shadow: 0 15px 35px rgba(0,0,0,0.8); transition: 0.3s; box-sizing: border-box; display: block; width: 100%; }
-        .icon-card:hover { border-color: #ffd700; transform: translateY(-5px); box-shadow: 0 20px 40px rgba(255,215,0,0.2); }
+        .icon-card:hover { border-color: #ffd700; transform: translateY(-5px); }
         .icon-logo { font-size: 45px; margin-bottom: 8px; }
         .icon-title { color: #ffd700; font-size: 17px; font-weight: 900; }
     </style>
@@ -346,7 +346,7 @@ DASHBOARD_PAGE = """
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
-        <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️️</div><div class="icon-title">{{ t.game3 }}</div></a>
+        <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
         <a href="/game_arrow_wheel" class="icon-card"><div class="icon-logo">🎯</div><div class="icon-title">{{ t.game6 }}</div></a>
@@ -355,7 +355,6 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لوحة تحكم المشرف المستقل الكاملة (صندوقه + لاعبيه + تقارير بفلتر) ---
 SUPERVISOR_DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -381,7 +380,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
     {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:10px; margin:15px auto; max-width:600px; font-weight:bold; font-size:14px;">{{ msg }}</div>{% endif %}
 
     <div class="grid-panels">
-        <!-- إنشاء لاعب -->
         <div class="box" style="flex: 1; min-width: 320px; margin:0;">
             <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء حساب لاعب جديد لمجموعتك</h3>
             <form method="POST">
@@ -396,7 +394,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
             </form>
         </div>
 
-        <!-- بيع وشراء رصيد من صندوق المشرف -->
         <div class="box" style="flex: 1; min-width: 320px; border-color:#38bdf8; margin:0;">
             <h3 style="color:#38bdf8; margin-top:0; font-size:17px; text-align:center;">💳 بيع أو سحب رصيد من صندوقك</h3>
             <form method="POST">
@@ -420,7 +417,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
         </div>
     </div>
 
-    <!-- قائمة اللاعبين التابعين للمشرف -->
     <div class="box" style="margin-top: 15px;">
         <h3 style="color:#ffd700; font-size:17px; text-align:center;">📋 لاعبو مجموعتك الخاصة وكلمات مرورهم</h3>
         <table>
@@ -433,7 +429,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
         </table>
     </div>
 
-    <!-- تقارير وحركات لاعبي المجموعة مع فلتر -->
     <div class="box" style="border-color:#a78bfa;">
         <h3 style="color:#a78bfa; font-size:17px; text-align:center;">📊 تقارير وحركات لاعبي مجموعتك (محاسبة مفصلة)</h3>
         <form method="GET" style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:15px;">
@@ -471,7 +466,6 @@ SUPERVISOR_DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لوحة الآدمن للإشراف على الصناديق واللاعبين والكلمات السرية ---
 ADMIN_SUPERVISORS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -526,7 +520,6 @@ ADMIN_SUPERVISORS_PAGE = """
         </form>
     </div>
 
-    <!-- جدول المشرفين ولاعبيهم وتفاصيلهم الكاملة وكلمات المرور -->
     <div class="box" style="border-color:#a78bfa;">
         <h3 style="color:#a78bfa; font-size:17px; text-align:center;">📋 تفاصيل المشرفين، صناديقهم، ولاعبيهم وأرصدتهم</h3>
         <table>
@@ -551,7 +544,6 @@ ADMIN_SUPERVISORS_PAGE = """
 </html>
 """
 
-# --- غرفة إدارة الألعاب لـ 10 قنوات مشرفين وعام ---
 ADMIN_GAME_CONTROL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -605,7 +597,6 @@ ADMIN_GAME_CONTROL_PAGE = """
 </html>
 """
 
-# --- بقية الصفحات الكلاسيكية (المحاسبة، كودات الشحن، الدردشة، والألعاب الست الكاملة) ---
 ADMIN_ACCOUNTING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -705,12 +696,12 @@ ADMIN_CHATS_PAGE = """
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing:border-box; margin:0; }
         .chat-container { display: flex; max-width: 1000px; margin: 15px auto; background: rgba(25,30,48,0.95); border-radius: 20px; border: 2px solid #ffd700; overflow: hidden; flex-wrap: wrap; box-sizing:border-box; }
-        .users-list { width: 30%; min-width: 150px; background: #0a0d16; border-left: 1px solid #444; padding: 12px; text-align: right; box-sizing:border-box; }
+        .users-list { width: 30%; min-width: 150px; background: #0a0d16; border-left: 1px solid #444; padding: 12px; text-align: right; box-sizing: border-box; }
         .user-link { display: block; padding: 10px; color: #ffd700; text-decoration: none; border-bottom: 1px solid #222; font-weight: bold; border-radius: 8px; margin-bottom: 4px; background: #141824; font-size: 13px; }
         .user-link.active { background: #3b82f6; color: #fff; }
-        .chat-window { width: 70%; padding: 15px; text-align: right; display: flex; flex-direction: column; box-sizing:border-box; }
-        .messages-area { height: 320px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 12px; overflow-y: scroll; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing:border-box; }
-        .msg { padding: 8px 12px; border-radius: 10px; max-width: 80%; font-size: 14px; box-sizing:border-box; }
+        .chat-window { width: 70%; padding: 15px; text-align: right; display: flex; flex-direction: column; box-sizing: border-box; }
+        .messages-area { height: 320px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 12px; overflow-y: scroll; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+        .msg { padding: 8px 12px; border-radius: 10px; max-width: 80%; font-size: 14px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -749,7 +740,6 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
-# الـ 6 ألعاب الكاملة بالتصميم الفاخر
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -1091,7 +1081,7 @@ GAME_ARROW_WHEEL_PAGE = """
 </html>
 """
 
-# --- مسارات الأرجوحة والبرمجيات في Flask ---
+# --- المسارات والتحكم الكامل ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1163,7 +1153,6 @@ def dashboard():
                 msg = "⚠️ الكود غير صالح أو مستخدم مسبقاً!"
     return render_template_string(DASHBOARD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, role=user.role, balance=user.balance, msg=msg)
 
-# --- لوحة تحكم المشرف المستقل الكاملة ---
 @app.route('/supervisor_dashboard', methods=['GET', 'POST'])
 def supervisor_dashboard():
     if 'username' not in session or session.get('role') != 'supervisor': return redirect(url_for('dashboard'))
@@ -1223,7 +1212,6 @@ def supervisor_dashboard():
 
     return render_template_string(SUPERVISOR_DASHBOARD_PAGE, lang_bar=get_lang_bar(), supervisor=supervisor, players=players, logs=logs, selected_player=selected_player, msg=msg)
 
-# --- إدارة الآدمن للصناديق والمشرفين ---
 @app.route('/admin_supervisors', methods=['GET', 'POST'])
 def admin_supervisors():
     if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
@@ -1268,7 +1256,6 @@ def admin_supervisors():
         })
     return render_template_string(ADMIN_SUPERVISORS_PAGE, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, supervisors=sup_data, msg=msg)
 
-# --- إدارة الألعاب لـ 10 قنوات وعام ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
     if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
@@ -1345,7 +1332,6 @@ def admin_chats():
         ).order_by(ChatMessage.id.asc()).all()
     return render_template_string(ADMIN_CHATS_PAGE, lang_bar=get_lang_bar(), chatting_users=chatting_users, active_user=active_user, messages=messages)
 
-# --- مسارات الألعاب الست مع عزل المشرفين ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
