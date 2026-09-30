@@ -277,7 +277,7 @@ def get_unified_math_outcome(game_name, supervisor_scope, player_choices, min_va
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- صفحة الدخول الأصلية مع واتساب ودخول الزائر ---
+# --- صفحات الواجهات الأصلية المكتملة 100% ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -813,6 +813,434 @@ ADMIN_CHATS_PAGE = """
 </html>
 """
 
+GAME_GOLDEN_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game1 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; margin: 0; box-sizing: border-box; }
+        .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 20px; border-radius: 25px; max-width: 950px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
+        .header-box { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); border: 2px solid #38bdf8; padding: 12px; border-radius: 16px; margin-bottom: 15px; box-sizing: border-box; }
+        .draw-screen-box { background: #000; border: 3px solid #ffd700; padding: 10px; border-radius: 16px; margin-bottom: 10px; display: inline-block; min-width: 200px; max-width: 100%; box-sizing: border-box; }
+        .slot-screen { font-size: 38px; font-weight: 900; color: #ffd700; letter-spacing: 2px; }
+        .winner-msg { font-size: 15px; font-weight: 900; color: #34d399; margin-bottom: 12px; min-height: 22px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-top: 12px; box-sizing: border-box; width: 100%; }
+        @media(max-width: 768px){ .grid { grid-template-columns: repeat(5, 1fr); gap: 5px; } }
+        .cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 2px solid #a78bfa; border-radius: 10px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; color: #fff; font-size: 14px; transition: 0.2s; box-sizing: border-box; width: 100%; }
+        .cell:hover { border-color: #ffd700; transform: scale(1.03); }
+        .cell.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; cursor: not-allowed; }
+        .cell.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #3b82f6 !important; }
+        .cell.winner-glow { background: #fbbf24 !important; border: 3px solid #fff !important; box-shadow: 0 0 20px #ffd700; color: #000 !important; transform: scale(1.1); }
+        .player-info-box { background: rgba(15,20,32,0.9); border: 2px solid #34d399; padding: 10px; border-radius: 12px; margin-top: 15px; text-align: right; box-sizing: border-box; font-size: 14px; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <div class="header-box">
+            <h2 style="color: #ffd700; margin: 0 0 6px 0; font-size: 18px;">احجز رقم ب 2 usdd واربح 70 usdd فورا</h2>
+            <p style="color: #f8fafc; margin: 0; font-size: 14px; font-weight: bold;">مجموعة المشرف التابع له: {{ supervisor_name }}</p>
+        </div>
+        <div class="draw-screen-box"><div id="slotScreen" class="slot-screen">--</div></div>
+        <div id="winnerAnnouncement" class="winner-msg"></div>
+        <div class="grid" id="numbersGrid">
+            {% for i in range(1, 51) %}
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <button type="button" onclick="handleAction('cancel', {{ i }})" class="cell my" id="cell_{{ i }}">{{ i }}<br><span style="font-size:9px; color:#93c5fd;">تراجع</span></button>
+                    {% else %}
+                        <div class="cell booked" id="cell_{{ i }}">{{ i }}<br><span style="font-size:8px; color:#fca5a5;">{{ bookings[i] }}</span></div>
+                    {% endif %}
+                {% else %}
+                    <button type="button" onclick="handleAction('book', {{ i }})" class="cell" id="cell_{{ i }}">{{ i }}</button>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <div class="player-info-box">
+            <h4 style="color: #34d399; margin-top: 0; font-size: 14px;">📋 لوحة حجوزاتي</h4>
+            <p style="margin: 4px 0;"><b>أرقامك المحجوزة:</b> <span style="color: #ffd700;">{{ my_nums_str }}</span></p>
+            <p style="margin: 4px 0;"><b>القيمة المخصومة:</b> <span style="color: #38bdf8;">{{ my_total_cost }} USDD</span></p>
+        </div>
+        {% if role == 'admin' or role == 'supervisor' %}
+            <div style="margin-top: 20px; text-align: center;">
+                <button type="button" onclick="triggerDraw()" style="background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; font-weight: 900; padding: 12px 25px; border: none; border-radius: 12px; cursor: pointer; font-size: 16px;">⚡ اسحب الآن لمجموعتك</button>
+            </div>
+        {% endif %}
+    </div>
+    <script>
+        function handleAction(actionType, numberVal) {
+            let fd = new FormData();
+            fd.append('action_type', actionType);
+            fd.append('number', numberVal);
+            fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+                if(data.success) { location.reload(); } else { alert(data.msg || "حدث خطأ!"); }
+            });
+        }
+        function triggerDraw() {
+            let fd = new FormData(); fd.append('action_type', 'admin_draw');
+            fetch('/game_golden_number', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+                if(data.winning_number) { runDrawAnimation(data.winning_number); } else if(data.msg) { alert(data.msg); }
+            });
+        }
+        function runDrawAnimation(winningNum) {
+            let screen = document.getElementById('slotScreen');
+            let ann = document.getElementById('winnerAnnouncement');
+            let counter = 0;
+            let interval = setInterval(() => {
+                screen.innerText = '#' + Math.floor(Math.random() * 50 + 1);
+                counter++;
+                if(counter > 22) {
+                    clearInterval(interval);
+                    screen.innerText = '#' + winningNum;
+                    ann.innerText = `مبروك ربحت 70 usdd للرقم ${winningNum}`;
+                    let winCell = document.getElementById('cell_' + winningNum);
+                    if(winCell) { winCell.className = "cell winner-glow"; }
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 90);
+        }
+    </script>
+</body>
+</html>
+"""
+
+GAME_ROULETTE_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game2 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; margin: 0; box-sizing: border-box; }
+        .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 15px; border-radius: 25px; max-width: 900px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
+        .timer-box { font-size: 16px; font-weight: 900; color: #ffd700; background: #000; padding: 6px 12px; border-radius: 12px; border: 2px solid #38bdf8; margin-bottom: 10px; display: inline-block; }
+        .spin-screen { font-size: 30px; font-weight: 900; color: #ffd700; background: #000; padding: 8px 15px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; margin-bottom: 10px; letter-spacing: 2px; }
+        .total-bet-display { background: rgba(255,215,0,0.15); border: 2px solid #ffd700; padding: 8px 15px; border-radius: 12px; font-weight: 900; color: #ffd700; margin: 8px auto; max-width: 320px; font-size: 15px; box-sizing: border-box; width: 100%; }
+        .roulette-table { display: grid; grid-template-columns: 45px repeat(12, 1fr); grid-template-rows: repeat(3, 45px); gap: 3px; max-width: 100%; overflow-x: auto; margin: 12px auto; background: #065f46; padding: 8px; border-radius: 14px; border: 3px solid #b8860b; box-sizing: border-box; }
+        .r-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; border-radius: 5px; cursor: pointer; color: #fff; font-size: 14px; transition: 0.15s; border: 1px solid rgba(255,255,255,0.2); box-sizing: border-box; }
+        .r-cell.zero { grid-row: span 3; background: #047857; border-color: #ffd700; font-size: 18px; }
+        .r-cell.red { background: #dc2626; }
+        .r-cell.black { background: #111827; }
+        .r-cell.selected { border: 2px solid #ffd700 !important; box-shadow: 0 0 8px #ffd700; }
+        .r-cell.winner-highlight { background: #fbbf24 !important; color: #000 !important; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎰 طاولة روليت الحظ المستقلة</h2>
+        <p style="font-size: 13px; margin: 5px 0;"><b>رصيدك: <span id="rouletteBal">{{ balance }}</span> USDD</b> (الرهان: 1 USDD | الربح: 20 USDD لكل مضاعف)</p>
+        <div><div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div></div>
+        <div><div id="spinScreen" class="spin-screen">--</div></div>
+        <div class="total-bet-display">🎯 إجمالي الرهان الحالي: <span id="currentTotalBet">0</span> USDD</div>
+        <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:8px; font-size: 13px;">اختر أرقامك من الطاولة</div>
+        <div class="roulette-table" id="rouletteTable">
+            <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0"><span>0</span><span id="r_mult_0" style="font-size:8px; color:#ffd700;">0$</span></div>
+            {% set row1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] %}
+            {% set row2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35] %}
+            {% set row3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34] %}
+            {% set red_list = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] %}
+            {% for n in row1 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:8px; color:#ffd700;">0$</span></div>{% endfor %}
+            {% for n in row2 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:8px; color:#ffd700;">0$</span></div>{% endfor %}
+            {% for n in row3 %}{% set is_red = n in red_list %}<div class="r-cell {{ 'red' if is_red else 'black' }}" onclick="toggleNum({{ n }})" id="r_cell_{{ n }}"><span>{{ n }}</span><span id="r_mult_{{ n }}" style="font-size:8px; color:#ffd700;">0$</span></div>{% endfor %}
+        </div>
+    </div>
+    <script>
+        let bets = {}; let timeLeft = 15; let gameActive = true;
+        let timerInterval = setInterval(() => {
+            timeLeft--;
+            let tBox = document.getElementById('timerBox');
+            if(tBox) tBox.innerText = `⏳ وقت الرهان: ${timeLeft} ث`;
+            if(timeLeft <= 0) { clearInterval(timerInterval); gameActive = false; if(tBox) tBox.innerText = `🛑 انتهى وقت الرهان، بدء السحب...`; setTimeout(executeDraw, 2000); }
+        }, 1000);
+        function toggleNum(n) {
+            if(!gameActive) { alert("انتهى وقت الرهان!"); return; }
+            if(!bets[n]) bets[n] = 0;
+            bets[n]++;
+            fetch('/game_roulette_bet', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'add', number:n})})
+            .then(res => res.json()).then(d => {
+                if(d.success) { document.getElementById('rouletteBal').innerText = d.balance; updateUI(); }
+                else { bets[n]--; alert(d.msg || "رصيد غير كافي!"); }
+            });
+        }
+        function updateUI() {
+            let total = 0;
+            for(let i=0; i<=36; i++) {
+                let cell = document.getElementById('r_cell_' + i); let badge = document.getElementById('r_mult_' + i);
+                if(bets[i] && bets[i] > 0) { cell.classList.add('selected'); badge.innerText = `x${bets[i]}`; total += bets[i]; }
+                else { cell.classList.remove('selected'); badge.innerText = `0$`; }
+            }
+            document.getElementById('currentTotalBet').innerText = total;
+        }
+        function executeDraw() {
+            fetch('/game_roulette_draw', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({bets: bets})})
+            .then(res => res.json()).then(data => { if(data.success) { runSpinAnimation(data.winning_number, data.msg, data.balance); } });
+        }
+        function runSpinAnimation(winningNum, finalMsg, newBal) {
+            let screen = document.getElementById('spinScreen'); let msgEl = document.getElementById('rouletteMsg');
+            let counter = 0;
+            let interval = setInterval(() => {
+                screen.innerText = '#' + Math.floor(Math.random() * 37); counter++;
+                if(counter > 25) {
+                    clearInterval(interval); screen.innerText = '#' + winningNum; msgEl.innerText = finalMsg;
+                    document.getElementById('rouletteBal').innerText = newBal;
+                    let winCell = document.getElementById('r_cell_' + winningNum);
+                    if(winCell) { winCell.className = "r-cell winner-highlight"; }
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 80);
+        }
+    </script>
+</body>
+</html>
+"""
+
+GAME_NUMBERS_EMPIRE_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game3 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #0f071f; color: #fff; padding: 10px; text-align: center; box-sizing: border-box; margin:0; }
+        .card { background: linear-gradient(135deg, #1f1035 0%, #110522 100%); border: 4px solid #ffd700; padding: 20px; border-radius: 30px; max-width: 850px; margin: 10px auto; box-shadow: 0 0 40px rgba(255,215,0,0.3); box-sizing: border-box; width: 100%; }
+        .boxes { display: flex; justify-content: center; gap: 12px; margin: 20px 0; flex-wrap: wrap; box-sizing: border-box; }
+        .box { width: 95px; height: 110px; background: linear-gradient(145deg, #581c87, #3b0764); border: 3px solid #ffd700; border-radius: 18px; color: #ffd700; font-size: 17px; font-weight: 900; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+        .box.booked { background: linear-gradient(145deg, #7f1d1d, #450a0a) !important; border-color: #ef4444 !important; }
+        .box.my { background: linear-gradient(145deg, #1e3a8a, #172554) !important; border-color: #60a5fa !important; }
+        .slot-box { font-size: 38px; font-weight: 900; color: #ffd700; background: #000; padding: 12px; border-radius: 15px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; font-size: 20px;">🏛️ إمبراطورية الأرقام الملكية الفاخرة</h2>
+        <p style="font-size:14px; color:#fde047; margin:5px 0;">سعر الحجز: 50 USDD | الجائزة الكبرى: 200 USDD</p>
+        <div style="background:#05030a; padding:15px; border-radius:18px; border:3px solid #ffd700; margin:12px 0;">
+            <div id="empireSlot" class="slot-box">--</div>
+            <div id="empireAnnouncement" style="font-size:15px; color:#34d399; margin-top:8px; font-weight:900;">في انتظار السحب الملكي...</div>
+        </div>
+        <div class="boxes">
+            {% for i in range(1, 6) %}
+                {% if i in bookings %}
+                    {% if bookings[i] == username %}
+                        <button onclick="empAction('cancel', {{ i }})" class="box my" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px;">تراجع</span></button>
+                    {% else %}
+                        <div class="box booked" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:10px;">{{ bookings[i] }}</span></div>
+                    {% endif %}
+                {% else %}
+                    <button onclick="empAction('book', {{ i }})" class="box" id="emp_box_{{ i }}"><span>👑</span><span>رقم {{ i }}</span><span style="font-size:11px; color:#fef08a;">50$</span></button>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% if role == 'admin' or role == 'supervisor' %}
+            <div style="margin-top:20px;">
+                <button onclick="empAction('admin_draw', 0)" style="background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; padding: 12px 25px; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; font-size: 16px;">⚡ بدء السحب الملكي الفوري</button>
+            </div>
+        {% endif %}
+    </div>
+    <script>
+        function empAction(type, box) {
+            let fd = new FormData(); fd.append('action_type', type); fd.append('box_number', box);
+            fetch('/game_numbers_empire', {method:'POST', body:fd}).then(r=>r.json()).then(d=>{
+                if(d.winning_number) {
+                    runEmpireAnimation(d.winning_number, d.msg);
+                } else {
+                    alert(d.msg || "تم التنفيذ!"); location.reload();
+                }
+            });
+        }
+        function runEmpireAnimation(winningNum, finalMsg) {
+            let screen = document.getElementById('empireSlot');
+            let ann = document.getElementById('empireAnnouncement');
+            let counter = 0;
+            let interval = setInterval(() => {
+                let randNum = Math.floor(Math.random() * 5) + 1;
+                screen.innerText = '#' + randNum;
+                counter++;
+                if(counter > 22) {
+                    clearInterval(interval);
+                    screen.innerText = '#' + winningNum;
+                    ann.innerText = finalMsg;
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 75);
+        }
+    </script>
+</body>
+</html>
+"""
+
+GAME_NUMBER_WHEEL_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game4 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing: border-box; margin: 0; }
+        .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 20px; border-radius: 25px; max-width: 750px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
+        .wheel-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px auto; max-width: 440px; box-sizing: border-box; width: 100%; }
+        .wheel-btn { background: #1f2937; border: 2px solid #ffd700; border-radius: 10px; padding: 10px 5px; font-size: 16px; font-weight: 900; color: #fff; cursor: pointer; aspect-ratio: 1; display:flex; align-items:center; justify-content:center; }
+        .wheel-btn.selected { background: #d97706 !important; color: #000 !important; }
+        .spin-screen { font-size: 38px; font-weight: 900; color: #ffd700; background: #000; padding: 10px 15px; border-radius: 12px; border: 3px solid #b8860b; display: inline-block; min-width: 140px; margin: 10px 0; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎡 عجلة الحظ (20 رقم)</h2>
+        <p style="font-size:14px; color:#ffd700; margin:5px 0;">سعر الحجز: 1 USDD | الجائزة: 20 USDD</p>
+        <div><div id="wheelSlot" class="spin-screen">--</div></div>
+        <div id="wheelMsg" style="font-size:14px; font-weight:900; color:#34d399; margin:6px 0;">اختر حتى 10 أرقام وابدأ السحب</div>
+        <div class="wheel-grid">
+            {% for n in range(1, 21) %}
+                <button type="button" id="w_num_{{ n }}" onclick="toggleWheelNum({{ n }})" class="wheel-btn">{{ n }}</button>
+            {% endfor %}
+        </div>
+        <button type="button" onclick="spinWheel()" style="padding: 12px 35px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 16px; border: none; border-radius: 14px; cursor: pointer; margin-top: 15px;">ابدأ السحب 🎡</button>
+    </div>
+    <script>
+        let wheelSelected = [];
+        function toggleWheelNum(n) {
+            let idx = wheelSelected.indexOf(n);
+            if(idx > -1) { wheelSelected.splice(idx, 1); document.getElementById('w_num_' + n).classList.remove('selected'); }
+            else {
+                if(wheelSelected.length >= 10) { alert("حد أقصى 10 أرقام!"); return; }
+                wheelSelected.push(n); document.getElementById('w_num_' + n).classList.add('selected');
+            }
+        }
+        function spinWheel() {
+            if(wheelSelected.length === 0) { alert("اختر رقماً واحداً على الأقل!"); return; }
+            let fd = new FormData(); fd.append('selected_numbers', JSON.stringify(wheelSelected));
+            fetch('/game_number_wheel', {method: 'POST', body: fd}).then(res => res.json()).then(d => {
+                if(d.success) { runWheelAnimation(d.winning_num, d.msg); } else { alert(d.msg || "حدث خطأ!"); }
+            });
+        }
+        function runWheelAnimation(winningNum, finalMsg) {
+            let screen = document.getElementById('wheelSlot'); let msgEl = document.getElementById('wheelMsg');
+            let counter = 0;
+            let interval = setInterval(() => {
+                screen.innerText = '#' + Math.floor(Math.random() * 20 + 1); counter++;
+                if(counter > 20) {
+                    clearInterval(interval); screen.innerText = '#' + winningNum; msgEl.innerText = finalMsg;
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 90);
+        }
+    </script>
+</body>
+</html>
+"""
+
+GAME_REVEAL_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game5 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing: border-box; margin:0; }
+        .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 20px; border-radius: 25px; max-width: 750px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
+        .boxes-grid { display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-wrap: wrap; box-sizing: border-box; }
+        .box-cell { background: linear-gradient(145deg, #7c3aed, #4c1d95); border: 3px solid #ffd700; border-radius: 15px; width: 85px; height: 95px; font-size: 30px; font-weight: 900; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .box-cell.revealed { background: #1e1b4b !important; border-color: #38bdf8 !important; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎟️ لعبة اكشف واربح</h2>
+        <p style="font-size:14px; color:#ffd700; margin:5px 0;">التكلفة: 1 USDD | الجائزة الكبرى: 100 USDD (3 أسود)</p>
+        <div id="revealMsg" style="font-size: 15px; font-weight: 900; color: #34d399; margin: 12px 0;">اضغط ابدأ المحاولة ثم اختر 3 صناديق</div>
+        <div class="boxes-grid">
+            {% for i in range(1, 6) %}
+                <div class="box-cell" id="b_{{ i }}" onclick="clickBox({{ i }})">📦</div>
+            {% endfor %}
+        </div>
+        <button type="button" id="startBtn" onclick="startReveal()" style="padding: 12px 35px; background: linear-gradient(135deg,#ffd700,#ff8c00); color: #000; font-weight: 900; font-size: 16px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px;">ابدأ المحاولة الجديدة (1 USDD) 🎟️</button>
+    </div>
+    <script>
+        let sessionRevealed = []; let clicksCount = 0; let gameActive = false;
+        function startReveal() {
+            fetch('/game_reveal_and_win', {method: 'POST'}).then(res => res.json()).then(d => {
+                if(d.success) {
+                    sessionRevealed = d.revealed; clicksCount = 0; gameActive = true;
+                    document.getElementById('revealMsg').innerText = "اختر 3 صناديق لكشف محتواها الآن!";
+                    document.getElementById('startBtn').style.display = 'none';
+                    for(let i=1; i<=5; i++) { let c = document.getElementById('b_' + i); c.innerText = "📦"; c.classList.remove('revealed'); }
+                } else { alert(d.msg || "رصيد غير كافي!"); }
+            });
+        }
+        function clickBox(boxIdx) {
+            if(!gameActive) { alert("اضغط ابدأ المحاولة الجديدة أولاً!"); return; }
+            let cell = document.getElementById('b_' + boxIdx);
+            if(cell.classList.contains('revealed')) return;
+            if(clicksCount < sessionRevealed.length) {
+                cell.innerText = sessionRevealed[clicksCount]; cell.classList.add('revealed'); clicksCount++;
+                if(clicksCount === sessionRevealed.length) {
+                    gameActive = false;
+                    setTimeout(() => {
+                        fetch('/game_reveal_result_check', {method: 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({revealed: sessionRevealed})})
+                        .then(res => res.json()).then(resData => {
+                            document.getElementById('revealMsg').innerText = resData.msg;
+                            document.getElementById('startBtn').style.display = 'inline-block';
+                        });
+                    }, 400);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+GAME_ARROW_WHEEL_PAGE = """
+<!DOCTYPE html>
+<html lang="{{ lang_key }}" dir="{{ t.dir }}">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.game6 }}</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing: border-box; margin:0; }
+        .card { background: rgba(25,30,48,0.95); border: 3px solid #ffd700; padding: 20px; border-radius: 25px; max-width: 750px; margin: 10px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.8); box-sizing: border-box; width: 100%; }
+        .wheel-container { position: relative; width: 220px; height: 220px; margin: 15px auto; border-radius: 50%; border: 5px solid #ffd700; background: #0f172a; display: flex; align-items: center; justify-content: center; }
+        .arrow-screen { font-size: 22px; font-weight: 900; color: #ffd700; background: #000; padding: 10px 15px; border-radius: 12px; border: 3px solid #38bdf8; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <div class="card">
+        <h2 style="color:#ffd700; margin-top:0; font-size: 20px;">🎯 لعبة رمي السهم المتحركة</h2>
+        <p style="font-size:14px; color:#ffd700; margin:5px 0;">التكلفة: 1 USDD</p>
+        <div class="wheel-container"><div id="arrowScreen" class="arrow-screen">🎯 جاهز للرمي</div></div>
+        <div id="arrowMsg" style="font-size: 15px; font-weight: 900; color: #34d399; margin: 10px 0;">اضغط ارم السهم لبدء المحاولة</div>
+        <button type="button" onclick="throwArrow()" style="padding: 14px 35px; background: linear-gradient(135deg,#22c55e,#15803d); color: #fff; font-weight: 900; font-size: 18px; border: none; border-radius: 14px; cursor: pointer; margin-top: 10px;">🎯 ارم السهم (1 USDD)</button>
+    </div>
+    <script>
+        function throwArrow() {
+            fetch('/game_arrow_wheel', {method: 'POST'}).then(res => res.json()).then(d => {
+                if(d.success) { runArrowAnimation(d.hit_target, d.msg); } else { alert(d.msg || "رصيد غير كافي!"); }
+            });
+        }
+        function runArrowAnimation(hitTarget, finalMsg) {
+            let screen = document.getElementById('arrowScreen'); let msgEl = document.getElementById('arrowMsg');
+            let counter = 0; let pool = ['استرداد 1$', 'دوبل 2$', 'نصف 0.5$', 'حظ أوفر', 'استرداد 1$'];
+            let interval = setInterval(() => {
+                screen.innerText = pool[Math.floor(Math.random() * pool.length)]; counter++;
+                if(counter > 20) {
+                    clearInterval(interval); screen.innerText = hitTarget; msgEl.innerText = finalMsg;
+                    setTimeout(() => { location.reload(); }, 5000);
+                }
+            }, 80);
+        }
+    </script>
+</body>
+</html>
+"""
+
 # --- مسارات التطبيق الكاملة ---
 
 @app.route('/set_lang/<lang>')
@@ -1274,4 +1702,4 @@ def game_reveal_result_check():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
