@@ -114,7 +114,6 @@ class NumbersEmpireBooking(db.Model):
 
 with app.app_context():
     db.create_all()
-    # تحديث وتأمين الأعمدة تلقائياً لمنع أي خطأ 500
     for table, col, col_type in [
         ('player_activities', 'supervisor_name', 'VARCHAR(80) DEFAULT "system"'),
         ('game_future_draws', 'supervisor_scope', 'VARCHAR(80) DEFAULT "global"'),
@@ -278,7 +277,7 @@ def get_unified_math_outcome(game_name, supervisor_scope, player_choices, min_va
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
-# --- قوالب الواجهات الكاملة ذات التصميم الفاخر ---
+# --- قوالب الواجهات والـ 6 ألعاب الكاملة بالتصميم الأصلي الفاخر ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -639,7 +638,7 @@ ADMIN_ACCOUNTING_TEMPLATE = """
     </div>
     <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
         <div class="panel-box" style="border-color: #ffd700;">
-            <h3 style="color: #ffd700; text-align:center; margin-top:0; font-size:16px;">🎟️️ توليد كودات الشحن</h3>
+            <h3 style="color: #ffd700; text-align:center; margin-top:0; font-size:16px;">🎟️ توليد كودات الشحن</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="generate_card">
                 <label>الفئة (USDD):</label>
