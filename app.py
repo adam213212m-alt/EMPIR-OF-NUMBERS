@@ -30,7 +30,7 @@ class User(db.Model):
     password = db.Column(db.String(120), nullable=False)
     balance = db.Column(db.Float, default=0.0)
     role = db.Column(db.String(20), nullable=False, default='user') # 'admin', 'supervisor', 'user'
-    created_by = db.Column(db.String(80), nullable=False, default='system') # اسم المشرف الذي أنشأ اللاعب
+    created_by = db.Column(db.String(80), nullable=False, default='system')
     owner_name = db.Column(db.String(100), default='غير محدد')
 
 class SystemVault(db.Model):
@@ -42,7 +42,7 @@ class FinancialLog(db.Model):
     __tablename__ = 'financial_logs'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     action_type = db.Column(db.String(100))
-    admin_name = db.Column(db.String(80)) # المشرف أو الآدمن المنفذ
+    admin_name = db.Column(db.String(80))
     target_user = db.Column(db.String(80))
     amount = db.Column(db.Float)
     log_time = db.Column(db.String(50))
@@ -55,7 +55,7 @@ class PlayerActivity(db.Model):
     game_name = db.Column(db.String(100), nullable=False)
     bet_details = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Float, default=0.0)
-    outcome = db.Column(db.String(50), nullable=False)
+    outcome = db.Column(db.String(50), nullable=False) # 'ربح' أو 'خسارة'
     winning_number = db.Column(db.String(50), default='---')
     timestamp = db.Column(db.String(50), nullable=False)
 
@@ -71,7 +71,7 @@ class RechargeCard(db.Model):
 class GameFutureDraw(db.Model):
     __tablename__ = 'game_future_draws'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    supervisor_scope = db.Column(db.String(80), nullable=False, default='global') # دعم 10 مشرفين أو عام
+    supervisor_scope = db.Column(db.String(80), nullable=False, default='global')
     game_name = db.Column(db.String(50), nullable=False)
     round_index = db.Column(db.Integer, nullable=False)
     winning_number = db.Column(db.Integer, nullable=False)
@@ -125,6 +125,7 @@ with app.app_context():
         db.session.add(EmpireGlobalState(id=1, last_winning_number=0, draw_timestamp=0.0, last_winner_info='لا يوجد فائز سابق بعد'))
     db.session.commit()
 
+# --- الترجمات الكاملة بـ 6 لغات ---
 TRANSLATIONS = {
     'ar': {
         'dir': 'rtl', 'title': 'امبراطورية الأرقام الملكية', 'subtitle': 'منصة الألعاب التفاعلية الفائقة 12D',
@@ -145,6 +146,46 @@ TRANSLATIONS = {
         'game1': 'The Tender Number', 'game2': 'Lucky Roulette', 'game3': 'Empire of Numbers', 'game4': 'Wheel of Fortune', 'game5': 'Reveal & Win', 'game6': 'Animated Arrow Throw',
         'cost': 'Cost', 'prize': 'Prize', 'book': 'Book', 'cancel': 'Cancel', 'booked': 'Booked',
         'spin': 'Spin Wheel', 'draw_now': 'Draw Now'
+    },
+    'fr': {
+        'dir': 'ltr', 'title': 'Empire Royal des Nombres', 'subtitle': 'Plateforme de Jeux Super Interactive 12D',
+        'login': 'Connexion', 'username': "Nom d'utilisateur", 'password': 'Mot de passe', 'balance': 'Solde',
+        'recharge': 'Recharger', 'withdraw': 'Retirer', 'change_pass': 'Changer le mot de passe', 'logout': 'Déconnexion',
+        'dashboard': 'Tableau de bord', 'back_dash': '🏠 Accueil', 'customers': 'Clients', 'accounting': 'Comptabilité et Coffre',
+        'game_control': '🎮 Contrôle des Jeux', 'chat': '💬 Chat en Direct',
+        'game1': 'Le Numéro Tendre', 'game2': 'Roulette Chanceuse', 'game3': 'Empire des Nombres', 'game4': 'Roue de la Fortune', 'game5': 'Révéler & Gagner', 'game6': 'Lancer de Flèche',
+        'cost': 'Coût', 'prize': 'Prix', 'book': 'Réserver', 'cancel': 'Annuler', 'booked': 'Réservé',
+        'spin': 'Tourner', 'draw_now': 'Tirer'
+    },
+    'de': {
+        'dir': 'ltr', 'title': 'Königliches Imperium der Zahlen', 'subtitle': 'Super Interaktive 12D Gaming Plattform',
+        'login': 'Anmelden', 'username': 'Benutzername', 'password': 'Passwort', 'balance': 'Guthaben',
+        'recharge': 'Aufladen', 'withdraw': 'Auszahlen', 'change_pass': 'Passwort ändern', 'logout': 'Abmelden',
+        'dashboard': 'Dashboard', 'back_dash': '🏠 Startseite', 'customers': 'Kunden', 'accounting': 'Buchhaltung',
+        'game_control': '🎮 Spielkontrolle', 'chat': '💬 Live-Chat',
+        'game1': 'Die Zarte Nummer', 'game2': 'Glücks-Roulette', 'game3': 'Imperium der Zahlen', 'game4': 'Glücksrad', 'game5': 'Aufdecken & Gewinnen', 'game6': 'Pfeilwurf',
+        'cost': 'Kosten', 'prize': 'Gewinn', 'book': 'Buchen', 'cancel': 'Abbrechen', 'booked': 'Gebucht',
+        'spin': 'Drehen', 'draw_now': 'Ziehen'
+    },
+    'es': {
+        'dir': 'ltr', 'title': 'Imperio Real de los Números', 'subtitle': 'Plataforma de Juegos Super Interactiva 12D',
+        'login': 'Iniciar Sesión', 'username': 'Nombre de usuario', 'password': 'Contraseña', 'balance': 'Saldo',
+        'recharge': 'Recargar', 'withdraw': 'Retirar', 'change_pass': 'Cambiar Contraseña', 'logout': 'Cerrar Sesión',
+        'dashboard': 'Panel', 'back_dash': '🏠 Inicio', 'customers': 'Clientes', 'accounting': 'Contabilidad',
+        'game_control': '🎮 Control de Juegos', 'chat': '💬 Chat en Vivo',
+        'game1': 'El Número Tierno', 'game2': 'Ruleta de la Suerte', 'game3': 'Empire of Numbers', 'game4': 'Rueda de la Fortuna', 'game5': 'Revelar y Ganar', 'game6': 'Lanzamiento de Flecha',
+        'cost': 'Costo', 'prize': 'Premio', 'book': 'Reservar', 'cancel': 'Cancelar', 'booked': 'Reservado',
+        'spin': 'Girar', 'draw_now': 'Sorteo'
+    },
+    'fa': {
+        'dir': 'rtl', 'title': 'امپراتوری سلطنتی اعداد', 'subtitle': 'پلتفرم بازی‌های تعاملی فوق‌العاده 12D',
+        'login': 'ورود به برنامه', 'username': 'نام کاربری', 'password': 'رمز عبور', 'balance': 'موجودی',
+        'recharge': 'شارژ حساب', 'withdraw': 'برداشت وجه', 'change_pass': 'تغییر رمز عبور', 'logout': 'خروج',
+        'dashboard': 'داشبورد', 'back_dash': '🏠 صفحه اصلی', 'customers': 'مشتریان', 'accounting': 'حسابداری و خزانه',
+        'game_control': '🎮 کنترل بازی‌ها', 'chat': '💬 پشتیبانی و چت',
+        'game1': 'عدد مهربان', 'game2': 'رولت شانس', 'game3': 'امپراتوری اعداد', 'game4': 'گردونه شانس', 'game5': 'کشف کن و برنده شو', 'game6': 'پرتاب دارت متحرک',
+        'cost': 'هزینه', 'prize': 'جایزه', 'book': 'رزرو', 'cancel': 'لغو', 'booked': 'رزرو شده',
+        'spin': 'چرخش', 'draw_now': 'قرعه‌کشی'
     }
 }
 
@@ -157,17 +198,26 @@ def get_lang_bar():
     curr = session.get('lang', 'ar')
     ar_sel = 'selected' if curr == 'ar' else ''
     en_sel = 'selected' if curr == 'en' else ''
+    fr_sel = 'selected' if curr == 'fr' else ''
+    de_sel = 'selected' if curr == 'de' else ''
+    es_sel = 'selected' if curr == 'es' else ''
+    fa_sel = 'selected' if curr == 'fa' else ''
+
     return f"""
-<div style="padding: 12px 30px; background: rgba(15, 18, 30, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid rgba(255,215,0,0.3); flex-wrap: wrap; gap: 10px; box-sizing: border-box; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+<div style="padding: 10px 25px; background: rgba(18, 18, 25, 0.95); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.2); flex-wrap: wrap; gap: 10px; box-sizing: border-box; width: 100%;">
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
         <select onchange="location.href='/set_lang/' + this.value" style="background:#1a1c29; color:#ffd700; border:1px solid #ffd700; padding:6px 12px; border-radius:8px; font-weight:bold; cursor:pointer;">
             <option value="ar" {ar_sel}>العربية 🇸🇦</option>
             <option value="en" {en_sel}>English 🇬🇧</option>
+            <option value="fr" {fr_sel}>Français 🇫🇷</option>
+            <option value="de" {de_sel}>Deutsch 🇩🇪</option>
+            <option value="es" {es_sel}>Español 🇪🇸</option>
+            <option value="fa" {fa_sel}>فارسی 🇮🇷</option>
         </select>
-        <a href="javascript:location.reload();" title="تحديث الصفحة" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 14px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; display: flex; align-items: center; gap: 5px;">🔄 تحديث</a>
+        <a href="javascript:location.reload();" title="تحديث الصفحة" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color:#ffd700; padding: 6px 12px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; display: flex; align-items: center; gap: 5px;">🔄 تحديث</a>
     </div>
     <div style="display:flex; gap:15px; align-items:center; flex-wrap: wrap;">
-        <div style="background:rgba(6,95,70,0.9); color:#34d399; padding:6px 16px; border-radius:10px; font-weight:900; font-size:14px; border:1px solid #34d399;">الرصيد: <span id="globalLiveBalance">...</span> USDD</div>
+        <div style="background:rgba(6,95,70,0.8); color:#34d399; padding:6px 14px; border-radius:8px; font-weight:900; font-size:14px;">الرصيد: <span id="globalLiveBalance">...</span> USDD</div>
         <a href="/chat" style="color:#38bdf8; text-decoration:none; font-weight:bold; font-size:14px;">💬 الدعم والدردشة</a>
         <a href="/dashboard" style="color:#ffd700; text-decoration:none; font-weight:bold; font-size:14px;">🏠 الرئيسية</a>
     </div>
@@ -215,6 +265,7 @@ def get_unified_math_outcome(game_name, supervisor_scope, player_choices, min_va
             return random.choice(player_choices)
         return random.randint(min_val, max_val)
 
+# --- صفحات الواجهات وتصميم فاخر (Glassmorphic) ---
 LOGIN_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -246,12 +297,6 @@ DASHBOARD_PAGE = """
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: radial-gradient(circle at center, #151928 0%, #070a12 100%); color: #fff; margin: 0; padding: 15px; min-height: 100vh; box-sizing: border-box; }
         .header { display: flex; justify-content: space-between; align-items: center; background: rgba(20, 24, 38, 0.95); padding: 15px 20px; border-radius: 18px; border-bottom: 3px solid #ffd700; flex-wrap: wrap; gap: 15px; box-sizing: border-box; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
         .action-bar { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 20px auto; max-width: 950px; flex-wrap: wrap; background: rgba(20,24,38,0.95); padding: 15px; border-radius: 20px; border: 2px solid rgba(255,215,0,0.4); box-sizing: border-box; width: 100%; }
-        .dropdown { position: relative; display: inline-block; }
-        .drop-btn { background: linear-gradient(135deg, #22c55e, #15803d); color: #fff; padding: 10px 20px; font-weight: 900; border: none; border-radius: 12px; cursor: pointer; font-size: 15px; }
-        .drop-btn.withdraw { background: linear-gradient(135deg, #ef4444, #991b1b); }
-        .dropdown-content { display: none; position: absolute; background: #1a1c29; min-width: 220px; box-shadow: 0px 8px 16px rgba(0,0,0,0.5); z-index: 10; border-radius: 12px; border: 1px solid #ffd700; overflow: hidden; right: 0; }
-        .dropdown-content a { color: #fff; padding: 12px 16px; text-decoration: none; display: block; text-align: right; cursor: pointer; font-size: 14px; }
-        .dropdown-content a:hover { background: #2d3748; color: #ffd700; }
         .redeem-box { display: flex; gap: 8px; align-items: center; background: #0a0d16; padding: 6px 12px; border-radius: 12px; border: 1px solid #ffd700; box-sizing: border-box; }
         .redeem-box input { background: transparent; border: none; color: #fff; padding: 5px; outline: none; font-size: 14px; width: 140px; }
         .redeem-box button { background: #ffd700; color: #000; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 900; cursor: pointer; }
@@ -273,10 +318,12 @@ DASHBOARD_PAGE = """
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             {% if role == 'admin' %}
-                <a href="/admin_supervisors" style="background:#22c55e; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 إدارة المشرفين والتقارير</a>
+                <a href="/admin_supervisors" style="background:#22c55e; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">👥 إدارة المشرفين والصناديق</a>
                 <a href="/admin_game_control" style="background:#38bdf8; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">🎮 لوحة تحكم الألعاب (10 قنوات)</a>
+                <a href="/admin_accounting" style="background:#ffd700; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 الخزنة والكودات</a>
+                <a href="/admin_chats" style="background:#a78bfa; color:#000; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">💬 الدعم والدردشة</a>
             {% elif role == 'supervisor' %}
-                <a href="/supervisor_dashboard" style="background:#22c55e; color:#000; padding:8px 14px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 لوحة تحكم مجموعتك وصندوقك</a>
+                <a href="/supervisor_dashboard" style="background:#22c55e; color:#000; padding:8px 14px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">📊 صندوقي وتقارير اللاعبين</a>
             {% endif %}
             <a href="/logout" style="background:#ef4444; color:#fff; padding:8px 12px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">{{ t.logout }}</a>
         </div>
@@ -299,7 +346,7 @@ DASHBOARD_PAGE = """
     <div class="icons-grid">
         <a href="/game_golden_number" class="icon-card"><div class="icon-logo">🏆</div><div class="icon-title">{{ t.game1 }}</div></a>
         <a href="/game_roulette" class="icon-card"><div class="icon-logo">🎰</div><div class="icon-title">{{ t.game2 }}</div></a>
-        <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️</div><div class="icon-title">{{ t.game3 }}</div></a>
+        <a href="/game_numbers_empire" class="icon-card"><div class="icon-logo">🏛️️</div><div class="icon-title">{{ t.game3 }}</div></a>
         <a href="/game_number_wheel" class="icon-card"><div class="icon-logo">🎡</div><div class="icon-title">{{ t.game4 }}</div></a>
         <a href="/game_reveal_and_win" class="icon-card"><div class="icon-logo">🎟️</div><div class="icon-title">{{ t.game5 }}</div></a>
         <a href="/game_arrow_wheel" class="icon-card"><div class="icon-logo">🎯</div><div class="icon-title">{{ t.game6 }}</div></a>
@@ -308,7 +355,7 @@ DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لوحة تحكم المشرف المستقل (صندوقه الخاص + لاعبيه + تقاريره) ---
+# --- لوحة تحكم المشرف المستقل الكاملة (صندوقه + لاعبيه + تقارير بفلتر) ---
 SUPERVISOR_DASHBOARD_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -317,7 +364,7 @@ SUPERVISOR_DASHBOARD_PAGE = """
     <title>لوحة مجموعة المشرف المستقل - 12D</title>
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; margin:0; }
-        .box { background: rgba(25,30,48,0.95); padding: 20px; border-radius: 18px; max-width: 800px; margin: 15px auto; border: 2px solid #ffd700; text-align: right; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+        .box { background: rgba(25,30,48,0.95); padding: 20px; border-radius: 18px; max-width: 900px; margin: 15px auto; border: 2px solid #ffd700; text-align: right; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
         input, select { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; background: #0a0d16; color: #fff; border: 1px solid #444; box-sizing: border-box; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
         th, td { border: 1px solid #444; padding: 8px; text-align: center; }
@@ -335,7 +382,7 @@ SUPERVISOR_DASHBOARD_PAGE = """
 
     <div class="grid-panels">
         <!-- إنشاء لاعب -->
-        <div class="box" style="flex: 1; min-width: 320px;">
+        <div class="box" style="flex: 1; min-width: 320px; margin:0;">
             <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء حساب لاعب جديد لمجموعتك</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="create_player">
@@ -343,14 +390,14 @@ SUPERVISOR_DASHBOARD_PAGE = """
                 <input type="text" name="username" required placeholder="اسم اللاعب...">
                 <label>كلمة المرور:</label>
                 <input type="password" name="password" required placeholder="كلمة المرور...">
-                <label>الرصيد الابتدائي:</label>
+                <label>الرصيد الابتدائي (يخصم من صندوقك):</label>
                 <input type="number" name="balance" min="0" value="0" step="0.5" required>
                 <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:12px; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:10px;">إنشاء اللاعب فوراً</button>
             </form>
         </div>
 
         <!-- بيع وشراء رصيد من صندوق المشرف -->
-        <div class="box" style="flex: 1; min-width: 320px; border-color:#38bdf8;">
+        <div class="box" style="flex: 1; min-width: 320px; border-color:#38bdf8; margin:0;">
             <h3 style="color:#38bdf8; margin-top:0; font-size:17px; text-align:center;">💳 بيع أو سحب رصيد من صندوقك</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="transfer_balance">
@@ -374,19 +421,21 @@ SUPERVISOR_DASHBOARD_PAGE = """
     </div>
 
     <!-- قائمة اللاعبين التابعين للمشرف -->
-    <div class="box" style="max-width: 950px;">
+    <div class="box" style="margin-top: 15px;">
         <h3 style="color:#ffd700; font-size:17px; text-align:center;">📋 لاعبو مجموعتك الخاصة وكلمات مرورهم</h3>
         <table>
-            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>الرصيد الحالي</th><th>تاريخ الإنشاء</th></tr>
+            <tr><th>اسم المستخدم</th><th>كلمة المرور</th><th>الرصيد الحالي</th><th>أُنشئ بواسطة</th></tr>
             {% for p in players %}
             <tr><td><b>{{ p.username }}</b></td><td style="color:#38bdf8; font-family:monospace;">{{ p.password }}</td><td style="color:#34d399;">{{ p.balance }} USDD</td><td>{{ p.created_by }}</td></tr>
+            {% else %}
+            <tr><td colspan="4" style="color:#aaa;">لا يوجد لاعبون مسجلون في مجموعتك بعد</td></tr>
             {% endfor %}
         </table>
     </div>
 
     <!-- تقارير وحركات لاعبي المجموعة مع فلتر -->
-    <div class="box" style="max-width: 950px; border-color:#a78bfa;">
-        <h3 style="color:#a78bfa; font-size:17px; text-align:center;">📊 تقارير وحركات لاعبي مجموعتك</h3>
+    <div class="box" style="border-color:#a78bfa;">
+        <h3 style="color:#a78bfa; font-size:17px; text-align:center;">📊 تقارير وحركات لاعبي مجموعتك (محاسبة مفصلة)</h3>
         <form method="GET" style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:15px;">
             <label style="font-weight:bold;">فلترة حسب اللاعب:</label>
             <select name="player_filter" onchange="this.form.submit()" style="min-width:200px;">
@@ -412,6 +461,8 @@ SUPERVISOR_DASHBOARD_PAGE = """
                     <td><span style="padding:3px 8px; border-radius:5px; background:{% if log.outcome == 'ربح' %}rgba(34,197,94,0.3){% else %}rgba(239,68,68,0.3){% endif %};">{{ log.outcome }}</span></td>
                     <td style="font-size:11px; color:#aaa;">{{ log.timestamp }}</td>
                 </tr>
+                {% else %}
+                <tr><td colspan="7" style="color:#aaa;">لا توجد حركات مسجلة بعد</td></tr>
                 {% endfor %}
             </table>
         </div>
@@ -420,13 +471,13 @@ SUPERVISOR_DASHBOARD_PAGE = """
 </html>
 """
 
-# --- لوحة الآدمن الخاصة بالمشرفين وإدارة 10 قنوات تحكم ---
+# --- لوحة الآدمن للإشراف على الصناديق واللاعبين والكلمات السرية ---
 ADMIN_SUPERVISORS_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة المشرفين والتقارير الشاملة - الآدمن</title>
+    <title>إدارة المشرفين والصناديق - الآدمن</title>
     <style>
         body { font-family: Tahoma; background: #151928; color: #fff; padding: 15px; text-align: center; box-sizing: border-box; margin:0; }
         .box { background: rgba(25,30,48,0.95); padding: 20px; border-radius: 18px; max-width: 950px; margin: 15px auto; border: 2px solid #ffd700; text-align: right; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
@@ -438,14 +489,14 @@ ADMIN_SUPERVISORS_PAGE = """
 </head>
 <body>
     {{ lang_bar | safe }}
-    <h2 style="color:#ffd700; font-size:22px;">👥 إدارة المشرفين المستقلين وأرصدتهم</h2>
+    <h2 style="color:#ffd700; font-size:22px;">👥 إدارة المشرفين المستقلين وأرصدة صناديقهم</h2>
     <div style="font-size:18px; font-weight:bold; color:#34d399; margin:10px 0;">🏦 الخزنة المركزية العامة: {{ vault_balance }} USDD</div>
     <a href="/dashboard" style="background:#38bdf8; color:#000; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900; font-size:13px;">الرئيسية</a>
 
     {% if msg %}<div style="background:#065f46; color:#34d399; padding:10px; border-radius:10px; margin:15px auto; max-width:600px; font-weight:bold; font-size:14px;">{{ msg }}</div>{% endif %}
 
     <div class="box">
-        <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء مشرف جديد (مجموعة مستقلة)</h3>
+        <h3 style="color:#ffd700; margin-top:0; font-size:17px; text-align:center;">➕ إنشاء مشرف جديد (صندوق مستقل)</h3>
         <form method="POST">
             <input type="hidden" name="action" value="create_supervisor">
             <label>اسم المستخدم للمشرف:</label>
@@ -475,11 +526,11 @@ ADMIN_SUPERVISORS_PAGE = """
         </form>
     </div>
 
-    <!-- جدول المشرفين ولاعبيهم وتفاصيلهم الكاملة -->
+    <!-- جدول المشرفين ولاعبيهم وتفاصيلهم الكاملة وكلمات المرور -->
     <div class="box" style="border-color:#a78bfa;">
         <h3 style="color:#a78bfa; font-size:17px; text-align:center;">📋 تفاصيل المشرفين، صناديقهم، ولاعبيهم وأرصدتهم</h3>
         <table>
-            <tr><th>المشرف / المحل</th><th>رصيد صندوقه</th><th>اللاعبون التابعون له</th><th>أرصدة وكلمات مرور لاعبيه</th></tr>
+            <tr><th>المشرف / المحل</th><th>رصيد صندوقه</th><th>عدد اللاعبين</th><th>أرصدة وكلمات مرور لاعبي كل مشرف</th></tr>
             {% for s in supervisors %}
             <tr>
                 <td><b>{{ s.username }}</b><br><span style="font-size:11px; color:#aaa;">{{ s.owner_name }}</span></td>
@@ -500,7 +551,7 @@ ADMIN_SUPERVISORS_PAGE = """
 </html>
 """
 
-# --- غرفة إدارة الألعاب لـ 10 مشرفين ---
+# --- غرفة إدارة الألعاب لـ 10 قنوات مشرفين وعام ---
 ADMIN_GAME_CONTROL_PAGE = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -554,9 +605,151 @@ ADMIN_GAME_CONTROL_PAGE = """
 </html>
 """
 
-# Include all 6 game templates exactly as before (GAME_GOLDEN_PAGE, GAME_ROULETTE_PAGE, GAME_NUMBERS_EMPIRE_PAGE, GAME_NUMBER_WHEEL_PAGE, GAME_REVEAL_PAGE, GAME_ARROW_WHEEL_PAGE, CHAT_PAGE, ADMIN_CHATS_PAGE)
-# To keep the script self-contained and fully working, we include them below:
+# --- بقية الصفحات الكلاسيكية (المحاسبة، كودات الشحن، الدردشة، والألعاب الست الكاملة) ---
+ADMIN_ACCOUNTING_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>برنامج المحاسبة - 12D</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #f8fafc; padding: 15px; text-align: center; box-sizing: border-box; margin:0; }
+        .panel-box { background: rgba(25,30,48,0.95); padding: 18px; border-radius: 16px; max-width: 380px; margin: 10px auto; border: 2px solid #ffd700; text-align: right; box-sizing: border-box; width:100%; }
+        input, select { width: 100%; padding: 10px; margin: 6px 0; border-radius: 10px; background: #0a0d16; color: white; border: 1px solid #444; box-sizing: border-box; font-size:14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
+        th { background: #0a0d16; color: #ffd700; }
+        .stats-grid { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 15px 0; box-sizing: border-box; }
+        .stat-card { background: rgba(24,34,50,0.9); border: 2px solid #38bdf8; padding: 15px; border-radius: 14px; flex: 1; min-width: 180px; text-align: center; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2 style="font-size:20px;">📊 برنامج المحاسبة والخزنة المركزية وكودات الشحن</h2>
+    {% if msg %}<div style="background: #065f46; color: #34d399; padding: 12px; border-radius: 12px; margin: 15px auto; max-width: 500px; font-weight: 900; font-size:14px;">{{ msg }}</div>{% endif %}
+    <div style="font-size: 24px; font-weight: 900; color: #34d399; margin: 12px 0;">🏦 الخزنة المركزية العامة: {{ vault_balance }} USDD</div>
+    <div class="stats-grid" style="max-width: 1000px; margin: 15px auto;">
+        <div class="stat-card" style="border-color: #ffd700;"><h4 style="color:#ffd700; margin:0; font-size:14px;">💳 كودات مشحونة</h4><div style="font-size:20px; font-weight:bold; margin-top:8px;">{{ total_points_sold }} USDD</div></div>
+        <div class="stat-card" style="border-color: #38bdf8;"><h4 style="color:#38bdf8; margin:0; font-size:14px;">📥 الواردات (الرهانات)</h4><div style="font-size:20px; font-weight:bold; margin-top:8px;">{{ total_game_bets }} USDD</div></div>
+        <div class="stat-card" style="border-color: #ef4444;"><h4 style="color:#ef4444; margin:0; font-size:14px;">🎁 الجوائز المدفوعة</h4><div style="font-size:20px; font-weight:bold; margin-top:8px;">{{ total_payouts }} USDD</div></div>
+        <div class="stat-card" style="border-color: #34d399;"><h4 style="color:#34d399; margin:0; font-size:14px;">📈 صافي الأرباح</h4><div style="font-size:20px; font-weight:bold; margin-top:8px; color:#34d399;">{{ net_game_result }} USDD</div></div>
+    </div>
+    <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+        <div class="panel-box" style="border-color: #ffd700;">
+            <h3 style="color: #ffd700; text-align:center; margin-top:0; font-size:16px;">🎟️ توليد كودات الشحن</h3>
+            <form method="POST">
+                <input type="hidden" name="action" value="generate_card">
+                <label>الفئة (USDD):</label>
+                <select name="card_amount" required>
+                    <option value="100">100 USDD</option>
+                    <option value="200">200 USDD</option>
+                    <option value="300">300 USDD</option>
+                    <option value="500">500 USDD</option>
+                    <option value="1000">1000 USDD</option>
+                </select>
+                <button type="submit" style="background:#ffd700; color:#000; padding:10px; font-weight:900; border:none; border-radius:8px; width:100%; cursor:pointer; margin-top:18px;">توليد الكود</button>
+            </form>
+        </div>
+    </div>
+    <div style="background: rgba(25,30,48,0.95); padding: 20px; border-radius: 20px; max-width: 900px; margin: 20px auto; overflow-x:auto; box-sizing:border-box;">
+        <h3 style="color: #ffd700; font-size:17px;">🎫 كودات الشحن المتاحة والمستخدمة</h3>
+        <table>
+            <tr><th>الكود</th><th>الفئة</th><th>الحالة</th><th>استخدمه</th><th>وقت الإنشاء</th></tr>
+            {% for c in cards %}
+            <tr><td style="color:#38bdf8; font-family:monospace;"><b>{{ c.code }}</b></td><td>{{ c.amount }}</td><td>{{ 'مستخدم ❌' if c.is_used else 'متاح ✅' }}</td><td>{{ c.used_by if c.used_by else '---' }}</td><td>{{ c.created_at }}</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
+"""
 
+CHAT_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>الدردشة الفورية والدعم</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing:border-box; margin:0; }
+        .chat-box { background: rgba(25,30,48,0.95); border: 2px solid #ffd700; border-radius: 20px; max-width: 650px; margin: 15px auto; padding: 15px; text-align: right; box-sizing:border-box; width:100%; }
+        .messages-area { height: 320px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 12px; overflow-y: scroll; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing:border-box; }
+        .msg { padding: 8px 12px; border-radius: 10px; max-width: 85%; font-size: 14px; box-sizing:border-box; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2 style="font-size:20px;">💬 غرفة الدردشة والدعم الفني الفوري</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+    <div class="chat-box">
+        <div class="messages-area" id="msgArea">
+            {% for m in messages %}
+            <div class="msg" style="background:{% if m.sender == username %}#1e3a8a; align-self:flex-start;{% else %}#065f46; align-self:flex-end;{% endif %}">
+                <b>{{ m.sender }}:</b><br><span>{{ m.message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <form method="POST" style="display:flex; gap:8px;">
+            <input type="text" name="message" required placeholder="اكتب استفسارك..." style="flex:1; padding:10px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px;">
+            <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:10px 20px; border:none; border-radius:8px; cursor:pointer;">إرسال</button>
+        </form>
+    </div>
+    <script>let area = document.getElementById('msgArea'); area.scrollTop = area.scrollHeight;</script>
+</body>
+</html>
+"""
+
+ADMIN_CHATS_PAGE = """
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>إدارة الدردشات السرية</title>
+    <style>
+        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing:border-box; margin:0; }
+        .chat-container { display: flex; max-width: 1000px; margin: 15px auto; background: rgba(25,30,48,0.95); border-radius: 20px; border: 2px solid #ffd700; overflow: hidden; flex-wrap: wrap; box-sizing:border-box; }
+        .users-list { width: 30%; min-width: 150px; background: #0a0d16; border-left: 1px solid #444; padding: 12px; text-align: right; box-sizing:border-box; }
+        .user-link { display: block; padding: 10px; color: #ffd700; text-decoration: none; border-bottom: 1px solid #222; font-weight: bold; border-radius: 8px; margin-bottom: 4px; background: #141824; font-size: 13px; }
+        .user-link.active { background: #3b82f6; color: #fff; }
+        .chat-window { width: 70%; padding: 15px; text-align: right; display: flex; flex-direction: column; box-sizing:border-box; }
+        .messages-area { height: 320px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 12px; overflow-y: scroll; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing:border-box; }
+        .msg { padding: 8px 12px; border-radius: 10px; max-width: 80%; font-size: 14px; box-sizing:border-box; }
+    </style>
+</head>
+<body>
+    {{ lang_bar | safe }}
+    <h2 style="font-size:20px;">💬 لوحة إدارة ومتابعة دردشات اللاعبين والمشرفين</h2>
+    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
+    <div class="chat-container">
+        <div class="users-list">
+            <h4 style="color:#ffd700; margin-top:0; font-size:14px;">المتحدثون</h4>
+            {% for u in chatting_users %}
+            <a href="/admin_chats?user={{ u }}" class="user-link {% if active_user == u %}active{% endif %}">👤 {{ u }}</a>
+            {% endfor %}
+        </div>
+        <div class="chat-window">
+            {% if active_user %}
+            <h4 style="color:#38bdf8; margin-top:0; font-size:15px;">محادثة مع: {{ active_user }}</h4>
+            <div class="messages-area" id="adminMsgArea">
+                {% for m in messages %}
+                <div class="msg" style="background:{% if m.sender == 'admin1' %}#1e3a8a; align-self:flex-start;{% else %}#065f46; align-self:flex-end;{% endif %}">
+                    <b>{{ m.sender }}:</b><br><span>{{ m.message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <form method="POST" style="display:flex; gap:8px;">
+                <input type="hidden" name="recipient" value="{{ active_user }}">
+                <input type="text" name="message" required placeholder="اكتب ردك..." style="flex:1; padding:10px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px;">
+                <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:0 18px; border:none; border-radius:8px; cursor:pointer;">إرسال</button>
+            </form>
+            {% else %}
+            <p style="color:#aaa; text-align:center; margin-top:120px;">اختر مستخدماً من القائمة لعرض المحادثة.</p>
+            {% endif %}
+        </div>
+    </div>
+    <script>let area = document.getElementById('adminMsgArea'); if(area) area.scrollTop = area.scrollHeight;</script>
+</body>
+</html>
+"""
+
+# الـ 6 ألعاب الكاملة بالتصميم الفاخر
 GAME_GOLDEN_PAGE = """
 <!DOCTYPE html>
 <html lang="{{ lang_key }}" dir="{{ t.dir }}">
@@ -668,9 +861,6 @@ GAME_ROULETTE_PAGE = """
         .r-cell.red { background: #dc2626; }
         .r-cell.black { background: #111827; }
         .r-cell.selected { border: 2px solid #ffd700 !important; box-shadow: 0 0 8px #ffd700; }
-        .r-cell.winner-highlight { background: #fbbf24 !important; color: #000 !important; border: 2px solid #fff !important; }
-        .controls-grid { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; box-sizing: border-box; }
-        .btn-ctrl { padding: 8px 10px; font-weight: 900; border-radius: 8px; border: none; cursor: pointer; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -681,8 +871,6 @@ GAME_ROULETTE_PAGE = """
         <div><div id="timerBox" class="timer-box">⏳ وقت الرهان المتبقي: 15 ث</div></div>
         <div><div id="spinScreen" class="spin-screen">--</div></div>
         <div class="total-bet-display">🎯 إجمالي الرهان الحالي: <span id="currentTotalBet">0</span> USDD</div>
-        <div id="rouletteMsg" style="font-weight:900; color:#34d399; margin-bottom:8px; font-size: 13px;">اختر أرقامك من الطاولة</div>
-        
         <div class="roulette-table" id="rouletteTable">
             <div class="r-cell zero" onclick="toggleNum(0)" id="r_cell_0"><span>0</span><span id="r_mult_0" style="font-size:8px; color:#ffd700;">0$</span></div>
             {% set row1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36] %}
@@ -903,41 +1091,7 @@ GAME_ARROW_WHEEL_PAGE = """
 </html>
 """
 
-CHAT_PAGE = """
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>الدردشة الفورية والدعم</title>
-    <style>
-        body { font-family: Tahoma; background: #151928; color: #fff; padding: 10px; text-align: center; box-sizing:border-box; margin:0; }
-        .chat-box { background: rgba(25,30,48,0.95); border: 2px solid #ffd700; border-radius: 20px; max-width: 650px; margin: 15px auto; padding: 15px; text-align: right; box-sizing:border-box; width:100%; }
-        .messages-area { height: 320px; background: #0a0d16; border: 1px solid #444; border-radius: 12px; padding: 12px; overflow-y: scroll; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing:border-box; }
-        .msg { padding: 8px 12px; border-radius: 10px; max-width: 85%; font-size: 14px; box-sizing:border-box; }
-    </style>
-</head>
-<body>
-    {{ lang_bar | safe }}
-    <h2 style="font-size:20px;">💬 غرفة الدردشة والدعم الفني الفوري</h2>
-    <a href="/dashboard" style="background:#3b82f6; color:#fff; padding:8px 16px; text-decoration:none; border-radius:10px; font-weight:900;">الرئيسية</a>
-    <div class="chat-box">
-        <div class="messages-area" id="msgArea">
-            {% for m in messages %}
-            <div class="msg" style="background:{% if m.sender == username %}#1e3a8a; align-self:flex-start;{% else %}#065f46; align-self:flex-end;{% endif %}">
-                <b>{{ m.sender }}:</b><br><span>{{ m.message }}</span>
-            </div>
-            {% endfor %}
-        </div>
-        <form method="POST" style="display:flex; gap:8px;">
-            <input type="text" name="message" required placeholder="اكتب استفسارك..." style="flex:1; padding:10px; background:#0a0d16; color:#fff; border:1px solid #444; border-radius:8px;">
-            <button type="submit" style="background:#22c55e; color:#000; font-weight:900; padding:10px 20px; border:none; border-radius:8px; cursor:pointer;">إرسال</button>
-        </form>
-    </div>
-    <script>let area = document.getElementById('msgArea'); area.scrollTop = area.scrollHeight;</script>
-</body>
-</html>
-"""
-
-# --- Routes وأكواد التشغيل الأساسية ---
+# --- مسارات الأرجوحة والبرمجيات في Flask ---
 
 @app.route('/set_lang/<lang>')
 def set_lang(lang):
@@ -1009,7 +1163,7 @@ def dashboard():
                 msg = "⚠️ الكود غير صالح أو مستخدم مسبقاً!"
     return render_template_string(DASHBOARD_PAGE, t=t, lang_key=lang_key, lang_bar=get_lang_bar(), username=user.username, role=user.role, balance=user.balance, msg=msg)
 
-# --- لوحة تحكم المشرف المستقل ---
+# --- لوحة تحكم المشرف المستقل الكاملة ---
 @app.route('/supervisor_dashboard', methods=['GET', 'POST'])
 def supervisor_dashboard():
     if 'username' not in session or session.get('role') != 'supervisor': return redirect(url_for('dashboard'))
@@ -1069,7 +1223,7 @@ def supervisor_dashboard():
 
     return render_template_string(SUPERVISOR_DASHBOARD_PAGE, lang_bar=get_lang_bar(), supervisor=supervisor, players=players, logs=logs, selected_player=selected_player, msg=msg)
 
-# --- إدارة الآدمن للمشرفين ---
+# --- إدارة الآدمن للصناديق والمشرفين ---
 @app.route('/admin_supervisors', methods=['GET', 'POST'])
 def admin_supervisors():
     if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
@@ -1114,7 +1268,7 @@ def admin_supervisors():
         })
     return render_template_string(ADMIN_SUPERVISORS_PAGE, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, supervisors=sup_data, msg=msg)
 
-# --- إدارة الألعاب لـ 10 مشرفين وعام ---
+# --- إدارة الألعاب لـ 10 قنوات وعام ---
 @app.route('/admin_game_control', methods=['GET', 'POST'])
 def admin_game_control():
     if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
@@ -1134,7 +1288,64 @@ def admin_game_control():
     supervisors = User.query.filter_by(role='supervisor').all()
     return render_template_string(ADMIN_GAME_CONTROL_PAGE, lang_bar=get_lang_bar(), supervisors=supervisors, msg=msg)
 
-# --- مسارات الألعاب الأساسية مع ربط المشرفين ---
+@app.route('/admin_accounting', methods=['GET', 'POST'])
+def admin_accounting():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    vault = SystemVault.query.get(1)
+    msg = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'generate_card':
+            amount = float(request.form.get('card_amount', 100))
+            code_str = 'EMP-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8)) + f'-{int(amount)}'
+            db.session.add(RechargeCard(code=code_str, amount=amount, is_used=False, created_at=get_local_time()))
+            db.session.commit()
+            msg = f"تم توليد الكود: {code_str}"
+    cards = RechargeCard.query.order_by(RechargeCard.id.desc()).all()
+    tp_sold = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type == 'شحن عبر بطاقة كود').scalar() or 0.0
+    tg_bets = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%مبيع رهان%')).scalar() or 0.0
+    tpayouts = db.session.query(db.func.sum(FinancialLog.amount)).filter(FinancialLog.action_type.like('%جائزة%')).scalar() or 0.0
+    net = tg_bets - tpayouts
+    return render_template_string(ADMIN_ACCOUNTING_TEMPLATE, lang_bar=get_lang_bar(), vault_balance=vault.vault_balance if vault else 0.0, cards=cards, total_points_sold=tp_sold, total_game_bets=tg_bets, total_payouts=tpayouts, net_game_result=net, msg=msg)
+
+@app.route('/chat', methods=['GET', 'POST'])
+def chat():
+    if 'username' not in session: return redirect(url_for('login'))
+    username = session['username']
+    if request.method == 'POST':
+        message = request.form.get('message', '').strip()
+        if message:
+            db.session.add(ChatMessage(sender=username, recipient='admin1', message=message, timestamp=get_local_time()))
+            db.session.commit()
+            return redirect(url_for('chat'))
+    messages = ChatMessage.query.filter(
+        ((ChatMessage.sender == username) & (ChatMessage.recipient == 'admin1')) |
+        ((ChatMessage.sender == 'admin1') & (ChatMessage.recipient == username))
+    ).order_by(ChatMessage.id.asc()).all()
+    return render_template_string(CHAT_PAGE, lang_bar=get_lang_bar(), username=username, messages=messages)
+
+@app.route('/admin_chats', methods=['GET', 'POST'])
+def admin_chats():
+    if 'username' not in session or session.get('username') != 'admin1': return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        recipient = request.form.get('recipient')
+        message = request.form.get('message', '').strip()
+        if recipient and message:
+            db.session.add(ChatMessage(sender='admin1', recipient=recipient, message=message, timestamp=get_local_time()))
+            db.session.commit()
+            return redirect(url_for('admin_chats', user=recipient))
+    active_user = request.args.get('user')
+    chatting_users = db.session.query(ChatMessage.sender).filter(ChatMessage.sender != 'admin1').distinct().all()
+    chatting_users = [u[0] for u in chatting_users]
+    messages = []
+    if active_user:
+        messages = ChatMessage.query.filter(
+            ((ChatMessage.sender == active_user) & (ChatMessage.recipient == 'admin1')) |
+            ((ChatMessage.sender == 'admin1') & (ChatMessage.recipient == active_user))
+        ).order_by(ChatMessage.id.asc()).all()
+    return render_template_string(ADMIN_CHATS_PAGE, lang_bar=get_lang_bar(), chatting_users=chatting_users, active_user=active_user, messages=messages)
+
+# --- مسارات الألعاب الست مع عزل المشرفين ---
 @app.route('/game_golden_number', methods=['GET', 'POST'])
 def game_golden_number():
     if 'username' not in session: return redirect(url_for('login'))
@@ -1313,19 +1524,6 @@ def game_reveal_result_check():
     user.balance += 0.5
     db.session.commit()
     return jsonify({"success": True, "msg": "تم استرداد 0.5 USDD"})
-
-@app.route('/chat', methods=['GET', 'POST'])
-def chat():
-    if 'username' not in session: return redirect(url_for('login'))
-    username = session['username']
-    if request.method == 'POST':
-        msg = request.form.get('message', '').strip()
-        if msg:
-            db.session.add(ChatMessage(sender=username, recipient='admin1', message=msg, timestamp=get_local_time()))
-            db.session.commit()
-            return redirect(url_for('chat'))
-    messages = ChatMessage.query.filter((ChatMessage.sender == username) | (ChatMessage.recipient == username)).all()
-    return render_template_string(CHAT_PAGE, lang_bar=get_lang_bar(), username=username, messages=messages)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
